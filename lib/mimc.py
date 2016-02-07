@@ -30,8 +30,9 @@ class MIMCData(object):
     def calcVl(self):
         return self.psums[:, 1] / self.M - (self.calcEl())**2
 
-    def calcEl(self, moment=0):
-        return self.psums[:, moment] / self.M
+    def calcEl(self, moment=1):
+        assert(moment>0)
+        return self.psums[:, moment-1] / self.M
 
     def calcTl(self):
         return self.t / self.M
@@ -117,11 +118,11 @@ supported with a given hierarchy")
 supported in one dimensional problem")
 
         if self.params.bayesian:
-            self.Q = MyDefaultDict(QS=0, QW=0, w=self.params.w,
+            self.Q = MyDefaultDict(S=0, W=0, w=self.params.w,
                                    s=self.params.s)
 
     def calcTotalWork(self):
-        return np.sum(self.fnWorkModel(self) * self.data.M)
+        return np.sum(self.fnWorkModel(self, self.lvls) * self.data.M)
 
     def estimateStatError(self):
         return self.params.Ca * \
@@ -148,22 +149,12 @@ supported in one dimensional problem")
                 100 * np.sqrt(V[i]) / np.abs(E[i])))
         return output
 
-    def estimateVl(self):
+    def _estimateVl(self):
         if not self.params.baeysian:
             return self.data.calcVl()
-        hl = self.params.fnHierarchy(self, self.L)
-        M = self.all_data[1:].M
-        m1 = self.all_data[1:].calcEl()
-        m2 = self.all_data[1:].calcEl(moment=2)
-        mu = hl[1:]**self.params.w - hl[:-1]**self.params.w
-        Lambda = (hl[1:]**(self.params.s/2.) - hl[:-1]**(self.params.s/2.))**2
-        G_3 = self.params.kappa1 * Lambda + M
-        G_4 = self.params.kappa1 + \
-              0.5*M*(m2-m1**2 + self.kappa0 * (m1 - mu)**2 /
-                     (self.kappa0 + M))
+        return self._estimateBaysianVl()
 
-        return np.concatenate(self.data[0].calcVl(), G_4 / G_3)
-
+    ################## Bayesian specific functions
     def estimateBias(self):
         if not self.params.baeysian:
             bnd = is_boundary(self.data.dim, self.lvls)
@@ -173,22 +164,68 @@ supported in one dimensional problem")
             if self.params.absBnd:
                 return np.abs(np.sum(np.abs(bnd_val)))
             return np.abs(np.sum(bnd_val))
-        # TODO: Implement bayesian estimation of bias
-        raise NotImplemented("TODO")
+        return _estimateBayesianBias(self)
 
-    def estimateParams(self):
+    def _estimateBayesianBias(self, L=None):
+        L = L or 1+len(self.all_data.lvls)
+        hl = self.params.fnHierarchy(self, np.arange(0,L+1).reshape((-1,1)))
+        return np.abs(self.Q.W) * hl[-1]**self.Q.w
+
+    def _estimateBayesianVl(self, L=None):
+        L = L or 1+len(self.all_data.lvls)
+        # TODO: need to correct this code for larger L values
+        hl = self.params.fnHierarchy(self, np.arange(0,L+1).reshape((-1,1)))
+        M = self.all_data[1:].M
+        m1 = self.all_data[1:].calcEl()
+        m2 = self.all_data[1:].calcEl(moment=2)
+        mu = self.Q.W*(hl[1:]**self.Q.w - hl[:-1]**self.Q.w)
+        Lambda = 1./(self.Q.S*(hl[1:]**(self.Q.s/2.) - hl[:-1]**(self.Q.s/2.))**2)
+        G_3 = self.params.kappa1 * Lambda + M
+        G_4 = self.params.kappa1 + \
+              0.5*M*(m2-m1**2 + self.kappa0 * (m1 - mu)**2 /
+                     (self.kappa0 + M))
+        return np.concatenate(self.data[0].calcVl(), G_4 / G_3)
+
+    def _estimateParams(self):
         if not self.params.baeysian:
             return
-        # TODO: Estimate Q_S, Q_W, q_1, q_2
-        raise NotImplemented("TODO")
+        hl = self.params.fnHierarchy(self)
+        begin = 1
+        M = self.all_data[begin:].M
+        m1 = self.all_data[begin:].calcEl()
+        m2 = self.all_data[begin:].calcEl(moment=2)
+        wl = hl[begin:]**self.Q.w - hl[(begin-1):-1]**self.Q.w
+        sl = (hl[begin:]**(self.Q.s/2.) - hl[(begin-1):-1]**(self.Q.s/2.))**-2
 
-    def estimateOptimalL(self):
+        self.Q.W = np.sum(wl * sl * M * m1) / np.sum(M * wl**2 * sl)
+        self.Q.S = np.sum(sl * (m2 - 2*m1*self.Q.W*wl + self.Q.W**2*wl**2)) / np.sum(M)
+        if self.params.w_sig > 0 or self.params.s_sig > 0:
+            # TODO: Estimate w=q_1, s=q_2
+            raise NotImplemented("TODO, estimate w and s")
+
+    def _estimateOptimalL(self):
         assert self.params.baeysian, "MIMC should be Bayesian to \
 estimate optimal number of levels"
-        # TODO: Estimate optimal L, CMLMC, Eq (4.1)
-        raise NotImplemented("TODO")
+        minL = len(self.lvls)
+        minWork = np.inf
+        for L in range(len(self.lvls), len(self.lvls)+1+self.params.incL):
+            Wl = self.params.fnWorkModel(self,
+                                         np.arange(0, L+1).reshape((-1, 1)))
+            M, _ = self._calcTheoryM(TOL,
+                                     bias_est=self._estimateBayesianBias(L),
+                                     self._estimateBayesianVl(L), Wl)
+            totalWork = np.sum(Wl*M)
+            if totalWork < minWork:
+                minL = L
+                minWork = totalWork
+        return minL
+    ################## END: Bayesian specific function
 
-    def calcSamples(self, fnSamplelvl, lvls, totalM, verbose):
+    def _addSamples(self, psums, M, t):
+        self.data.addSamples(psums, M, t)
+        self.all_data.addSamples(psums, M, t)
+
+    def _calcSamples(self, fnSamplelvl, lvls, totalM, verbose):
         s = len(lvls)
         M = np.zeros(s, dtype=np.int)
         psums = np.zeros((s, 2))
@@ -205,6 +242,15 @@ estimate optimal number of levels"
             M[i] = totalM[i]
         return psums, M, t
 
+    def _calcTheoryM(self, TOL, bias_est, Vl, Wl):
+        theta = -1
+        if not self.params.const_theta:
+            theta = 1 - bias_est/TOL
+        if theta <= 0:
+            theta = self.params.theta   # Bias too large or const_theta
+        return (theta * TOL / self.params.Ca)**-2 *\
+            np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl), theta
+
     def doRun(self, finalTOL, TOLs, fnExtendLvls, fnSampleLvls, fnItrDone=None, verbose=False):
         # fnExtendLvls, fnSamplelvl
         # fnExtendLvls(MIMCRun): Returns new lvls and number of samples on each.
@@ -212,6 +258,8 @@ estimate optimal number of levels"
         # fnSampleLvls(MIMCRun, moments, mods, inds, M):
         #    Returns array: M sums of mods*inds, and total (linear) time it took to compute them
         # fnItrDone(MIMCRun, i, TOLs): Called at the end of iteration i out of TOLs
+        # fnWorkModel(MIMCRun, lvls): Returns work estimate of lvls
+        # fnHierarchy(MIMCRun, lvls): Returns associated hierarchy of lvls
         if len(self.data.lvls) != 0:
             warnings.warn("Running the same object twice, resetting")
             self.data = MIMCData(self.data.dim)
@@ -225,9 +273,6 @@ estimate optimal number of levels"
         self.addLevels(newLvls)
         self.calcSamples(fnSampleLvls, todoM, verbose)
 
-        def calcTheoryM(tol, Vl, Wl, theta):
-            return (theta * tol / self.params.Ca)**-2 * np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
-
         import gc
         for itrIndex, TOL in enumerate(TOLs):
             if verbose:
@@ -238,18 +283,16 @@ estimate optimal number of levels"
                 if self.params.bayesian:
                     L = self.optimalL()
                     if L > len(self.data.lvls):
-                        self.data.addLevels([[i] for i in
-                                             range(len(self.data.lvls), L+1)])
-                theta = -1
-                if not self.params.const_theta:
-                    theta = 1 - self.estimateBias() / TOL
-                if theta <= 0:
-                    theta = self.params.theta   # Bias too large or const_theta
+                        self.data._addLevels(np.arange(len(self.data.lvls),
+                                                       L+1).reshape((-1, 1)))
+                todoM, theta = self._calcTheoryM(TOL,
+                                                 self.estimateBias(),
+                                                 self._estimateVl(),
+                                                 self.fnWorkModel(self,
+                                                                  self.lvls))
+                todoM = np.int_(todoM)
                 if verbose:
                     print("# theta", theta)
-                todoM = np.int_(calcTheoryM(TOL, self.estimateVl(),
-                                            self.fnWorkModel(self), theta))
-                if verbose:
                     print("# New M: ", todoM)
                 if not self.params.reuse_samples:
                     self.data.zero_samples()
@@ -271,16 +314,11 @@ estimate optimal number of levels"
                     self.addLevels(newlvls)
                     todoM = np.zeros(len(self.lvls))
                     todoM[prev:] = todoM
-                    self.calcSamples(fnSampleLvls, todoM, verbose)
+                    self._calcSamples(fnSampleLvls, todoM, verbose)
             if fnItrDone:
                 fnItrDone(self, itrIndex, TOL)
             if TOL <= finalTOL:
                 break
-
-    def addSamples(self, psums, M, t):
-        self.data.addSamples(psums, M, t)
-        self.all_data.addSamples(psums, M, t)
-
 
 def lvls_tensor(run):
     d, lvls = run.data.dim, run.data.lvls
@@ -339,15 +377,18 @@ def get_geometric_hl(lvls, beta):
     return np.prod(beta**(np.array(lvls, dtype=np.int)), axis=1)
 
 
-def get_tol_sequence(TOL, maxTOL, max_additional_itr):
-    # TODO: From CMLMC, Page 10
-    raise NotImplemented("TODO: get_tol_sequence")
+def get_tol_sequence(TOL, maxTOL, max_additional_itr=1, r1=2, r2=1.1):
+    # number of iterations until TOL
+    eni = np.int(-(np.log(TOL)-np.log(maxTOL))/np.log(r1))
+    adjTOL = TOL/r2
+    return np.concatenate((TOL*r1**np.arange(eni, -1, -1),
+                           TOL*r2**np.arange(1, max_additional_itr)))
 
 
 def get_optimal_hl(mimc):
-    # TODO: Get formula from HajiAli 2015, Optimizing MLMC hierarchies
     if mimc.data.dim != 1:
         raise NotImplemented("Optimized hierarchies are only supported\
  for one-dimensional problems")
 
+    # TODO: Get formula from HajiAli 2015, Optimizing MLMC hierarchies
     raise NotImplemented("TODO: get_optimal_hl")
