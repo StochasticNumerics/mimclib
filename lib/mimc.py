@@ -9,14 +9,20 @@ import set_util
 
 
 class MIMCData(object):
-    def __init__(self, dim):
+    def __init__(self, dim, psums=np.empty(0, 2), t=np.empty(0),
+                 M=np.empty(0, dtype=np.int)):
+        self.dim = dim
         self.lvls = []                            # MIMC lvls
-        self.psums = np.empty(0, 2)               # sums of lvls
-        self.t = np.array(list())                 # Time of lvls
-        self.M = np.array(list(), dtype=np.int)   # Number of samples in each lvl
+        self.psums = psums               # sums of lvls
+        self.t = t                 # Time of lvls
+        self.M = M   # Number of samples in each lvl
 
     def calcEg(self):
         return np.sum(self.calcEl())
+
+    def __getitem__(self, ind):
+        return MIMCData(self.dim, psums=self.psums[ind, :],
+                        t=self.t[ind], M=self.M[ind])
 
     def Dim(self):
         return self.dim
@@ -24,19 +30,27 @@ class MIMCData(object):
     def calcVl(self):
         return self.psums[:, 1] / self.M - (self.calcEl())**2
 
-    def calcEl(self):
-        return self.psums[:, 0] / self.M
+    def calcEl(self, moment=0):
+        return self.psums[:, moment] / self.M
 
     def calcTl(self):
         return self.t / self.M
 
-    def calcTotalTime(self):
+    def calcTotalTime(self, ind=None):
         return np.sum(self.Tl() * self.M)
 
     def addSamples(self, psums, M, t):
+        assert psums.shape[0] == len(M) and len(M) == len(t), \
+            "Inconsistent arguments "
+
         self.psums += psums
         self.M += M
         self.t += t
+
+    def zero_samples(self):
+        self.M = 0
+        self.t = 0
+        self.psums = 0
 
     def addLevels(self, new_lvls):
         assert(len(new_lvls) > 0)
@@ -70,12 +84,11 @@ class MyDefaultDict(object):
 default value '{}' is used.".format(name, default_val))
             return default_val
         raise NameError("Argument '{}' is required but not \
-provided!".format(key))
+provided!".format(name))
 
 
 class MIMCRun(object):
     def __init__(self, **kwargs):
-        self.data = MIMCData(dim=kwargs["dim"])
         self.params = MyDefaultDict(kwargs)
         self.params.set_defaults(bayesian=False, absBnd=False,
                                  reuse_samples=True,
@@ -86,16 +99,29 @@ class MIMCRun(object):
         self.bias = np.inf           # Approximation of the discretization error
         self.stat_error = np.inf     # Sampling error (based on M)
 
-        if self.bayesian and 'fnWorkModel' not in kwargs:
+        self.data = MIMCData(dim=self.params.dim)
+        self.all_data = MIMCData(dim=self.params.dim)
+        # If self.params.reuse_samples is True then
+        # all_data will always equal data
+
+        if self.params.bayesian and 'fnWorkModel' not in kwargs:
             raise NotImplementedError("Bayesian parameter fitting is only \
 supported with a given work model")
 
-        if self.bayesian and self.dim > 1:
+        if self.params.bayesian and 'fnHierarchy' not in kwargs:
+            raise NotImplementedError("Bayesian parameter fitting is only \
+supported with a given hierarchy")
+
+        if self.params.bayesian and self.dim > 1:
             raise NotImplementedError("Bayesian parameter fitting is only \
 supported in one dimensional problem")
 
+        if self.params.bayesian:
+            self.Q = MyDefaultDict(QS=0, QW=0, w=self.params.w,
+                                   s=self.params.s)
+
     def calcTotalWork(self):
-        return np.sum(self.fnWorkModel() * self.data.M)
+        return np.sum(self.fnWorkModel(self) * self.data.M)
 
     def estimateStatError(self):
         return self.params.Ca * \
@@ -125,27 +151,42 @@ supported in one dimensional problem")
     def estimateVl(self):
         if not self.params.baeysian:
             return self.data.calcVl()
-        # TODO: Implement bayesian estimation of Vl
+        hl = self.params.fnHierarchy(self, self.L)
+        M = self.all_data[1:].M
+        m1 = self.all_data[1:].calcEl()
+        m2 = self.all_data[1:].calcEl(moment=2)
+        mu = hl[1:]**self.params.w - hl[:-1]**self.params.w
+        Lambda = (hl[1:]**(self.params.s/2.) - hl[:-1]**(self.params.s/2.))**2
+        G_3 = self.params.kappa1 * Lambda + M
+        G_4 = self.params.kappa1 + \
+              0.5*M*(m2-m1**2 + self.kappa0 * (m1 - mu)**2 /
+                     (self.kappa0 + M))
+
+        return np.concatenate(self.data[0].calcVl(), G_4 / G_3)
 
     def estimateBias(self):
         if not self.params.baeysian:
             bnd = is_boundary(self.data.dim, self.lvls)
             if np.sum(bnd) == len(self.lvls):
                 return np.inf
-            bnd_val = self.data.calcEl()[bnd]
+            bnd_val = self.data[bnd].calcEl()
             if self.params.absBnd:
                 return np.abs(np.sum(np.abs(bnd_val)))
             return np.abs(np.sum(bnd_val))
         # TODO: Implement bayesian estimation of bias
+        raise NotImplemented("TODO")
 
     def estimateParams(self):
         if not self.params.baeysian:
             return
         # TODO: Estimate Q_S, Q_W, q_1, q_2
+        raise NotImplemented("TODO")
 
     def estimateOptimalL(self):
-        assert(self.params.baeysian)
-        # TODO: Estimate optimal L
+        assert self.params.baeysian, "MIMC should be Bayesian to \
+estimate optimal number of levels"
+        # TODO: Estimate optimal L, CMLMC, Eq (4.1)
+        raise NotImplemented("TODO")
 
     def calcSamples(self, fnSamplelvl, lvls, totalM, verbose):
         s = len(lvls)
@@ -154,13 +195,13 @@ supported in one dimensional problem")
         p = np.arange(1, psums.shape[1])
         t = np.zeros(s)
         for i in range(0, s):
-            if totalM[i] <= self.data.M[i]:
+            if totalM[i] <= self.data[i].M:
                 continue
             if verbose:
-                print("# Doing", totalM[i]-self.data.M[i], "of level", lvls[i])
+                print("# Doing", totalM[i]-self.data[i].M, "of level", lvls[i])
             inds, mods = lvl_to_inds_general(lvls[i])
             psums[i, :], t[i] = fnSamplelvl(self, p, mods, inds,
-                                            totalM[i] - self.data.M[i])
+                                            totalM[i] - self.data[i].M)
             M[i] = totalM[i]
         return psums, M, t
 
@@ -173,14 +214,15 @@ supported in one dimensional problem")
         # fnItrDone(MIMCRun, i, TOLs): Called at the end of iteration i out of TOLs
         if len(self.data.lvls) != 0:
             warnings.warn("Running the same object twice, resetting")
-            self.data.reset()
+            self.data = MIMCData(self.data.dim)
+
         if not all(x >= y for x, y in zip(TOLs, TOLs[1:])):
             raise Exception("Tolerances must be decreasing")
 
         import time
         tic = time.time()
         newLvls, todoM = fnExtendLvls(self)
-        self.data.addLevels(newLvls)
+        self.addLevels(newLvls)
         self.calcSamples(fnSampleLvls, todoM, verbose)
 
         def calcTheoryM(tol, Vl, Wl, theta):
@@ -235,6 +277,10 @@ supported in one dimensional problem")
             if TOL <= finalTOL:
                 break
 
+    def addSamples(self, psums, M, t):
+        self.data.addSamples(psums, M, t)
+        self.all_data.addSamples(psums, M, t)
+
 
 def lvls_tensor(run):
     d, lvls = run.data.dim, run.data.lvls
@@ -262,8 +308,9 @@ def lvls_td(run, w):
         if len(newlvls) > 0:
             return newlvls
 
-def work_estimate(beta, gamma, lvls):
-    return np.prod(beta**(np.array(lvls, dtype=np.int) * np.array(gamma)), axis=1)
+
+def work_estimate(hl, gamma):
+    return hl**gamma
 
 
 def is_boundary(d, lvls):
@@ -286,3 +333,21 @@ def lvl_to_inds_general(lvl):
     inds = np.array(list(itertools.product(*seeds)), dtype=np.int)
     mods = (2 * np.sum(lvl) % 2 - 1) * (2 * (np.sum(inds, axis=1) % 2) - 1)
     return mods, np.tile(lvl, (inds.shape[0], 1)) - inds
+
+
+def get_geometric_hl(lvls, beta):
+    return np.prod(beta**(np.array(lvls, dtype=np.int)), axis=1)
+
+
+def get_tol_sequence(TOL, maxTOL, max_additional_itr):
+    # TODO: From CMLMC, Page 10
+    raise NotImplemented("TODO: get_tol_sequence")
+
+
+def get_optimal_hl(mimc):
+    # TODO: Get formula from HajiAli 2015, Optimizing MLMC hierarchies
+    if mimc.data.dim != 1:
+        raise NotImplemented("Optimized hierarchies are only supported\
+ for one-dimensional problems")
+
+    raise NotImplemented("TODO: get_optimal_hl")
