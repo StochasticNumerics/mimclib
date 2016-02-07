@@ -129,7 +129,7 @@ supported in one dimensional problem")
 
     def estimateBias(self):
         if not self.params.baeysian:
-            bnd = calcBoundary(self.lvls)   # TODO: Call function from set_util
+            bnd = is_boundary(self.data.dim, self.lvls)
             if np.sum(bnd) == len(self.lvls):
                 return np.inf
             bnd_val = self.data.calcEl()[bnd]
@@ -218,7 +218,6 @@ supported in one dimensional problem")
                 if verbose:
                     self.textOutput()
                     print("------------------------------------------------")
-
                 if self.params.bayesian or (self.bias + self.stat_error < TOL):
                     if verbose:
                         print("{} took {}".format(TOL, self.totalTime))
@@ -233,7 +232,7 @@ supported in one dimensional problem")
                     self.calcSamples(fnSampleLvls, todoM, verbose)
             if fnItrDone:
                 fnItrDone(self, itrIndex, TOL)
-            if TOL < finalTOL:
+            if TOL <= finalTOL:
                 break
 
 
@@ -266,18 +265,17 @@ def lvls_td(run, w):
 def work_estimate(beta, gamma, lvls):
     return np.prod(beta**(np.array(lvls, dtype=np.int) * np.array(gamma)), axis=1)
 
-def boundary_gen(d, lvls):
-    # TODO: Use set_util
+
+def is_boundary(d, lvls):
     bnd = np.zeros(len(lvls), dtype=int)
     for i in range(0, d):
         x = np.zeros(d)
         x[i] = 1
         bnd += np.array([1 if l[i] == 0 or (np.array(l)+x).tolist() in lvls else 0 for l in lvls])
-    return np.nonzero(bnd < d)[0]
+    return bnd < d
 
 
 def lvl_to_inds_general(lvl):
-    # TODO: Use set_util
     lvl = np.array(lvl, dtype=np.int)
     seeds = list()
     for i in range(0, lvl.shape[0]):
