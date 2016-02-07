@@ -66,9 +66,11 @@ class MyDefaultDict(object):
             return self.__defaults__[name]
         if name in self.__warn_defaults__:
             default_val = self.__warn_defaults__[name]
-            warnings.warn("Argument '{}' is required but not provided, default value '{}' is used.".format(name, default_val))
+            warnings.warn("Argument '{}' is required but not provided,\
+default value '{}' is used.".format(name, default_val))
             return default_val
-        raise NameError("Argument '{}' is required but not provided!".format(key))
+        raise NameError("Argument '{}' is required but not \
+provided!".format(key))
 
 
 class MIMCRun(object):
@@ -81,8 +83,8 @@ class MIMCRun(object):
         self.params.set_warn_defaults(Ca=3, theta=0.5,
                                       fnWorkModel=lambda x: x.Tl())
 
-        self.bias = np.inf                     # Approximation of the discretization error
-        self.stat_error = np.inf              # Sampling error (based on M)
+        self.bias = np.inf           # Approximation of the discretization error
+        self.stat_error = np.inf     # Sampling error (based on M)
 
         if self.bayesian and 'fnWorkModel' not in kwargs:
             raise NotImplementedError("Bayesian parameter fitting is only \
@@ -95,11 +97,12 @@ supported in one dimensional problem")
     def calcTotalWork(self):
         return np.sum(self.fnWorkModel() * self.data.M)
 
-    def calcStatError(self):
-        return self.params.Ca * np.sqrt(np.sum(self.data.calcVl() / self.data.M))
+    def estimateStatError(self):
+        return self.params.Ca * \
+            np.sqrt(np.sum(self.data.estimateVl() / self.data.M))
 
-    def calcError(self):
-        return self.params.Ca * np.sqrt(np.sum(self.data.calcVl() / self.data.M))
+    def estimateTotalError(self):
+        return self.estimateBias() + self.estimateStateError()
 
     def __str__(self):
         output = "Time={:.12e}\nEg={:.12e}\n\
@@ -107,7 +110,7 @@ supported in one dimensional problem")
                                        self.data.calcEg(),
                                        self.bias,
                                        self.stat_error)
-        V = self.data.calcVl()
+        V = self.estimateVl()
         E = self.data.calcEl()
         T = self.data.calcTl()
 
