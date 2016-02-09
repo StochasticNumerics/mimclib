@@ -5,8 +5,12 @@ from __future__ import print_function
 import numpy as np
 import itertools
 import warnings
-from setutil import setutil
+from . import setutil
 
+__all__ = []
+def public(sym): __all__.append(sym.__name__)
+
+@public
 class MIMCData(object):
     def __init__(self, dim, lvls=None,
                  psums=None, t=None, M=None):
@@ -106,6 +110,7 @@ default value '{}' is used.".format(name, default_val))
 provided!".format(name))
 
 
+@public
 class MIMCRun(object):
     def __init__(self, **kwargs):
         self.params = MyDefaultDict(**kwargs)

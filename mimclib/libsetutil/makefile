@@ -1,4 +1,4 @@
-TARGETS =  _set_util.so libset_util.a
+TARGETS =  libset_util.so libset_util.a
 DEBUG = -O3
 # DEBUG = -pg
 # CCFLAGS += -g
@@ -7,8 +7,8 @@ DEBUG = -O3
 all: ${TARGETS}
 
 
-include ${PETSC_DIR}/lib/petsc/conf/variables
-include ${PETSC_DIR}/lib/petsc/conf/rules
+#include ${PETSC_DIR}/lib/petsc/conf/variables
+#include ${PETSC_DIR}/lib/petsc/conf/rules
 #include ${PETSC_DIR}/conf/rules
 
 ############### Set Util
@@ -25,5 +25,8 @@ src/var_list.cpp: src/var_list.h
 libset_util.a: set_util.o var_list.o
 	ar rcs $@ $^
 
-_set_util.so: set_util.o var_list.o
+libset_util.so: set_util.o var_list.o
 	g++ ${DEBUG} -fPIC -Wall -std=c++11 -shared -Wl,-soname,$@ -o $@ $^
+
+clean:
+	${RM} *.so *.a *.o

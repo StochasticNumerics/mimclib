@@ -2,10 +2,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import numpy as np
 import ctypes as ct
 import numpy.ctypeslib as npct
-from os import environ
 
 __arr_int32__ = npct.ndpointer(dtype=np.int32, flags='C_CONTIGUOUS')
 __arr_uint32__ = npct.ndpointer(dtype=np.uint32, flags='C_CONTIGUOUS')
@@ -30,8 +30,8 @@ __arr_ind_t__ = npct.ndpointer(dtype=ind_t, flags='C_CONTIGUOUS')
 #         newInd.extend(opt_ind)
 #     return VarSizeList(newInd, sizes=sizes)
 
-__lib__ = npct.load_library("_set_util.so",
-                            environ['MISC_LIBRARY_PATH'])
+__libdir = os.path.join(os.path.dirname(__file__))
+__lib__ = npct.load_library("_libset_util.so", __libdir)
 __lib__.CheckAdmissibility.restype = None
 __lib__.CheckAdmissibility.argtypes = [ct.c_voidp, __ct_ind_t__,
                                        __ct_ind_t__, __arr_bool__]
