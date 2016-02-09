@@ -1,0 +1,9 @@
+# Compiled Object files
+*.o
+*.so
+*.a
+
+# Temp output
+*.log
+*.out
+*.pyc
