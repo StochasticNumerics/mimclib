@@ -1,18 +1,16 @@
-import numpy as np
-import site
-import mimc
-
 import warnings
 import os.path
+import numpy as np
+import mimc
 warnings.formatwarning = lambda msg, cat, filename, lineno, line: \
                          "{}:{}: ({}) {}\n".format(os.path.basename(filename),
                                                    lineno, cat.__name__, msg)
 warnings.filterwarnings('error')
 
-from pdelib.SField import SField
 
-def main():
+def MLMCPDE():
     import argparse
+    from pdelib.SField import SField
     SField.Init()
 
     parser = argparse.ArgumentParser(add_help=True)
@@ -25,11 +23,12 @@ def main():
                                                  r.params.beta),
                            **vars(parser.parse_known_args()[0]))
 
-    mimcRun.doRun(fnSampleLvls=lambda *a: Sample_PDE(sf, *a))
+    mimcRun.doRun(fnSampleLvls=lambda *a: SamplePDE(sf, *a))
 
     SField.Final()
+    return mimcRun.data.Eg()
 
-def Sample_PDE(sf, run, moments, mods, inds, M):
+def SamplePDE(sf, run, moments, mods, inds, M):
     import time
     timeStart = time.time()
     psums = np.zeros(len(moments))
@@ -41,4 +40,4 @@ def Sample_PDE(sf, run, moments, mods, inds, M):
     return psums, time.time() - timeStart
 
 if __name__ == "__main__":
-    main()
+    MLMCPDE()

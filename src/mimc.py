@@ -5,7 +5,7 @@ from __future__ import print_function
 import numpy as np
 import itertools
 import warnings
-import set_util
+from setutil import setutil
 
 class MIMCData(object):
     def __init__(self, dim, lvls=None,
@@ -483,7 +483,7 @@ def extend_lvls_td(run, w):
     max_deg = prev_deg
     while True:
         max_deg += np.min(w)
-        C, _ = set_util.AnisoProfCalculator(w*0, w).GetIndexSet(max_deg)
+        C, _ = setutil.AnisoProfCalculator(w*0, w).GetIndexSet(max_deg)
         all_lvls = C.to_dense_matrix() - 1
         newlvls = [lvl.tolist() for lvl in all_lvls if lvl.tolist() not in lvls]
         if len(newlvls) > 0:

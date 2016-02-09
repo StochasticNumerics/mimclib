@@ -19,13 +19,13 @@ setup(
     url="http://stochastic_numerics.kaust.edu.sa/",
     packages=find_packages(),
     long_description=read('README')
-    # ,ext_modules=[
-    #     Extension('_set_util',
-    #               ['setutil/set_util.cpp', 'mimc/setutil/set_util.h',
-    #                'setutil/var_list.cpp', 'mimc/setutil/var_list.h'],
-    #               include_dirs=[],
-    #               library_dirs=['/'],
-    #               libraries=[],
-    #               extra_compile_args=['-g']
-    #              )]
+    ,ext_modules=[
+        Extension('_set_util',
+                  ['setutil/src/set_util.cpp', 'setutil/mimc/set_util.h',
+                   'setutil/src/var_list.cpp', 'setutil/mimc/var_list.h'],
+                  include_dirs=[''],
+                  library_dirs=['/'],
+                  libraries=[],
+                  extra_compile_args=['-g']
+                 )]
 )
