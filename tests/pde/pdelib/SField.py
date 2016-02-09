@@ -46,6 +46,7 @@ class SField(object):
         # The following nelem insures nestedness
         mods = np.array(mods, dtype=np.double)
         qoi_dim = self.GetDim()
+        nelem = nelem.astype(np.uint32)
         assert(nelem.shape[1] == 1 or nelem.shape[1] == qoi_dim)
         if nelem.shape[1] == 1 and qoi_dim != 1:
             nelem = np.tile(nelem, qoi_dim)

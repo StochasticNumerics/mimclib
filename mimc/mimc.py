@@ -32,22 +32,28 @@ class MIMCData(object):
 
     def __getitem__(self, ind):
         return MIMCData(self.dim,
-                        lvls=np.array(self.lvls, dtype=object)[ind].tolist(),
-                        psums=self.psums[ind, :], t=self.t[ind],
-                        M=self.M[ind])
+                        lvls=np.array(self.lvls, dtype=object)[ind].reshape((-1,self.dim)).tolist(),
+                        psums=self.psums[ind, :].reshape((-1, self.psums.shape[1])),
+                        t=self.t[ind].reshape(-1), M=self.M[ind].reshape(-1))
 
     def Dim(self):
         return self.dim
 
     def calcVl(self):
-        return self.psums[:, 1] / self.M - (self.calcEl())**2
+        return self.calcEl(moment=2) - (self.calcEl())**2
 
     def calcEl(self, moment=1):
         assert(moment > 0)
-        return self.psums[:, moment-1] / self.M
+        idx = self.M != 0
+        val = np.zeros_like(self.M, dtype=np.float)
+        val[idx] = self.psums[idx, moment-1] / self.M[idx]
+        return val
 
     def calcTl(self):
-        return self.t / self.M
+        idx = self.M == 0
+        val = np.zeros_like(self.M, dtype=np.float)
+        val[idx] = self.t[idx] / self.M[idx]
+        return val
 
     def calcTotalTime(self, ind=None):
         return np.sum(self.t)
@@ -211,7 +217,7 @@ for tolerance smaller than TOL")
             add_store('beta', type=float, default=2,
                       help="Level separation parameter to be used \
 with get_geometric_hl")
-            add_store('h0', type=float, default=2,
+            add_store('h0inv', type=float, default=2,
                       help="Minimum element size get_geometric_hl")
             add_store('gamma', type=float,
                       help="Work exponent to be used with work_estimate")
@@ -241,14 +247,14 @@ Bias={:.12e}\nstatErr={:.12e}\n".format(self.data.calcTotalTime(),
             "Level", "E", "V", "M", "Time", "Var%"))
         for i in range(0, len(self.data.lvls)):
             output += ("{:<8}{:>+20.12e}{:>20.12e}{:>8}{:>15.6e}{:>8.2f}%\n".format(
-                self.data.lvls[i], E[i], V[i], self.data.M[i], T[i],
+                str(self.data.lvls[i]), E[i], V[i], self.data.M[i], T[i],
                 100 * np.sqrt(V[i]) / np.abs(E[i])))
         return output
 
     def _estimateVl(self):
         if not self.params.bayesian:
             return self.data.calcVl()
-        return self._estimateBaysianVl()
+        return self._estimateBayesianVl()
 
     ################## Bayesian specific functions
     def estimateBias(self):
@@ -266,27 +272,29 @@ Bias={:.12e}\nstatErr={:.12e}\n".format(self.data.calcTotalTime(),
         L = L or len(self.all_data.lvls)-1
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        hl = self.params.fnHierarchy(self, np.arange(0, L+1).reshape((-1, 1)))
+        hl = self.params.fnHierarchy(self, np.arange(0, L+1)
+                                     .reshape((-1, 1))).reshape(1, -1)[0]
         return np.abs(self.Q.W) * hl[-1]**self.Q.w[0]
 
     def _estimateBayesianVl(self, L=None):
-        L = L or len(self.all_data.lvls)-1
+        oL = len(self.all_data.lvls)-1
+        L = L or oL
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        hl = self.params.fnHierarchy(self, np.arange(0,L+1).reshape((-1,1)))
-        M = self.all_data[1:].M
-        m1 = self.all_data[1:].calcEl()
-        m2 = self.all_data[1:].calcEl(moment=2)
+        hl = self.params.fnHierarchy(self,
+                                     np.arange(0, L+1)
+                                     .reshape((-1, 1))).reshape(1, -1)[0]
+        M = np.concatenate((self.all_data[1:].M, np.zeros(L-oL)))
+        m1 = np.concatenate((self.all_data[1:].calcEl(), np.zeros(L-oL)))
+        m2 = np.concatenate((self.all_data[1:].calcEl(moment=2),
+                             np.zeros(L-oL)))
         mu = self.Q.W*(hl[1:]**self.Q.w[0] - hl[:-1]**self.Q.w[0])
         Lambda = 1./(self.Q.S*(hl[1:]**(self.Q.s[0]/2.) - hl[:-1]**(self.Q.s[0]/2.))**2)
         G_3 = self.params.kappa1 * Lambda + M
         G_4 = self.params.kappa1 + \
-              0.5*M*(m2-m1**2 + self.params.kappa0 * (m1 - mu)**2 /
-                     (self.params.kappa0 + M))
-        allVl = np.concatenate(self.data[0].calcVl(), G_4 / G_3)
-        if len(allVl) >= L+1:
-            return allVl[:L+1]
-        return np.concatenate(allVl, np.zeros(L+1-len(AllVl)))
+              0.5*M*(m2 + self.params.kappa0 * (m1 - mu)**2 /
+                     (self.params.kappa0 + M)) - 0.5*m1**2
+        return np.concatenate((self.data[0].calcVl(), G_4 / G_3))
 
     def _estimateParams(self):
         if not self.params.bayesian:
@@ -337,25 +345,29 @@ estimate optimal number of levels"
         p = np.arange(1, psums.shape[1])
         t = np.zeros(s)
         for i in range(0, s):
-            if totalM[i] <= self.data[i].M:
+            if totalM[i] <= self.data.M[i]:
                 continue
             if verbose:
-                print("# Doing", totalM[i]-self.data[i].M, "of level", lvls[i])
+                print("# Doing", totalM[i]-self.data.M[i], "of level", lvls[i])
             mods, inds = lvl_to_inds_general(lvls[i])
             psums[i, :], t[i] = fnSamplelvl(self, p, mods, inds,
-                                            totalM[i] - self.data[i].M)
+                                            totalM[i] - self.data.M[i])
             M[i] = totalM[i]
         self.data.addSamples(psums, M, t)
         self.all_data.addSamples(psums, M, t)
 
-    def _calcTheoryM(self, TOL, bias_est, Vl, Wl):
+    def _calcTheoryM(self, TOL, bias_est, Vl, Wl, ceil=True, minM=1):
         theta = -1
         if not self.params.const_theta:
             theta = 1 - bias_est/TOL
         if theta <= 0:
             theta = self.params.theta   # Bias too large or const_theta
-        return (theta * TOL / self.params.Ca)**-2 *\
-            np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl), theta
+        M = (theta * TOL / self.params.Ca)**-2 *\
+            np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
+        M = np.maximum(M, minM)
+        if ceil:
+            return M.astype(np.int), theta
+        return M, theta
 
     def doRun(self, fnSampleLvls, finalTOL=None, fnExtendLvls=None,
               TOLs=None, fnItrDone=None, verbose=None):
@@ -400,14 +412,13 @@ estimate optimal number of levels"
                 if self.params.bayesian:
                     L = self._estimateOptimalL(TOL)
                     if L > len(self.data.lvls):
-                        self.data._addLevels(np.arange(len(self.data.lvls),
+                        self._addLevels(np.arange(len(self.data.lvls),
                                                        L+1).reshape((-1, 1)))
                 todoM, theta = self._calcTheoryM(TOL,
                                                  self.estimateBias(),
                                                  self._estimateVl(),
                                                  self.params.fnWorkModel(self,
                                                                          self.data.lvls))
-                todoM = todoM.astype(np.int)
                 if verbose:
                     print("# theta", theta)
                     print("# New M: ", todoM)
@@ -438,22 +449,31 @@ estimate optimal number of levels"
                 break
 
 
-def extend_lvls_tensor(run, M0, min_lvls=2):
+def extend_lvls_tensor(run, M0, min_deg=1):
     d, lvls = run.data.dim, run.data.lvls
-    if len(lvls) <= 0:
-        newlvls = [[0] * d]
-        # TODO: should add multiple levels
-        #count = min_lvls+1
+    if len(run.data.lvls) <= 0:
+        out_lvls = [[0] * d]
+        seeds = lvls = out_lvls
+        deg = 0
     else:
+        out_lvls = list()
+        lvls = run.data.lvls
         deg = np.max([np.max(ll) for ll in lvls])
+        seeds = [ll for ll in lvls if np.max(ll) == deg]
+
+    additions = [f for f in itertools.product([0, 1], repeat=d) if max(f) > 0]
+    while True:
         newlvls = list()
-        additions = [f for f in itertools.product([0, 1], repeat=d) if max(f) > 0]
-        for l in [ll for ll in lvls if np.max(ll) == deg]:
+        for l in seeds:
             newlvls.extend([(np.array(l) + a).tolist() for a in
-                            additions if np.max(np.array(l) + a) ==
-                            deg + 1 and (np.array(l) + a).tolist() not
-                            in newlvls])
-    return newlvls, M0*np.ones(len(newlvls), dtype=np.int)
+                            additions if (np.array(l) + a).tolist()
+                            not in newlvls])
+        out_lvls.extend(newlvls)
+        deg += 1
+        if deg >= min_deg:
+            break
+        seeds = newlvls
+    return out_lvls, M0*np.ones(len(out_lvls), dtype=np.int)
 
 
 def extend_lvls_td(run, w):
@@ -498,8 +518,8 @@ def lvl_to_inds_general(lvl):
     return mods, np.tile(lvl, (inds.shape[0], 1)) - inds
 
 
-def get_geometric_hl(lvls, h0, beta):
-    return h0*beta**(np.array(lvls, dtype=np.uint32))
+def get_geometric_hl(lvls, h0inv, beta):
+    return beta**(-np.array(lvls, dtype=np.float))/h0inv
 
 
 def get_tol_sequence(TOL, maxTOL, max_additional_itr=1, r1=2, r2=1.1):

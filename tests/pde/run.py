@@ -7,6 +7,7 @@ import os.path
 warnings.formatwarning = lambda msg, cat, filename, lineno, line: \
                          "{}:{}: ({}) {}\n".format(os.path.basename(filename),
                                                    lineno, cat.__name__, msg)
+warnings.filterwarnings('error')
 
 from pdelib.SField import SField
 
@@ -20,7 +21,7 @@ def main():
     mimcRun = mimc.MIMCRun(fnWorkModel=lambda r, lvls:
                            mimc.work_estimate(lvls, r.params.gamma),
                            fnHierarchy=lambda r, lvls:
-                           mimc.get_geometric_hl(lvls, r.params.h0,
+                           mimc.get_geometric_hl(lvls, r.params.h0inv,
                                                  r.params.beta),
                            **vars(parser.parse_known_args()[0]))
 
@@ -32,7 +33,7 @@ def Sample_PDE(sf, run, moments, mods, inds, M):
     import time
     timeStart = time.time()
     psums = np.zeros(len(moments))
-    sf.BeginRuns(mods, run.params.fnHierarchy(run, inds))
+    sf.BeginRuns(mods, 1./run.params.fnHierarchy(run, inds))
     for m in range(0, M):
         sample = sf.Sample()
         psums += sample**moments
