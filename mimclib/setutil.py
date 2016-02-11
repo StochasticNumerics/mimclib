@@ -7,12 +7,20 @@ import numpy as np
 import ctypes as ct
 import numpy.ctypeslib as npct
 
+__all__ = []
+
+
+def public(sym):
+    __all__.append(sym.__name__)
+    return sym
+
 __arr_int32__ = npct.ndpointer(dtype=np.int32, flags='C_CONTIGUOUS')
 __arr_uint32__ = npct.ndpointer(dtype=np.uint32, flags='C_CONTIGUOUS')
 __arr_bool__ = npct.ndpointer(dtype=np.bool, flags='C_CONTIGUOUS')
 __arr_double__ = npct.ndpointer(dtype=np.double, flags='C_CONTIGUOUS')
 
 ind_t = np.uint16
+
 __ct_ind_t__ = ct.c_uint16
 __arr_ind_t__ = npct.ndpointer(dtype=ind_t, flags='C_CONTIGUOUS')
 
@@ -130,6 +138,7 @@ __lib__.VarSizeList_find.argtypes = [ct.c_voidp, __arr_ind_t__,
                                      __arr_ind_t__, __ct_ind_t__]
 
 
+@public
 class VarSizeList(object):
     def __init__(self, _handle, min_dim=0):
         self._handle = _handle
@@ -179,7 +188,7 @@ class VarSizeList(object):
         d_end = d_end or self.max_dim()
         assert(d_end > d_start)
         ind_count = np.sum(self.get_active_dim())
-        ij = np.empty(ind_count*2, dtype=ind_t)
+        ij = np.empty(int(ind_count*2), dtype=ind_t)
         data = np.empty(ind_count, dtype=ind_t)
         __lib__.VarSizeList_to_matrix(self._handle, ij, len(ij), data,
                                       len(data))
@@ -268,6 +277,7 @@ class VarSizeList(object):
         return inner_bnd, real_lvls
 
 
+@public
 class ProfCalculator(object):
     def GetIndexSet(self, max_prof):
         import ctypes as ct
@@ -288,6 +298,7 @@ class ProfCalculator(object):
         __lib__.FreeProfitCalculator(self._handle)
 
 
+@public
 class MISCProfCalculator(ProfCalculator):
     def __init__(self, d_err_rates, d_work_rates, s_g_rates,
                  s_g_bar_rates):
@@ -301,6 +312,7 @@ class MISCProfCalculator(ProfCalculator):
                                              s_g_bar_rates)
 
 
+@public
 class AnisoProfCalculator(ProfCalculator):
     def __init__(self, wE, wW):
         assert(len(wE) == len(wW))
@@ -308,6 +320,7 @@ class AnisoProfCalculator(ProfCalculator):
         self._handle = __lib__.GetAnisoProfit(self.d, wE, wW)
 
 
+@public
 def TensorGrid(m, base=1, count=None):
     m = np.array(m, dtype=ind_t)
     assert np.all(m >= base), "m has to be larger than base"
@@ -317,6 +330,7 @@ def TensorGrid(m, base=1, count=None):
     return output.reshape((count, len(m)), order='C')
 
 
+@public
 def GenTDSet(d, count, base=1):
     output = np.empty(count*d, dtype=ind_t)
     __lib__.GenTDSet(d, base, output, count)

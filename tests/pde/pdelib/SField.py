@@ -1,6 +1,7 @@
 import numpy.ctypeslib as npct
 import ctypes as ct
 import numpy as np
+import os
 
 arr_double = npct.ndpointer(dtype=np.double, ndim=1, flags='CONTIGUOUS')
 arr_uint = npct.ndpointer(dtype=np.uint32, ndim=2, flags='CONTIGUOUS')
@@ -9,7 +10,8 @@ arr_uint = npct.ndpointer(dtype=np.uint32, ndim=2, flags='CONTIGUOUS')
 class SField(object):
     try:
         # TODO: We need to figure out a way
-        lib = npct.load_library("pdelib/libsolver_nd_df.so", ".")
+        lib = npct.load_library("libsolver_nd_df.so",
+                                os.path.join(os.path.dirname(__file__)))
         lib.SFieldCreate.restype = ct.c_ulong
         lib.SFieldBeginRuns.restype = ct.c_ulong
         lib.SFieldEndRuns.restype = ct.c_ulong

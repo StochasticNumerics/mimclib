@@ -1,14 +1,23 @@
 import warnings
 import os.path
 import numpy as np
-import mimc
+import mimclib.mimc as mimc
+import mimclib.db as mimcdb
+
 warnings.formatwarning = lambda msg, cat, filename, lineno, line: \
                          "{}:{}: ({}) {}\n".format(os.path.basename(filename),
                                                    lineno, cat.__name__, msg)
 warnings.filterwarnings('error')
 
 
-def MLMCPDE():
+def TestDB():
+    db = mimcdb.MIMCDatabase(user="abdo")
+    data = db.readRunData(db.getRunDataIDs())
+    import IPython
+    IPython.embed()
+
+
+def MLMCPDE(DB=True):
     import argparse
     from pdelib.SField import SField
     SField.Init()
@@ -16,28 +25,37 @@ def MLMCPDE():
     parser = argparse.ArgumentParser(add_help=True)
     mimc.MIMCRun.addOptionsToParser(parser)
     sf = SField()
-    mimcRun = mimc.MIMCRun(fnWorkModel=lambda r, lvls:
-                           mimc.work_estimate(lvls, r.params.gamma),
-                           fnHierarchy=lambda r, lvls:
-                           mimc.get_geometric_hl(lvls, r.params.h0inv,
-                                                 r.params.beta),
-                           **vars(parser.parse_known_args()[0]))
+    if DB:
+        db = mimcdb.MIMCDatabase(user="abdo")
 
-    mimcRun.doRun(fnSampleLvls=lambda *a: SamplePDE(sf, *a))
+    mimcRun = mimc.MIMCRun(**vars(parser.parse_known_args()[0]))
+    if DB:
+        run_id = db.createRun(TOL=mimcRun.params.TOL, tag="NoTag",
+                              dim=mimcRun.data.dim, params=mimcRun.params)
+    mimcRun.setFunctions(fnWorkModel=lambda lvls:
+                         mimc.work_estimate(lvls, mimcRun.params.gamma),
+                         fnHierarchy=lambda lvls:
+                         mimc.get_geometric_hl(lvls, mimcRun.params.h0inv,
+                                               mimcRun.params.beta),
+                         fnSampleLvl=lambda *a: SamplePDE(sf, mimcRun, *a),
+                         fnItrDone=lambda *a: db.writeRunData(run_id, mimcRun,
+                                                              *a))
 
+    mimcRun.doRun()
     SField.Final()
-    return mimcRun.data.Eg()
+    return mimcRun.data.calcEg()
+
 
 def SamplePDE(sf, run, moments, mods, inds, M):
     import time
     timeStart = time.time()
     psums = np.zeros(len(moments))
-    sf.BeginRuns(mods, 1./run.params.fnHierarchy(run, inds))
+    sf.BeginRuns(mods, 1./run.fnHierarchy(inds))
     for m in range(0, M):
-        sample = sf.Sample()
-        psums += sample**moments
+        psums += sf.Sample()**moments
     sf.EndRuns()
     return psums, time.time() - timeStart
 
 if __name__ == "__main__":
     MLMCPDE()
+    #TestDB()

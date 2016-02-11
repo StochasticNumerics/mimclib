@@ -233,7 +233,8 @@ VarSizeList(const VarSizeList &set) : m_ind_set(set.m_ind_set) , m_ind_map(set.m
     uint32 find_ind(const mul_ind_t& cur) const {
         uint32 index;
         bool found = find_ind(cur, index);
-        assert(found);
+        if (!found)
+            throw std::out_of_range("Index not found!");
         return index;
     }
 

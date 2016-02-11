@@ -12,7 +12,7 @@ def read(fname):
 
 setup(
     name="mimclib",
-    version="0.1.0.dev",
+    version="0.1.0.dev0",
     author="Abdul-Lateef Haji-Ali",
     author_email="abdullateef.hajiali@kaust.edu.sa",
     description="A library implementing the MIMC and CMLMC methods.",
