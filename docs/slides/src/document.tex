@@ -12,8 +12,9 @@
   \item Support parallel computation whenever possible.
   \item Provide easy to use storage facility.
   \item Provide easy to customize plotting facility (for common plots).
-  \item Use \texttt{Python} for easier implementation and object code (\texttt{C++} or
-    \texttt{FORTRAN}) for computationally expensive parts.
+  \item Use \texttt{Python} for easier implementation of most parts of code
+    and use object code (\texttt{C++} or \texttt{FORTRAN}) for
+    computationally expensive parts.
   \end{itemize}
 \end{frame}
 
@@ -29,34 +30,84 @@
 
 \begin{frame}[fragile]{Installation (for users)}
 \begin{verbatim}
-cd WorkDir
-git clone https://ahajiali@bitbucket.org/ahajiali/mimclib.git
-cd mimclib
-make
+> cd WorkDir
+> git clone \
+https://ahajiali@bitbucket.org/ahajiali/mimclib.git
+> cd mimclib
+> make
+
+> python -c 'from  mimclib.db import DBCreationScript ; \
+print DBCreationScript();' | mysql
 \end{verbatim}
 \end{frame}
 
-\begin{frame}[fragile]{A typical python example}
+\begin{frame}[fragile]{A typical python example for a single MLMC run}
 \begin{verbatim}
-    import argparse
-    parser = argparse.ArgumentParser(add_help=True)
-    mimc.MIMCRun.addOptionsToParser(parser)
-    db = mimcdb.MIMCDatabase(user="abdo")
+# Read arguments from command line
+import argparse
+parser = argparse.ArgumentParser(add_help=True)
+mimc.MIMCRun.addOptionsToParser(parser)
+tmp = parser.parse_known_args()[0]
+mimcRun = mimc.MIMCRun(**vars(tmp))
 
-    mimcRun = mimc.MIMCRun(**vars(parser.parse_known_args()[0]))
-    run_id = db.createRun(TOL=mimcRun.params.TOL, tag="NoTag",
-                          dim=mimcRun.data.dim, params=mimcRun.params)
-    mimcRun.setFunctions(fnWorkModel=lambda lvls:
-                         mimc.work_estimate(lvls, mimcRun.params.gamma),
-                         fnHierarchy=lambda lvls:
-                         mimc.get_geometric_hl(lvls, mimcRun.params.h0inv,
-                                               mimcRun.params.beta),
-                         fnSampleLvl=lambda *a: SamplePDE(sf, mimcRun, *a),
-                         fnItrDone=lambda *a: db.writeRunData(run_id, mimcRun,
-                                                              *a))
+# Create entry in DB for MIMCRun
+db = mimcdb.MIMCDatabase()
+run_id = db.createRun(TOL=mimcRun.params.TOL,
+                      tag="MyFirstMIMCRun",
+                      dim=mimcRun.data.dim,
+                      params=mimcRun.params)
+\end{verbatim}
+\end{frame}
 
-    mimcRun.doRun()
-    return mimcRun.data.calcEg()
+\begin{frame}[fragile]{User defined functions with typical impl.}
+\begin{verbatim}
+def fnWorkModel(lvls):
+  return mimc.work_estimate(lvls, mimcRun.params.gamma)
+
+def fnHierarchy(lvls):
+  return mimc.get_geometric_hl(lvls,
+                               mimcRun.params.h0inv,
+                               mimcRun.params.beta)
+
+def fnItrDone(itrIndex, TOL, totalTime)
+  db.writeRunData(run_id, mimcRun,
+                  itrIndex, TOL, totalTime)
+
+def fnSampleLvl(moments, mods, inds, M):
+  ...
+
+
+\end{verbatim}
+\end{frame}
+
+
+\begin{frame}[fragile]{A typical python example for a single MLMC run}
+\begin{verbatim}
+mimcRun.setFunctions(fnWorkModel=fnWorkModel,
+                     fnHierarchy=fnHierarchy,
+                     fnSampleLvl=fnSampleLvl,
+                     fnItrDone=fnItrDone)
+
+mimcRun.doRun()
+print("Final value:", mimcRun.data.calcEg())
+\end{verbatim}
+\end{frame}
+
+\begin{frame}[fragile]{Running the script. MLMC}
+\begin{verbatim}
+> python run.py --  -mimc_TOL 0.001 \
+   -mimc_verbose True -mimc_dim 1 -mimc_bayesian True \
+   -mimc_w 2 -mimc_s 4 -mimc_gamma 3 \
+   -mimc_beta 2
+\end{verbatim}
+\end{frame}
+
+\begin{frame}[fragile]{Running the script. MLMC}
+\begin{verbatim}
+> python run.py --  -mimc_TOL 0.001 \
+   -mimc_verbose True -mimc_dim 3 -mimc_w 2 2 2 \
+   -mimc_s 4 4 4 -mimc_gamma 1 1 1 \
+   -mimc_beta 2 2 2
 \end{verbatim}
 \end{frame}
 
