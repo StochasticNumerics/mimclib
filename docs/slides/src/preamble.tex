@@ -1,0 +1,118 @@
+%\usepackage{enumitem}
+%\usetheme{Warsaw}
+%\usetheme{src/beamerthemekaust}
+%\usetheme{kaust}
+\usepackage{src/beamerthemekaust}
+% Not needed in new siamltex1213
+\usepackage{color}
+\usepackage{graphicx}
+\usepackage[mathscr]{eucal}
+\usepackage{comment}
+\usepackage{alltt}
+
+\providecommand{\prob}[1]{{\ensuremath{\mathrm{P}}\mspace{-2mu}\left[#1\right]}}% Probability
+\providecommand{\E}[1]{{\ensuremath{\mathrm{E}}\mspace{-2mu}\left[#1\right]}}% Expected Value
+\providecommand{\var}[1]{{\ensuremath{\mathrm{Var}}\mspace{-2mu}\left[#1\right]}}% Variance
+\newcommand{\Std}{\operatorname{std} }   % standard deviation
+\providecommand{\tol}{\mathrm{TOL}}
+\providecommand{\rset}{\mathbb{R}}
+\providecommand{\rsetp}{\mathbb{R}_{+}}
+\providecommand{\zset}{\mathbb{Z}}
+\providecommand{\nset}{\mathbb{N}}
+\providecommand{\todo}[1]{ {\color{red} \textbf{TODO:} #1 }}
+\providecommand{\atodo}[1]{ {\color{red} \textbf{ABDO:} #1 }}
+\providecommand{\Order}[1]{ {\ensuremath{ \mathcal O\left( #1 \right)}} }
+\providecommand{\order}[1]{ {\ensuremath{ o\left( #1 \right)}} }
+\DeclareMathOperator*{\argmin}{\arg\!\min}
+\providecommand{\mykeywords}[1]{\par \textbf{Keywords:} #1}
+\providecommand{\subclass}[1]{\par{ \bf Class:} #1}
+\providecommand{\CWork}{\ensuremath{C_{\text{\textnormal{work}}}}}
+\renewcommand{\vec}[1]{{\ensuremath{{\boldsymbol #1}}}}
+\providecommand{\valpha}{{\ensuremath{\vec{\alpha}}}}
+\providecommand{\vdelta}{{\ensuremath{\vec{\delta}}}}
+\providecommand{\vtau}{{\ensuremath{\vec{\tau}}}}
+\providecommand{\intlim}[2]{{\ensuremath{ \int_{ \{ #1 \::\: #2 \}} }}}
+\providecommand{\sumlim}[2]{{\ensuremath{ \sum_{ \{ #1 \::\: #2 \}} }}}
+
+\providecommand{\eqdef}{{\ensuremath{ := } }}
+\providecommand{\rd}{{{\red{\ensuremath{d}}}}}
+
+%\providecommand{\indset}{{\ensuremath{ I }}}
+\providecommand{\indset}{{\{ 1 \cdots d \}}}
+\providecommand{\indsetA}{{\ensuremath{ I_1 }}}
+\providecommand{\indsetB}{{\ensuremath{ I_2 }}}
+\providecommand{\indsetC}{{\ensuremath{ I_3 }}}
+\providecommand{\indsetBC}{{\ensuremath{ \hat I }}}
+\providecommand{\estS}{{\ensuremath{ \Delta S }}}
+\providecommand{\myref}[1]{{\blue{\bf#1}}}
+\providecommand{\vg}{{\ensuremath{V_0}}}
+\providecommand{\work}{\ensuremath{W}}
+
+\providecommand{\workEst}{{\ensuremath{ \widetilde W }}}
+\providecommand{\workRem}{{\ensuremath{ \widetilde W_1 }}}
+
+
+\providecommand{\estS}{{\ensuremath{ \Delta \mathscr{S} }}}
+\newcommand*{\theorembreak}{\usebeamertemplate{theorem
+    end}\framebreak\usebeamertemplate{theorem begin}}
+\newcommand{\red}[1]{{{\color{red} #1}}}
+\newcommand{\blue}[1]{{{\color{blue} #1}}}
+
+
+\usepackage{array}
+\newcolumntype{L}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+
+\graphicspath{{src/imgs/}}
+
+
+\newcommand\Fontvi{\fontsize{8.5}{8}\selectfont}
+
+\newcommand\Wider[2][4em]{%
+\makebox[\linewidth][c]{%
+  \begin{minipage}{\dimexpr\textwidth+#1\relax}
+  \raggedright#2
+  \end{minipage}%
+  }%
+}
+
+% \usepackage{perpage}
+% \MakePerPage{footnote}
+
+\newcommand{\lib}{\texttt{mimclib}}
+
+\renewcommand*{\thefootnote}{\fnsymbol{footnote}}
+\newcommand\myfootcite[1]{\footnote{\fontsize{7}{8.5}\selectfont #1}}
+\setcounter{footnote}{1}
+%\hspace{4cm} \insertframenumber/\inserttotalframenumber
+\title[\lib\ {[Haji--Ali]}]
+{\lib}
+\subtitle{Our in-house UQ library}
+\author{
+\underline{Abdul--Lateef~Haji--Ali}
+\and
+Ra\'{u}l Tempone
+}
+\institute{
+King Abdullah University of Science and Technology (KAUST), Saudi
+Arabia.
+
+\ \url{stochastic\_numerics.kaust.edu.sa}
+}
+
+\conference{}
+\date{\small \today}
+\titlegraphic{
+%\includegraphics[scale=0.5] {epfl-logo}\hskip 3cm
+\flushright \vskip-1.5cm \hyperlink{TableOfContents}{\includegraphics[scale=0.35]{kaust_full}}
+}
+
+\headergraphic{\hyperlink{TableOfContents}{\includegraphics[scale=0.11]{kaust_logo2}}}
+
+%\logo{\includegraphics[scale=0.11]{kaust_logo2}\vspace{99900pt}}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "../main"
+%%% End:

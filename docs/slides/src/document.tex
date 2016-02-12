@@ -1,0 +1,66 @@
+{
+\nofooter \noheader \frame[noframenumbering]{\titlepage}
+}
+
+\begin{frame}{Vision (the ambitious version)}
+  \begin{itemize}
+  \item Provide an easy to use, easy to extend open source
+    library for UQ problem, both forward and inverse,
+  \item Multilevel and Mult-index versions of Monte Carlo, Quasi Monte
+    Carlo, Stochastic collocation, Least square projection among
+    others.
+  \item Support parallel computation whenever possible.
+  \item Provide easy to use storage facility.
+  \item Provide easy to customize plotting facility (for common plots).
+  \item Use \texttt{Python} for easier implementation and object code (\texttt{C++} or
+    \texttt{FORTRAN}) for computationally expensive parts.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{What has been done}
+  \begin{itemize}
+  \item Multilevel and Mult-index versions of Monte Carlo
+  \item MySQL database storage.
+  \item Still need to port existing plotting code
+  \item Needs heavy documenting
+  \item Needs further testing
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Installation (for users)}
+\begin{verbatim}
+cd WorkDir
+git clone https://ahajiali@bitbucket.org/ahajiali/mimclib.git
+cd mimclib
+make
+\end{verbatim}
+\end{frame}
+
+\begin{frame}[fragile]{A typical python example}
+\begin{verbatim}
+    import argparse
+    parser = argparse.ArgumentParser(add_help=True)
+    mimc.MIMCRun.addOptionsToParser(parser)
+    db = mimcdb.MIMCDatabase(user="abdo")
+
+    mimcRun = mimc.MIMCRun(**vars(parser.parse_known_args()[0]))
+    run_id = db.createRun(TOL=mimcRun.params.TOL, tag="NoTag",
+                          dim=mimcRun.data.dim, params=mimcRun.params)
+    mimcRun.setFunctions(fnWorkModel=lambda lvls:
+                         mimc.work_estimate(lvls, mimcRun.params.gamma),
+                         fnHierarchy=lambda lvls:
+                         mimc.get_geometric_hl(lvls, mimcRun.params.h0inv,
+                                               mimcRun.params.beta),
+                         fnSampleLvl=lambda *a: SamplePDE(sf, mimcRun, *a),
+                         fnItrDone=lambda *a: db.writeRunData(run_id, mimcRun,
+                                                              *a))
+
+    mimcRun.doRun()
+    return mimcRun.data.calcEg()
+\end{verbatim}
+\end{frame}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "../main"
+%%% End:

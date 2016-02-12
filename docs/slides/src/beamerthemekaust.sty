@@ -1,0 +1,123 @@
+\mode<presentation>
+
+\def\beamer@theme@col{\setbeamercolor{separation line}{structure,bg=structure.fg!50!bg}}
+\ProcessOptionsBeamer
+
+\usefonttheme[onlysmall]{structurebold}
+%\beamer@theme@col
+
+\newif\ifbeamer@tree@showhooks
+\beamer@tree@showhookstrue
+
+\DeclareOptionBeamer{hooks}[true]{\csname beamer@tree@showhooks#1\endcsname}
+\ProcessOptionsBeamer
+\mode<presentation>
+
+\newcommand\noheader{
+\makeatletter % to change template
+    \setbeamertemplate{headline}[default] % not mandatory, but I though it was better to set it blank
+    \def\beamer@entrycode{\vspace*{-\headheight}} % here is the part we are interested in :)
+\makeatother
+}
+\newcommand\nofooter{\setbeamertemplate{footline}{}}
+
+\newcommand\headergraphic[1]{\def \insertheadergraphic{#1}}
+\newcommand\conference[1]{\def \insertconference{#1}}
+\headergraphic{}
+
+\beamertemplatenavigationsymbolsempty
+\setbeamertemplate{itemize items}[ball]
+%\setbeamercolor{item projected}{bg=red}
+
+\defbeamertemplate*{title page}{kaust}[1][]
+{
+  \vbox{}
+  \vfill
+  \begingroup
+    \centering
+    \begin{beamercolorbox}[sep=8pt,left,#1]{title}
+      \usebeamerfont{title}\inserttitle\par%
+      \ifx\insertsubtitle\@empty%
+      \else%
+        \vskip0.25em%
+        {\usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle\par}%
+      \fi%
+    \end{beamercolorbox}%
+    \vskip1em\par
+    \begin{beamercolorbox}[sep=8pt,left,#1]{author}
+      \usebeamerfont{author}\insertauthor
+    \end{beamercolorbox}
+    \begin{beamercolorbox}[sep=8pt,left,#1]{institute}
+      \usebeamerfont{institute}\insertinstitute
+    \end{beamercolorbox}
+    \begin{beamercolorbox}[sep=8pt,left,#1]{date}
+      {\usebeamerfont{institute}\insertconference}
+
+      {\usebeamerfont{institute}\insertdate}
+    \end{beamercolorbox}\vskip0.5em
+    {\usebeamercolor[fg]{titlegraphic}\inserttitlegraphic\par}
+  \endgroup
+  \vfill
+}
+
+\defbeamertemplate*{headline}{kaust}
+{%
+    % \begin{beamercolorbox}[wd=\paperwidth,colsep=1.5pt]{upper separation line head}
+    % \end{beamercolorbox}
+    \begin{minipage}{0.78\textwidth}
+    \begin{beamercolorbox}[ht=2.5ex,dp=1.125ex,%
+      leftskip=.3cm,rightskip=.3cm plus1fil]{title in head/foot}
+      \usebeamerfont{title in head/foot}\insertshorttitle
+    \end{beamercolorbox}
+    \begin{beamercolorbox}[ht=2.5ex,dp=1.125ex,%
+      leftskip=.3cm,rightskip=.3cm plus1fil]{section in head/foot}
+      {\usebeamerfont{section in head/foot}%
+        \ifbeamer@tree@showhooks
+        \setbox\beamer@tempbox=\hbox{\insertsectionhead}%
+        \ifdim\wd\beamer@tempbox>1pt%
+        \hskip2pt\raise1.9pt\hbox{\vrule width0.4pt
+          height1.875ex\vrule width 5pt height0.4pt}%
+        \hskip1pt%
+        \fi%
+        \else%
+        \hskip6pt%
+        \fi%
+        \insertsectionhead}
+    % \end{beamercolorbox}
+    % \begin{beamercolorbox}[ht=2.5ex,dp=1.125ex,%
+    %   leftskip=.3cm,rightskip=.3cm plus1fil]{subsection in head/foot}
+      {\usebeamerfont{subsection in head/foot}%
+        \ifbeamer@tree@showhooks
+        \setbox\beamer@tempbox=\hbox{\insertsubsectionhead}%
+        \ifdim\wd\beamer@tempbox>1pt%
+        \hskip4pt%
+        -- \hskip1pt%
+        \fi%
+        \else%
+        \hskip12pt%
+        \fi%
+        \insertsubsectionhead}
+    \end{beamercolorbox}
+  \end{minipage}
+  \begin{minipage}{0.2\textwidth}
+\raisebox{-0.8\height}[0pt][0pt]{\insertheadergraphic}
+  \end{minipage}
+    \begin{beamercolorbox}[wd=0.75\paperwidth,colsep=1.5pt]{lower separation line head}
+    \end{beamercolorbox}
+}
+
+\defbeamertemplate*{footline}{kaust}{\hfill \insertframenumber/\inserttotalframenumber\ \ }
+\mode<all>
+
+\newcommand{\backupbegin}{
+   \newcounter{finalframe}
+   \setcounter{finalframe}{\value{framenumber}}
+}
+\newcommand{\backupend}{
+   \setcounter{framenumber}{\value{finalframe}}
+}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "../main"
+%%% End:
