@@ -5,6 +5,7 @@ typedef int int32;
 typedef unsigned int uint32;
 typedef unsigned short ind_t;
 
+#include <stdexcept>
 #include <vector>
 #include <map>
 #include <list>
