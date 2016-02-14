@@ -108,7 +108,7 @@ provided!".format(name))
 
 @public
 class MIMCRun(object):
-    def __init__(self, fnWorkModel=None, fnHierarchy=None, **kwargs):
+    def __init__(self, **kwargs):
         self.params = MyDefaultDict(**kwargs)
         self.fnHierarchy = None
         self.fnWorkModel = None
@@ -135,13 +135,18 @@ supported in one dimensional problem")
     def _checkFunctions(self):
         # If self.params.reuse_samples is True then
         # all_data will always equal data
+        if self.fnWorkModel is None and hasattr(self.params, "gamma"):
+            self.fnWorkModel = lambda lvls: work_estimate(lvls,
+                                                          self.params.gamma)
+
+        if self.fnHierarchy is None:
+            self.fnHierarchy = lambda lvls: get_geometric_hl(lvls,
+                                                             self.params.h0inv,
+                                                             self.params.beta)
+
         if self.params.bayesian and self.fnWorkModel is None:
             raise NotImplementedError("Bayesian parameter fitting is only \
 supported with a given work model")
-
-        if self.params.bayesian and self.fnHierarchy is None:
-            raise NotImplementedError("Bayesian parameter fitting is only \
-supported with a given hierarchy")
 
         if self.fnWorkModel is None:
             # ADDING WORK MODEL B
@@ -155,10 +160,13 @@ are the same as the argument ones")
         #                                                 self.params.M0,
         #                                                 self.params.min_lvls/self.params.dim))
         if self.fnExtendLvls is None:
-            weights = self.params.beta * (np.array(self.params.w) +
-                                          (np.array(self.params.s) -
-                                           np.array(self.params.gamma))/2.)
+            weights = np.array(self.params.beta) * (np.array(self.params.w) +
+                                                    (np.array(self.params.s) -
+                                                     np.array(self.params.gamma))/2.)
             weights /= np.sum(weights)
+            if len(weights) == 1:
+                weights = weights[0]*np.ones(self.params.dim)
+
             self.fnExtendLvls = lambda w=weights: extend_lvls_td(w,
                                                                  self.data.lvls,
                                                                  self.params.M0,
@@ -201,8 +209,8 @@ are the same as the argument ones")
         add_store('verbose', type='bool', default=False,
                   help="Verbose output")
         add_store('bayesian', type='bool', default=False,
-                  help="Use Bayesian fitting to estimate bias, variance and optimize number\
-of levels every iteration. This is based on CMLMC.")
+                  help="Use Bayesian fitting to estimate bias, variance and optimize number \
+of levels in every iteration. This is based on CMLMC.")
         add_store('dim', type=int, help="Number of dimensions used in MIMC")
         add_store('reuse_samples', type='bool', default=True,
                   help="Reuse samples between iterations")
@@ -219,49 +227,57 @@ estimating bias (sometimes that's too conservative).")
                   help="Maximum increment of number of levels \
 between iterations")
         add_store('w', nargs='+', type=float,
-                  help="Weak convergence rates. Must be of size -DIM")
+                  help="Weak convergence rates. Must be scalar or of size -dim. \
+Not needed if fnExtendLvls is specified and -bayesian is False.")
         add_store('s', nargs='+', type=float,
-                  help="Strong convergence rates. Must be of size -DIM")
-        add_store('kappa0', type=float, default=0.1,
+                  help="Strong convergence rates. Must be a scalar or of size -dim. \
+Not needed if fnExtendLvls is specified and -bayesian is False.")
+        add_store('bayes_k0', type=float, default=0.1,
                   help="Variance in prior of the constant \
-in the weak convergence model")
-        add_store('kappa1', type=float, default=0.1,
+in the weak convergence model. Not needed if -bayesian is False.")
+        add_store('bayes_k1', type=float, default=0.1,
                   help="Variance in prior of the constant \
-in the strong convergence model")
-        add_store('w_sig', type=float, default=-1,
+in the strong convergence model. Not needed if -bayesian is False.")
+        add_store('bayes_w_sig', type=float, default=-1,
                   help="Variance in prior of the power \
-in the weak convergence model, negative values lead to disabling the fitting")
-        add_store('s_sig', type=float, default=-1,
+in the weak convergence model, negative values lead to disabling the fitting. \
+Not needed if -bayesian is False.")
+        add_store('bayes_s_sig', type=float, default=-1,
                   help="Variance in prior of the power \
-in the weak convergence model, negative values lead to disabling the fitting")
+in the weak convergence model, negative values lead to disabling the fitting. \
+Not needed if -bayesian is False.")
 
         if additional:
             add_store('TOL', type=float,
                       help="The required tolerance for the MIMC run")
-            add_store('maxTOL', type=float, default=0.1,
+            add_store('max_TOL', type=float, default=0.1,
                       help="The (approximate) tolerance for \
-the first iteration.")
+the first iteration. Not needed if TOLs is provided to doRun.")
             add_store('M0', type=int, default=10, help="The initial number of samples \
-used to estimate the sample variance when not using the Bayesian estimators")
+used to estimate the sample variance when not using the Bayesian estimators. \
+Not needed if fnExtendLvls is provided.")
             add_store('min_lvls', type=int, default=2,
                       help="The initial number of levels to run \
-the first iteration")
+the first iteration. Not needed if fnExtendLvls is provided.")
             add_store('max_add_itr', type=int, default=2,
                       help="Maximum number of additonal iterations\
-to run when the MIMC is expected to but is not converging")
+to run when the MIMC is expected to but is not converging.\
+Not needed if TOLs is provided to doRun.")
             add_store('r1', type=float, default=2,
                       help="A parameters to control to tolerance sequence \
-for tolerance larger than TOL")
+for tolerance larger than TOL. Not needed if TOLs is provided to doRun.")
             add_store('r2', type=float, default=1.1,
                       help="A parameters to control to tolerance sequence \
-for tolerance smaller than TOL")
+for tolerance smaller than TOL. Not needed if TOLs is provided to doRun.")
             add_store('beta', type=float, nargs='+', default=[2],
-                      help="Level separation parameter to be used \
-with get_geometric_hl")
-            add_store('h0inv', type=float, default=2,
-                      help="Minimum element size get_geometric_hl")
+                      help="Level separation parameter. to be used \
+with get_geometric_hl. Not needed if fnHierarchy is provided.")
+            add_store('h0inv', type=float, nargs='+',default=2,
+                      help="Minimum element size get_geometric_hl. \
+Not needed if fnHierarchy is provided.")
             add_store('gamma', type=float,
-                      help="Work exponent to be used with work_estimate")
+                      help="Work exponent to be used with work_estimate.\
+Not needed if fnWorkModel and fnExtendLvls are provided.")
         return mimcgrp
 
     def calcTotalWork(self):
@@ -323,10 +339,10 @@ Bias={:.12e}\nStatErr={:.12e}\
                              np.zeros(L-oL)))
         mu = self.Q.W*(hl[1:]**self.Q.w[0] - hl[:-1]**self.Q.w[0])
         Lambda = 1./(self.Q.S*(hl[1:]**(self.Q.s[0]/2.) - hl[:-1]**(self.Q.s[0]/2.))**2)
-        G_3 = self.params.kappa1 * Lambda + M
-        G_4 = self.params.kappa1 + \
-              0.5*M*(m2 + self.params.kappa0 * (m1 - mu)**2 /
-                     (self.params.kappa0 + M)) - 0.5*m1**2
+        G_3 = self.params.bayes_k1 * Lambda + M
+        G_4 = self.params.bayes_k1 + \
+              0.5*M*(m2 + self.params.bayes_k0 * (m1 - mu)**2 /
+                     (self.params.bayes_k0 + M)) - 0.5*m1**2
         return np.concatenate((self.all_data[0].calcVl(), G_4 / G_3))
 
     def _estimateQParams(self):
@@ -346,7 +362,7 @@ Bias={:.12e}\nStatErr={:.12e}\
         sl = (hl[begin:]**(self.Q.s[0]/2.) - hl[(begin-1):-1]**(self.Q.s[0]/2.))**-2
         self.Q.W = np.sum(wl * sl * M * m1) / np.sum(M * wl**2 * sl)
         self.Q.S = np.sum(sl * (m2 - 2*m1*self.Q.W*wl + self.Q.W**2*wl**2)) / np.sum(M)
-        if self.params.w_sig > 0 or self.params.s_sig > 0:
+        if self.params.bayes_w_sig > 0 or self.params.bayes_s_sig > 0:
             # TODO: Estimate w=q_1, s=q_2
             raise NotImplemented("TODO, estimate w and s")
 
@@ -418,7 +434,7 @@ estimate optimal number of levels"
     def doRun(self, finalTOL=None, TOLs=None, verbose=None):
         self._checkFunctions()
         finalTOL = finalTOL or self.params.TOL
-        TOLs = TOLs or get_tol_sequence(finalTOL, self.params.maxTOL,
+        TOLs = TOLs or get_tol_sequence(finalTOL, self.params.max_TOL,
                                         max_additional_itr=self.params.max_add_itr,
                                         r1=self.params.r1,
                                         r2=self.params.r2)
@@ -467,7 +483,7 @@ estimate optimal number of levels"
                     self.data.zero_samples()
                 self._genSamples(todoM, verbose)
                 if verbose:
-                    print(self)
+                    print(self, end="")
                     print("------------------------------------------------")
                 if self.params.bayesian or (self.totalErrorEst() < TOL):
                     break
@@ -475,6 +491,7 @@ estimate optimal number of levels"
             tic = time.time()
             if verbose:
                 print("{} took {}".format(TOL, totalTime))
+                print("################################################")
             if self.fnItrDone:
                 self.fnItrDone(itrIndex, TOL, totalTime)
             if TOL <= finalTOL:

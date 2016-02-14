@@ -30,14 +30,8 @@ def MLMCPDE(DB=True):
 
     mimcRun = mimc.MIMCRun(**vars(parser.parse_known_args()[0]))
     if DB:
-        run_id = db.createRun(TOL=mimcRun.params.TOL, tag="NoTag",
-                              dim=mimcRun.data.dim, params=mimcRun.params)
-    mimcRun.setFunctions(fnWorkModel=lambda lvls:
-                         mimc.work_estimate(lvls, mimcRun.params.gamma),
-                         fnHierarchy=lambda lvls:
-                         mimc.get_geometric_hl(lvls, mimcRun.params.h0inv,
-                                               mimcRun.params.beta),
-                         fnSampleLvl=lambda *a: SamplePDE(sf, mimcRun, *a),
+        run_id = db.createRun(mimc_run=mimcRun, tag="NoTag")
+    mimcRun.setFunctions(fnSampleLvl=lambda *a: SamplePDE(sf, mimcRun, *a),
                          fnItrDone=lambda *a: db.writeRunData(run_id, mimcRun,
                                                               *a))
 

@@ -4,14 +4,17 @@
 
 \begin{frame}{Vision (the ambitious version)}
   \begin{itemize}
-  \item Provide an easy to use, easy to extend open source
-    library for UQ problem, both forward and inverse,
+  \item Provide an \textbf{easy to use}, \textbf{customizable} and
+    \textbf{extendable} open source library for UQ problems, both
+    forward and inverse.
   \item Multilevel and Mult-index versions of Monte Carlo, Quasi Monte
     Carlo, Stochastic collocation, Least square projection among
     others.
   \item Support parallel computation whenever possible.
   \item Provide easy to use storage facility.
-  \item Provide easy to customize plotting facility (for common plots).
+  \item Provide easy to customize plotting facility (for common
+    plots).
+  \item Provide easy to run test cases.
   \item Use \texttt{Python} for easier implementation of most parts of code
     and use object code (\texttt{C++} or \texttt{FORTRAN}) for
     computationally expensive parts.
@@ -20,24 +23,24 @@
 
 \begin{frame}{What has been done}
   \begin{itemize}
-  \item Multilevel and Mult-index versions of Monte Carlo
+  \item Multilevel and Mult-index versions of Monte Carlo.
   \item MySQL database storage.
-  \item Still need to port existing plotting code
-  \item Needs heavy documenting
-  \item Needs further testing
+  \item Still need to port existing plotting code.
+  \item Needs heavy documenting.
+  \item Needs further testing.
   \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Installation (for users)}
+\begin{frame}[fragile]{Installation}
 \begin{verbatim}
-> cd WorkDir
 > git clone \
 https://ahajiali@bitbucket.org/ahajiali/mimclib.git
 > cd mimclib
 > make
 
-> python -c 'from  mimclib.db import DBCreationScript ; \
-print DBCreationScript();' | mysql
+> python -c \
+'from mimclib.db import MIMCDatabase ; \
+ print MIMCDatabase().DBCreationScript();' | mysql
 \end{verbatim}
 \end{frame}
 
@@ -52,65 +55,158 @@ mimcRun = mimc.MIMCRun(**vars(tmp))
 
 # Create entry in DB for MIMCRun
 db = mimcdb.MIMCDatabase()
-run_id = db.createRun(TOL=mimcRun.params.TOL,
-                      tag="MyFirstMIMCRun",
-                      dim=mimcRun.data.dim,
-                      params=mimcRun.params)
+run_id = db.createRun(mimc_run=mimcRun,
+                      tag="MyFirstMIMCRun")
 \end{verbatim}
 \end{frame}
 
 \begin{frame}[fragile]{User defined functions with typical impl.}
 \begin{verbatim}
-def fnWorkModel(lvls):
-  return mimc.work_estimate(lvls, mimcRun.params.gamma)
 
-def fnHierarchy(lvls):
-  return mimc.get_geometric_hl(lvls,
-                               mimcRun.params.h0inv,
-                               mimcRun.params.beta)
+def myItrDone(itrIndex, TOL, totalTime)
+    db.writeRunData(run_id, mimcRun,
+                    itrIndex, TOL, totalTime)
 
-def fnItrDone(itrIndex, TOL, totalTime)
-  db.writeRunData(run_id, mimcRun,
-                  itrIndex, TOL, totalTime)
+def mySampleLvl(moments, mods, inds, M):
+    ...
 
-def fnSampleLvl(moments, mods, inds, M):
-  ...
-
-
-\end{verbatim}
-\end{frame}
-
-
-\begin{frame}[fragile]{A typical python example for a single MLMC run}
-\begin{verbatim}
-mimcRun.setFunctions(fnWorkModel=fnWorkModel,
-                     fnHierarchy=fnHierarchy,
-                     fnSampleLvl=fnSampleLvl,
-                     fnItrDone=fnItrDone)
+mimcRun.setFunctions(fnSampleLvl=mySampleLvl,
+                     fnItrDone=myItrDone)
 
 mimcRun.doRun()
 print("Final value:", mimcRun.data.calcEg())
 \end{verbatim}
 \end{frame}
 
+\begin{frame}[fragile]{Minimal example of \texttt{fnSampleLvl}}
+\begin{verbatim}
+def mySampleLvl(moments, mods, inds, M):
+    tic = time.time()
+    psums = np.zeros(len(moments))
+    for m in range(0, M):
+        rf = SampleRandomField()
+        solves = np.array([SolvePDE(rf, ind)
+                           for ind in inds])
+        psums += np.sum(mods*solves)**moments
+    return psums, time.time() - tic
+\end{verbatim}
+\end{frame}
+
+
+\begin{frame}[fragile]{Running the script. MLMC}
+\begin{verbatim}[fontsize=\tiny]
+> python run.py --help
+...
+MIMC:
+  Arguments to control MIMC logic
+  -mimc_verbose VERBOSE
+                        Verbose output (default: False)
+  -mimc_bayesian BAYESIAN
+                        Use Bayesian fitting to estimate bias, variance and
+                        optimize number of levels in every iteration. This is
+                        based on CMLMC. (default: False)
+  -mimc_dim DIM         Number of dimensions used in MIMC
+  -mimc_reuse_samples REUSE_SAMPLES
+                        Reuse samples between iterations (default: True)
+  -mimc_abs_bnd ABS_BND
+                        Take absolute value of deltas when estimating bias
+                        (sometimes that's too conservative). (default: False)
+  -mimc_const_theta CONST_THETA
+                        Use the same theta for all iterations (default: False)
+  -mimc_Ca CA           Parameter to control confidence level (default: 3)
+  -mimc_theta THETA     Default theta or error splitting parameter. (default:
+                        0.5)
+  -mimc_incL INCL       Maximum increment of number of levels between
+                        iterations (default: 2)
+  -mimc_w W [W ...]     Weak convergence rates. Must be scalar or of size
+                        -dim. Not needed if fnExtendLvls is specified and
+                        -bayesian is False.
+  -mimc_s S [S ...]     Strong convergence rates. Must be a scalar or of size
+                        -dim. Not needed if fnExtendLvls is specified and
+                        -bayesian is False.
+  -mimc_bayes_k0 BAYES_K0
+                        Variance in prior of the constant in the weak
+                        convergence model. Not needed if -bayesian is False.
+                        (default: 0.1)
+\end{verbatim}
+\end{frame}
+
+
 \begin{frame}[fragile]{Running the script. MLMC}
 \begin{verbatim}
 > python run.py --  -mimc_TOL 0.001 \
-   -mimc_verbose True -mimc_dim 1 -mimc_bayesian True \
+   -mimc_verbose True -mimc_beta 2 \
    -mimc_w 2 -mimc_s 4 -mimc_gamma 3 \
-   -mimc_beta 2
+   -mimc_dim 1 -mimc_bayesian True
 \end{verbatim}
 \end{frame}
 
-\begin{frame}[fragile]{Running the script. MLMC}
+\begin{frame}[fragile]{Running the script. MIMC}
 \begin{verbatim}
 > python run.py --  -mimc_TOL 0.001 \
-   -mimc_verbose True -mimc_dim 3 -mimc_w 2 2 2 \
-   -mimc_s 4 4 4 -mimc_gamma 1 1 1 \
-   -mimc_beta 2 2 2
+   -mimc_verbose True -mimc_beta 2 \
+   -mimc_w 2 -mimc_s 4 -mimc_gamma 3 \
+   -mimc_dim 3
 \end{verbatim}
 \end{frame}
 
+
+\begin{frame}[fragile]{Running the script. MIMC}
+\begin{verbatim}[fontsize=\tiny]
+# TOL 0.064
+# Doing 10 of level [0, 0, 0]
+# Doing 10 of level [1, 0, 0]
+# Doing 10 of level [0, 1, 0]
+# Doing 10 of level [0, 0, 1]
+# theta 0.910430964557
+# New M:  [1 1 1 1]
+Time=1.279902458191e-02
+Eg=4.081242043174e-02
+Bias=5.732418268322e-03
+StatErr=2.315553460368e-02
+TotalErrEst=2.888795287200e-02
+Level            E                   V                 M           Time    Var%
+[0, 0, 0] +3.508000216342e-02  5.816263231955e-04      10   2.677917e-04   68.75%
+[1, 0, 0] -3.577668501136e-05  5.889145858614e-10      10   3.391027e-04   67.83%
+[0, 1, 0] +5.051151896793e-03  1.390208876034e-05      10   3.349066e-04   73.82%
+[0, 0, 1] +7.170430565400e-04  2.252022211074e-07      10   3.381014e-04   66.18%
+------------------------------------------------
+0.064 took 0.0444068908691
+################################################
+# TOL 0.032
+# Doing 10 of level [2, 0, 0]
+# Doing 10 of level [0, 2, 0]
+# Doing 10 of level [1, 1, 0]
+# Doing 10 of level [0, 0, 2]
+# Doing 10 of level [0, 1, 1]
+# Doing 10 of level [1, 0, 1]
+# theta 0.915065479473
+# New M:  [9 1 1 1 1 1 1 1 1 1]
+Time=4.904699325562e-02
+Eg=4.353032508860e-02
+Bias=2.717904656861e-03
+StatErr=2.317969676795e-02
+TotalErrEst=2.589760142481e-02
+Level            E                   V                 M           Time    Var%
+[0, 0, 0] +3.508000216342e-02  5.816263231955e-04      10   2.677917e-04   68.75%
+[1, 0, 0] -3.577668501136e-05  5.889145858614e-10      10   3.391027e-04   67.83%
+[0, 1, 0] +5.051151896793e-03  1.390208876034e-05      10   3.349066e-04   73.82%
+[0, 0, 1] +7.170430565400e-04  2.252022211074e-07      10   3.381014e-04   66.18%
+[2, 0, 0] +8.522078350716e-04  3.342785097452e-07      10   5.013943e-04   67.84%
+[0, 2, 0] +1.351443321107e-03  7.968378702599e-07      10   4.625082e-04   66.05%
+[1, 1, 0] +4.313801868918e-05  2.521346195284e-09      10   7.431030e-04  116.40%
+[0, 0, 2] +3.864966472036e-04  1.033711179566e-07      10   4.588842e-04   83.19%
+[0, 1, 1] +8.082552132935e-05  6.935959828495e-09      10   7.311106e-04  103.04%
+[1, 0, 1] +3.793313461029e-06  1.016459571338e-11      10   7.277966e-04   84.05%
+------------------------------------------------
+0.032 took 0.142173051834
+################################################
+\end{verbatim}
+\end{frame}
+
+\begin{frame}{\lib\ needs your help!}
+Questions?
+\end{frame}
 %%% Local Variables:
 %%% mode: latex
 %%% TeX-master: "../main"
