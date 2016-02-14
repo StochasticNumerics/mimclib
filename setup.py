@@ -1,6 +1,9 @@
 import os
 from setuptools import setup, find_packages, Extension
 
+from setuptools.command.install import install as cmd_install
+class install(cmd_install, object):
+    def run(self): super(install, self).run()
 
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
@@ -28,5 +31,6 @@ setup(
                   library_dirs=['/'],
                   libraries=[],
                   extra_compile_args=['-g', '-std=c++11']
-                 )]
+                 )],
+    cmdclass={'install': install},
 )
