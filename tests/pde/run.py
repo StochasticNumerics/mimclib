@@ -12,9 +12,13 @@ warnings.filterwarnings('error')
 
 def TestDB():
     db = mimcdb.MIMCDatabase(user="abdo")
-    data = db.readRunData(db.getRunDataIDs())
-    import IPython
-    IPython.embed()
+    data = db.readRunData(db.getRunDataIDs(tag="D1_poisson"))
+
+    import matplotlib.pyplot as plt
+    import mimclib.plot as miplt
+    fig = plt.figure()
+    miplt.plotTOLvsErrors(fig.gca(), data)
+    plt.show()
 
 
 def MLMCPDE(DB=True):
