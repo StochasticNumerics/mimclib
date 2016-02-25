@@ -230,7 +230,7 @@ FROM {lvlTable} WHERE data_id=?'''.format(lvlTable=self.lvlTable), [data_id]).fe
                       format(','.join(map(str, np.array(dim).
                                           astype(np.int).reshape(-1)))))
         if tag is not None:
-            qs.append('tag LIKE {}'.format(tag))
+            qs.append('''tag LIKE '{}' '''.format(tag))
         if minTOL is not None:
             qs.append('TOL>=({})'.format(minTOL))
         if maxTOL is not None:
@@ -256,7 +256,7 @@ tag after specifying run_id")
                       format(','.join(map(str, np.array(dim).
                                           astype(np.int).reshape(-1)))))
         if tag is not None:
-            qs.append('r.tag LIKE {}'.format(tag))
+            qs.append('''r.tag LIKE '{}' '''.format(tag))
 
         if run_id is not None:
             qs.append('r.run_id in ({})'.
