@@ -32,7 +32,7 @@ run_data[i].run.data is an instance of mimc.MIMCData
     return ax.scatter(xy[sel, 0], xy[sel, 1], *args, **kwargs)
   
 def plotElVsLvls(ax, runs_data, *args, **kwargs):
-    """Plots El vs TOL of @runs_data, as
+    """Plots El, Vl vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
@@ -46,7 +46,7 @@ ax is in instance of matplotlib.axes
         L = len(r.run.data.lvls)
         psums[:L, :] += r.run.data.psums[:, :1]
         M[:L] += r.run.data.M
-        
+
     ax.set_yscale('log')
     El = psums[:, 0]/M
     Vl = psums[:, 1]/M - El**2
@@ -54,7 +54,7 @@ ax is in instance of matplotlib.axes
                        yerr=3*np.sqrt(Vl/M), *args, **kwargs)
   
 def plotTlVsLvls(ax, runs_data, *args, **kwargs):
-    """Plots El vs TOL of @runs_data, as
+    """Plots Tl vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
@@ -71,5 +71,20 @@ ax is in instance of matplotlib.axes
         
     ax.set_yscale('log')
     return ax.plot(np.arange(0, maxL), Tl/M,
+                   *args, **kwargs)
+
+def plotLVsTl(ax, runs_data, *args, **kwargs):
+    """Plots L vs TOL of @runs_data, as
+returned by MIMCDatabase.readRunData()
+ax is in instance of matplotlib.axes
+"""
+    L = [len(r.run.data.lvls) for r in runs_data]
+    TOL = [r.TOL for r in runs_data]
+    max_dim = np.max([r.run.data.dim for r in runs_data])
+    if max_dim > 1:
+        raise Exception("This function is only for 1D MIMC")
+        
+    ax.set_yscale('log')
+    return ax.plot(L, TOL,
                    *args, **kwargs)
   
