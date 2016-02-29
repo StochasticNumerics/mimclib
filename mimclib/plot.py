@@ -1,5 +1,40 @@
 import numpy as np
 
+class ECDF(StepFunction):
+
+    """
+    Return the Empirical CDF of an array as a step function.
+
+    Parameters
+    ----------
+    x : array-like
+        Observations
+    side : {'left', 'right'}, optional
+        Default is 'right'. Defines the shape of the intervals constituting the
+        steps. 'right' correspond to [a, b) intervals and 'left' to (a, b].
+
+    Returns
+    -------
+    Empirical CDF as a step function.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from statsmodels.distributions.empirical_distribution import ECDF
+    >>>
+    >>> ecdf = ECDF([3, 3, 1, 4])
+    >>>
+    >>> ecdf([3, 55, 0.5, 1.5])
+    array([ 0.75,  1.  ,  0.  ,  0.25])
+    """
+
+    def __init__(self, x, side='right'):
+        x = np.array(x, copy=True)
+        x.sort()
+        nobs = len(x)
+        y = np.linspace(1. / nobs, 1, nobs)
+        super(ECDF, self).__init__(x, y, side=side, sorted=True)
+
 def plotTOLvsErrors(ax, runs_data, exact, *args, **kwargs):
     """Plots Errors vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
@@ -83,17 +118,22 @@ ax is in instance of matplotlib.axes
     real_time = False
     if "real_time" in kwargs:
         real_time = kwargs["real_time"]
-
     if real_time:
         TotalTime = [np.sum(r.totalTime) for r in runs_data]
+        minTime = np.min([r.totalTime for r in runs_data])
+        maxTime = np.max([r.totalTime for r in runs_data])
     else:
         TotalTime = [np.sum(r.run.data.t) for r in runs_data]
+        minTime = np.min([r.run.data.t for r in runs_data])
+        maxTime = np.max([r.run.data.t for r in runs_data])
     TOL = [r.TOL for r in runs_data]
+    N = [len(r.TOL) for r in runs_data]
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel('TOL')
     ax.set_ylabel('Time (s)')
-    return ax.plot(TOL, TotalTime, *args, **kwargs)
+    return ax.plot(TOL, TotalTime/N,
+                   yerr=(maxTime-minTime), *args, **kwargs)
 
 def plotLvlsVsTOL(ax, runs_data, *args, **kwargs):
     """Plots L vs TOL of @runs_data, as
@@ -109,3 +149,16 @@ ax is in instance of matplotlib.axes
     ax.set_xscale('log')
     return ax.scatter(TOL, L, *args, **kwargs)
   
+def plotErrorsQQ(ax, runs_data, *args, **kwargs) #(runs, tol, marker='o', color="b", fig=None, label=None):
+    """Plots Normal vs Empirical CDF of @runs_data, as
+returned by MIMCDatabase.readRunData()
+ax is in instance of matplotlib.axes
+"""
+    from scipy.stats import norm
+    x = [r.run.data.calcEg() for r in runs_data if r.TOL == kwargs["tol"]]
+    x = np.array(x)
+    x = (x - np.mean(x)) / np.std(x)
+    ec = ECDF(x)
+    ax.set_xlabel(r'Empirical CDF')
+    ax.set_ylabel("Normal CDF")
+    return ax.scatter(norm.cdf(x), ec(x), *args, **kwargs)
