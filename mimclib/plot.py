@@ -1,7 +1,49 @@
 import numpy as np
+import matplotlib.pylab as plt
+
+class FunctionLine2D(plt.Line2D):
+    def __init__(self, fn, data=None, **kwargs):
+        self.flip = kwargs.pop('flip', False)
+        self.fn = fn
+        if data is not None:
+            x = np.array(sum([list(d[0]) for d in data], []))
+            y = np.array(sum([list(d[1]) for d in data], []))
+            if len(x) > 0 and len(y) > 0:
+                const = [np.mean(y/fn(x)), 0]
+                # const = np.polyfit(fn(x), y, 1)
+                # print(const, np.mean(y/fn(x)))
+                self.fn = lambda x, cc=const, ff=fn: cc[0] * ff(x) + cc[1]
+
+        super(FunctionLine2D, self).__init__([], [], **kwargs)
+
+    def _linspace(self, lim, scale, N=100):
+        if scale == 'log':
+            return np.exp(np.linspace(np.log(lim[0]), np.log(lim[1]), N))
+        else:
+            return np.linspace(lim[0], lim[1], N)
+
+    def draw(self, renderer):
+        import matplotlib.pylab as plt
+        ax = self.get_axes()
+        if self.flip:
+            y = self._linspace(ax.get_ylim(), ax.get_yscale())
+            self.set_xdata(self.fn(y))
+            self.set_ydata(y)
+        else:
+            x = self._linspace(ax.get_xlim(), ax.get_xscale())
+            self.set_xdata(x)
+            self.set_ydata(self.fn(x))
+
+        plt.Line2D.draw(self, renderer)
+        self.set_xdata([])
+        self.set_ydata([])
+
+    @staticmethod
+    def ExpLine(rate, data=None, **kwargs):
+        return FunctionLine2D(lambda x, r=rate: np.array(x)**r,
+                              data=data, **kwargs)
 
 class StepFunction(object):
-
     """
     A basic step function.
 
@@ -110,7 +152,7 @@ class ECDF(StepFunction):
         y = np.linspace(1. / nobs, 1, nobs)
         super(ECDF, self).__init__(x, y, side=side, sorted=True)
 
-def plotTOLvsErrors(ax, runs_data, exact, *args, **kwargs):
+def plotTOLvsErrors(ax, runs_data, *args, **kwargs):
     """Plots Errors vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
@@ -126,14 +168,20 @@ run_data[i].totalTime
 run_data[i].run is an instance of mimc.MIMCRun
 run_data[i].run.data is an instance of mimc.MIMCData
 """
+    exact = kwargs.pop('exact', None)
     if exact is None:
         # Calculate mean based on data
-        minTOL = np.min([r.TOL for r in runs_data])
+        minTOL = np.min([r.finalTOL for r in runs_data])
         exact = np.mean([r.run.data.calcEg() for r in runs_data if
-                         r.TOL == minTOL])
+                         r.finalTOL == minTOL])
 
-    xy = np.array([[r.TOL, np.abs(exact - r.run.data.calcEg())] for r
-                   in runs_data])
+    xy = np.array([[r.finalTOL, np.abs(exact - r.run.data.calcEg())] for r
+                   in runs_data if r.iteration_index+1 == r.total_iterations])
+
+    if not kwargs.pop('no_ref', False):
+        ax.add_line(FunctionLine2D.ExpLine(1, [],
+                                           linestyle='--', c='k',
+                                           label='TOL'))
 
     ax.set_yscale('log')
     ax.set_xscale('log')
@@ -162,9 +210,33 @@ ax is in instance of matplotlib.axes
     ax.set_yscale('log')
     El = psums[:, 0]/M
     Vl = psums[:, 1]/M - El**2
-    return ax.errorbar(np.arange(0, maxL), El,
-                       yerr=[3*np.sqrt(Vl/M)-Vl, Vl-3*np.sqrt(Vl/M)],
-                       *args, **kwargs)
+    return ax.errorbar(np.arange(0, maxL), El, *args,
+                       yerr=3*np.sqrt(Vl/M),
+                       **kwargs) 
+
+def plotVarVsLvls(ax, runs_data, *args, **kwargs):
+    """Plots El, Vl vs TOL of @runs_data, as
+returned by MIMCDatabase.readRunData()
+ax is in instance of matplotlib.axes
+"""
+    maxL = np.max([len(r.run.data.lvls) for r in runs_data])
+    max_dim = np.max([r.run.data.dim for r in runs_data])
+    if max_dim > 1:
+        raise Exception("This function is only for 1D MIMC")
+    psums = np.zeros((maxL, 2))
+    M = np.zeros(maxL)
+    for r in runs_data:
+        L = len(r.run.data.lvls)
+        psums[:L, :] += r.run.data.psums[:, :1]
+        M[:L] += r.run.data.M
+
+    ax.set_xlabel(r'$\ell$')
+    ax.set_ylabel(r'$E_\ell$')
+    ax.set_yscale('log')
+    El = psums[:, 0]/M
+    Vl = psums[:, 1]/M - El**2
+    return ax.plot(np.arange(0, maxL), Vl, *args,
+                   **kwargs) 
 
 def plotTimeVsLvls(ax, runs_data, *args, **kwargs):
     """Plots Time vs TOL of @runs_data, as
@@ -191,27 +263,31 @@ def plotTimeVsTOL(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    real_time = False
-    if "real_time" in kwargs:
-        real_time = kwargs["real_time"]
-        if real_time:
-            TotalTime = [np.sum(r.totalTime) for r in runs_data]
-            minTime = np.min([r.totalTime for r in runs_data])
-            maxTime = np.max([r.totalTime for r in runs_data])
+    real_time = kwargs.pop("real_time", False)
+
+    if real_time:
+        xy = [[r.TOL, r.totalTime] for r in runs_data]
     else:
-        TotalTime = [np.sum(r.run.data.t) for r in runs_data]
-        minTime = np.min([r.run.data.t for r in runs_data])
-        maxTime = np.max([r.run.data.t for r in runs_data])
-    TOL = [r.TOL for r in runs_data]
-    N = [len(r.TOL) for r in runs_data]
+        xy = [[r.TOL, np.sum(r.run.data.t)] for r in runs_data]
+
+    import itertools
+    xy = sorted(xy, key=lambda xx: xx[0])
+    
+    TOLs = []
+    times = []
+    for TOL, itr in itertools.groupby(xy, key=lambda xx: xx[0]):
+        all_times = [d[1] for d in itr]
+        times.append([np.min(all_times), np.mean(all_times), np.max(all_times)])
+        TOLs.append(TOL)
+    times = np.array(times)
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel('TOL')
     ax.set_ylabel('Time (s)')
-    return ax.errorbar(TOL, TotalTime/N,
-                       yerr=[maxTime-TotalTime/N, 
-                             TotalTime/N-minTime],
-                       *args, **kwargs)
+    return ax.errorbar(TOLs, times[:, 1], *args,
+                       yerr=[times[:,1]-times[:,0], 
+                             times[:,2]-times[:,1]],
+                       **kwargs)
 
 def plotLvlsVsTOL(ax, runs_data, *args, **kwargs):
     """Plots L vs TOL of @runs_data, as
@@ -232,11 +308,18 @@ def plotErrorsQQ(ax, runs_data, *args, **kwargs): #(runs, tol, marker='o', color
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
+    tol = kwargs.pop("tol", 0.0)
     from scipy.stats import norm
-    x = [r.run.data.calcEg() for r in runs_data if r.TOL == kwargs["tol"]]
+    x = [r.run.data.calcEg() for r in runs_data if r.TOL == tol]
     x = np.array(x)
     x = (x - np.mean(x)) / np.std(x)
     ec = ECDF(x)
     ax.set_xlabel(r'Empirical CDF')
     ax.set_ylabel("Normal CDF")
+
+    if not kwargs.pop('no_ref', False):
+        ax.add_line(FunctionLine2D.ExpLine(1, [],
+                                           linestyle='--', c='k',
+                                           label='ref'))
+
     return ax.scatter(norm.cdf(x), ec(x), *args, **kwargs)
