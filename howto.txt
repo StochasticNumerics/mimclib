@@ -25,3 +25,30 @@ close failed in file object destructor:
 sys.excepthook is missing
 lost sys.stderr
 kw13919:litvina~/MIMCLIB/mimclib> 
+
+
+
+kw13919:litvina~/MIMCLIB/mimclib> mysql -u root -p
+Enter password:
+mysql> grant all privileges on *.* to 'litvina'@'%' with grant option;
+Query OK, 0 rows affected (0.00 sec)
+
+
+
+Then
+kw13919:litvina~/MIMCLIB/mimclib> module unload gcc
+Unloading module gcc version 4.6.0
+
+kw13919:litvina~/MIMCLIB/mimclib> module load gcc/5.1.0
+Loading module gcc version 5.1.0
+Initial gcc version: 4.8.4-2ubuntu1~14.04.1)
+/opt/share/gcc/5.1.0
+Current gcc version: 5.1.0
+
+kw13919:litvina~/MIMCLIB/mimclib> python -c "from mimclib.db import MIMCDatabase ; print MIMCDatabase().DBCreationScript();" | mysql
+
+kw13919:litvina~/MIMCLIB/mimclib>
+
+
+It seems that installation of mimclib is successful.
+
