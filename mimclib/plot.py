@@ -183,6 +183,8 @@ run_data[i].run.data is an instance of mimc.MIMCData
                                            linestyle='--', c='k',
                                            label='TOL'))
 
+    ax.set_xlabel('TOL')
+    ax.set_ylabel('Errors')
     ax.set_yscale('log')
     ax.set_xscale('log')
     sel = np.logical_and(np.isfinite(xy[:, 1]), xy[:, 1] >=
@@ -211,7 +213,7 @@ ax is in instance of matplotlib.axes
     El = psums[:, 0]/M
     Vl = psums[:, 1]/M - El**2
     return ax.errorbar(np.arange(0, maxL), El, *args,
-                       yerr=3*np.sqrt(Vl/M),
+                       yerr=3*np.sqrt(np.abs(Vl/M)),
                        **kwargs) 
 
 def plotVarVsLvls(ax, runs_data, *args, **kwargs):
@@ -231,7 +233,7 @@ ax is in instance of matplotlib.axes
         M[:L] += r.run.data.M
 
     ax.set_xlabel(r'$\ell$')
-    ax.set_ylabel(r'$E_\ell$')
+    ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
     El = psums[:, 0]/M
     Vl = psums[:, 1]/M - El**2
@@ -253,7 +255,9 @@ ax is in instance of matplotlib.axes
         L = len(r.run.data.lvls)
         Tl[:L] += r.run.data.t
         M[:L] += r.run.data.M
-        
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel(r'$\ell$')
     ax.set_yscale('log')
     return ax.plot(np.arange(0, maxL), Tl/M,
                    *args, **kwargs)
@@ -299,9 +303,11 @@ ax is in instance of matplotlib.axes
     max_dim = np.max([r.run.data.dim for r in runs_data])
     if max_dim > 1:
         raise Exception("This function is only for 1D MIMC")
-        
+
     ax.set_xscale('log')
-    return ax.scatter(TOL, L, *args, **kwargs)
+    ax.set_xlabel('TOL')
+    ax.set_ylabel(r'$\ell$')
+    return ax.scatter(TOL, L)
   
 def plotErrorsQQ(ax, runs_data, *args, **kwargs): #(runs, tol, marker='o', color="b", fig=None, label=None):
     """Plots Normal vs Empirical CDF of @runs_data, as
@@ -322,4 +328,4 @@ ax is in instance of matplotlib.axes
                                            linestyle='--', c='k',
                                            label='ref'))
 
-    return ax.scatter(norm.cdf(x), ec(x), *args, **kwargs)
+    return ax.scatter(norm.cdf(x), ec(x))
