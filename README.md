@@ -57,10 +57,10 @@ Then
 
 `module load gcc/5.1.0`
 
->Loading module gcc version 5.1.0
->Initial gcc version: 4.8.4-2ubuntu1~14.04.1)
->/opt/share/gcc/5.1.0
->Current gcc version: 5.1.0
+>Loading module gcc version 5.1.0 <br />
+>Initial gcc version: 4.8.4-2ubuntu1~14.04.1) <br />
+>/opt/share/gcc/5.1.0 <br />
+>Current gcc version: 5.1.0 <br />
 
 `python -c "from mimclib.db import MIMCDatabase ; print MIMCDatabase().DBCreationScript();" | mysql`
 
