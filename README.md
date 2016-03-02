@@ -14,7 +14,7 @@ I tried to install mysql and failed
 
 `python -c "from mimclib.db import MIMCDatabase ; print MIMCDatabase().DBCreationScript();" | mysql`
 
-ERROR 1045 (28000): Access denied for user 'litvina'@'localhost' (using password: NO)
+>ERROR 1045 (28000): Access denied for user 'litvina'@'localhost' (using password: NO)
 
 >close failed in file object destructor: <br />
 >sys.excepthook is missing <br />
