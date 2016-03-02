@@ -16,8 +16,8 @@ I tried to install mysql and failed
 
 ERROR 1045 (28000): Access denied for user 'litvina'@'localhost' (using password: NO)
 
->close failed in file object destructor: 
->sys.excepthook is missing 
+>close failed in file object destructor: <br />
+>sys.excepthook is missing <br />
 >lost sys.stderr 
 
 I installed first
@@ -28,9 +28,9 @@ Tried again and failed again
 
 `python -c "from mimclib.db import MIMCDatabase ; print MIMCDatabase().DBCreationScript();" | mysql`
 
->ERROR 1045 (28000): Access denied for user 'litvina'@'localhost' (using password: NO) 
-.close failed in file object destructor: 
->sys.excepthook is missing 
+>ERROR 1045 (28000): Access denied for user 'litvina'@'localhost' (using password: NO) <br />
+>close failed in file object destructor: <br />
+>sys.excepthook is missing <br />
 >lost sys.stderr 
 
 Correct solution is
@@ -43,7 +43,7 @@ Correct solution is
 
 `grant all privileges on *.* to 'litvina'@'%' with grant option;`
 
-.Query OK, 0 rows affected (0.00 sec)
+>Query OK, 0 rows affected (0.00 sec)
 
 
 
