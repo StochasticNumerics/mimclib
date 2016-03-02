@@ -1,4 +1,4 @@
-User notes from Alexander Litvinenko:
+### User notes from Alexander Litvinenko:
 
 First time command make didn't work The reason was an old gcc compiler. 
 
@@ -14,8 +14,7 @@ I tried to install mysql and failed
 
 `python -c "from mimclib.db import MIMCDatabase ; print MIMCDatabase().DBCreationScript();" | mysql`
 
->ERROR 1045 (28000): Access denied for user 'litvina'@'localhost' (using password: NO)
-
+>ERROR 1045 (28000): Access denied for user 'litvina'@'localhost' (using password: NO) <br />
 >close failed in file object destructor: <br />
 >sys.excepthook is missing <br />
 >lost sys.stderr 
