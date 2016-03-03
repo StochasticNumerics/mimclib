@@ -240,7 +240,7 @@ ax is in instance of matplotlib.axes
     return ax.plot(np.arange(0, maxL), Vl, *args,
                    **kwargs) 
 
-def plotTimeVsLvls(ax, runs_data, *args, **kwargs):
+def plotLvlsVsTime(ax, runs_data, *args, **kwargs):
     """Plots Time vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
@@ -256,10 +256,10 @@ ax is in instance of matplotlib.axes
         Tl[:L] += r.run.data.t
         M[:L] += r.run.data.M
 
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel(r'$\ell$')
+    ax.set_xlabel(r'$\ell$')
+    ax.set_ylabel('Time (s)')
     ax.set_yscale('log')
-    return ax.plot(np.arange(0, maxL), Tl/M,
+    return ax.plot(Tl/M, np.arange(0, maxL),
                    *args, **kwargs)
 
 def plotTimeVsTOL(ax, runs_data, *args, **kwargs):

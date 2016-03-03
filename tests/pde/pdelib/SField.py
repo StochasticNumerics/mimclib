@@ -10,8 +10,13 @@ arr_uint = npct.ndpointer(dtype=np.uint32, ndim=2, flags='CONTIGUOUS')
 class SField(object):
     try:
         # TODO: We need to figure out a way
-        lib = npct.load_library("libsolver_nd_df.so",
-                                os.path.join(os.path.dirname(__file__)))
+        save = ct.cdll._dlltype
+        try:
+            ct.cdll._dlltype = lambda name: ct.CDLL(name, ct.RTLD_GLOBAL)
+            path = os.path.join(os.path.dirname(__file__))
+            lib = npct.load_library("libsolver_nd_df.so", path)
+        finally:
+            ct.cdll._dlltype = save
         lib.SFieldCreate.restype = ct.c_ulong
         lib.SFieldBeginRuns.restype = ct.c_ulong
         lib.SFieldEndRuns.restype = ct.c_ulong
