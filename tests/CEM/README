@@ -1,0 +1,6 @@
+Here should be an example from computational electro-magnetics (CEM).
+This is a joint prohect between Prof. Tempone and Prof. Bagci groups.
+The geometry of the shape is uncertain. We research how this uncertainty propagate to the solution (e.h. complete electro-magnetics scattered fields).
+We pre-generate various meshes for the sphere (later plan consider other shapes). 
+The CEM code is fortran code provided by Hakan Bagci and his group.
+Hakan provide to us few object files and interface of the main black boc procedure , which should be called from MLMC code.
