@@ -39,6 +39,41 @@ double schoebelZhuHullWhite0(szhw imod,double targetVar,double K){
   return rv;
 };
 
+void schoebelZhuHullWhiteEllStep(double dt,szhw imod,double *x,double *y,double *xa,double *ya,double *dW){
+  //std :: cout << "Components " << x[0] << " " << x[1]  << " " << x[2]  << " " <<  xa[0]  << " " <<  xa[1]  << " " <<  xa[2] << "\n";
+  //std :: cout << "dW " << dW[0] << " " << dW[1]  << " " << dW[2]<< "\n";
+  y[2] = (x[2]+imod.kap*imod.sbar*dt)/(1+imod.kap*dt);
+  y[1] = (x[1]+imod.lam*imod.theta*dt)/(1+imod.lam*dt);
+  y[0] = x[0]/(1-x[1]*dt);
+  ya[2] = (xa[2]+imod.kap*imod.sbar*dt)/(1+imod.kap*dt);
+  ya[1] = (xa[1]+imod.lam*imod.theta*dt)/(1+imod.lam*dt);
+  ya[0] = xa[0]/(1-xa[1]*dt);
+  y[0] += pow(x[2],imod.p)*x[0]*dW[0];
+  y[1] += imod.eta*dW[1];
+  y[2] += imod.gam*pow(x[2],imod.p-1)*dW[2];
+  ya[0] -= pow(xa[2],imod.p)*xa[0]*dW[0];
+  ya[1] -= imod.eta*dW[1];
+  ya[2] -= imod.gam*pow(xa[2],imod.p-1)*dW[2];
+  for(unsigned int j=0;j<3;j++){
+    x[j] = y[j];
+    xa[j] = ya[j];
+  }
+  //std :: cout << "Components " << x[0] << " " << x[1]  << " " << x[2]  << " " <<  xa[0]  << " " <<  xa[1]  << " " <<  xa[2] << "\n";
+}
+
+void schoebelZhuHullWhiteUpdateCVar(double dt,double * x,double * cVar){
+  cVar[0] += x[2]*x[2]*dt;
+}
+
+void schoebelZhuHullWhiteUpdateDiscount(double dt, double * x, double * disc){
+  disc[0] += dt*x[1];
+}
+
+void schoebelZhuHullWhiteUpdateEvaluate(double * x, double * disc, double *cVar, double* targetVar, double *g,double *K){
+  if ((g[0]<0.0)&&(cVar[0]>=targetVar[0])) g[0]= exp(-1*disc[0])*((x[0]-K[0]>0.0)?x[0]-K[0]:0.0);
+}
+
+
 double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K){
   
   unsigned int i;
@@ -98,31 +133,14 @@ double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K){
     // Store random increments for simulation of the coarse process
     for(i=0;i<3;i++) dW2[i]=dW1[i];
     // Update cumulative variance and discount
-    cVar[0] += x1[2]*x1[2]*dt;
-    discount[0] += x1[1]*dt;
-    cVar[2] += x1a[2]*x1a[2]*dt;
-    discount[2] += x1a[1]*dt;
-    // Drift-implicit time step
-    y1[2] = (x1[2]+imod.kap*imod.sbar*dt)/(1+imod.kap*dt);
-    y1[1] = (x1[1]+imod.lam*imod.theta*dt)/(1+imod.lam*dt);
-    y1[0] = x1[0]/(1-x1[1]*dt);
-    y1a[2] = (x1a[2]+imod.kap*imod.sbar*dt)/(1+imod.kap*dt);
-    y1a[1] = (x1a[1]+imod.lam*imod.theta*dt)/(1+imod.lam*dt);
-    y1a[0] = x1a[0]/(1-x1a[1]*dt);
-    // Volatility part
-    y1[0] += pow(x1[2],imod.p)*x1[0]*dW1[0];
-    y1[1] += imod.eta*dW1[1];
-    y1[2] += imod.gam*pow(x1[2],imod.p-1)*dW1[2];
-    y1a[0] -= pow(x1a[2],imod.p)*x1a[0]*dW1[0];
-    y1a[1] -= imod.eta*dW1[1];
-    y1a[2] -= imod.gam*pow(x1a[2],imod.p-1)*dW1[2];
-    for(i=0;i<3;i++){
-      x1[i] = y1[i];
-      x1a[i] = y1a[i];
-    }
+    schoebelZhuHullWhiteUpdateCVar(dt,x1,cVar);
+    schoebelZhuHullWhiteUpdateCVar(dt,x1a,cVar+2);
+    schoebelZhuHullWhiteUpdateDiscount(dt,x1,discount);
+    schoebelZhuHullWhiteUpdateDiscount(dt,x1a,discount+2);
+    schoebelZhuHullWhiteEllStep(dt,imod,x1,y1,x1a,y1a,dW1);
     // Check if volatility target is reached
-    if ((g[0]<0.0)&&(cVar[0]>=targetVar)) g[0]= exp(-1*discount[0])*((x1[0]-K>0.0)?x1[0]-K:0.0);
-    if ((g[2]<0.0)&&(cVar[2]>=targetVar)) g[2]= exp(-1*discount[2])*((x1a[0]-K>0.0)?x1a[0]-K:0.0);
+    schoebelZhuHullWhiteUpdateEvaluate(x1,discount,cVar,&targetVar,g,&K);
+    schoebelZhuHullWhiteUpdateEvaluate(x1a,discount+2,cVar+2,&targetVar,g+2,&K);
     // Draw new random variables
     for(i=0;i<3;i++) dW1[i] = sqrtDt*normalDouble();
     //dW1[0] = imod.corrStructure[0]*dW1[0]+imod.corrStructure[1]*dW1[1]+imod.corrStructure[2]*dW1[2];
@@ -132,66 +150,32 @@ double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K){
     // Increment the random increments for the coarse process
     for(i=0;i<3;i++) dW2[i]+=dW1[i];
     // Update compounded variance and discount factor
-    cVar[0] += x1[2]*x1[2]*dt;
-    cVar[2] += x1a[2]*x1a[2]*dt;
-    discount[0] += x1[1]*dt;
-    discount[2] += x1a[1]*dt;
-    // Drift implicit update of the state
-    y1[2] = (x1[2]+imod.kap*imod.sbar*dt)/(1+imod.kap*dt);
-    y1[1] = (x1[1]+imod.lam*imod.theta*dt)/(1+imod.lam*dt);
-    y1[0] = x1[0]/(1-x1[1]*dt);
-    y1a[2] = (x1a[2]+imod.kap*imod.sbar*dt)/(1+imod.kap*dt);
-    y1a[1] = (x1a[1]+imod.lam*imod.theta*dt)/(1+imod.lam*dt);
-    y1a[0] = x1a[0]/(1-x1a[1]*dt);
-    // Volatility part
-    y1[0] += pow(x1[2],imod.p)*x1[0]*dW1[0];
-    y1[1] += imod.eta*dW1[1];
-    y1[2] += imod.gam*pow(x1[2],imod.p-1)*dW1[2];
-    y1a[0] -= pow(x1a[2],imod.p)*x1a[0]*dW1[0];
-    y1a[1] -= imod.eta*dW1[1];
-    y1a[2] -= imod.gam*pow(x1a[2],imod.p-1)*dW1[2];
-    for(i=0;i<3;i++){
-      x1[i] = y1[i];
-      x1a[i] = y1a[i];
-    }
+    schoebelZhuHullWhiteUpdateCVar(dt,x1,cVar);
+    schoebelZhuHullWhiteUpdateCVar(dt,x1a,cVar+2);
+    schoebelZhuHullWhiteUpdateDiscount(dt,x1,discount);
+    schoebelZhuHullWhiteUpdateDiscount(dt,x1a,discount+2);
+    schoebelZhuHullWhiteEllStep(dt,imod,x1,y1,x1a,y1a,dW1);
     //std :: cout << "Components " << x1[0] << " " << x1[1]  << " " << x1[2]  << " " <<  x1a[0]  << " " <<  x1a[1]  << " " <<  x1a[2] << "\n";
     //std :: cout << "cumVar " << cVar[0] << " " << cVar[2] << " (" << targetVar << ")\n";
     
     // Re-check if volatility budget is full
-    if ((g[0]<0.0)&&(cVar[0]>=targetVar))  g[0]=exp(-1*discount[0])*((x1[0]-K>0.0)?x1[0]-K:0.0);
-    if ((g[2]<0.0)&&(cVar[2]>=targetVar))  g[2]=exp(-1*discount[2])*((x1a[0]-K>0.0)?x1a[0]-K:0.0);
+    schoebelZhuHullWhiteUpdateEvaluate(x1,discount,cVar,&targetVar,g,&K);
+    schoebelZhuHullWhiteUpdateEvaluate(x1a,discount+2,cVar+2,&targetVar,g+2,&K);
     // Update the compounded variance and discount for the coarse process
-    cVar[1] += x2[2]*x2[2]*dt*2;
-    discount[1] += x2[1]*dt*2;
-    cVar[3] += x2a[2]*x2a[2]*dt*2;
-    discount[3] += x2a[1]*dt*2;
-    // Drift implicit bit of the coarse process
-    y2[2] = (x2[2]+imod.kap*imod.sbar*dt)/(1+imod.kap*dt*2);
-    y2[1] = (x2[1]+imod.lam*imod.theta*dt)/(1+imod.lam*dt*2);
-    y2[0] = x2[0]/(1-x2[1]*dt*2);
-    y2a[2] = (x2a[2]+imod.kap*imod.sbar*dt)/(1+imod.kap*dt*2);
-    y2a[1] = (x2a[1]+imod.lam*imod.theta*dt)/(1+imod.lam*dt*2);
-    y2a[0] = x2a[0]/(1-x2a[1]*dt*2);
-    //std :: cout << "asset price 2: "<< x2[0];
-    // Stochastic part
-    y2[0] += pow(x2[2],imod.p)*x2[0]*dW2[0];
-    y2[1] += imod.eta*dW2[1];
-    y2[2] += imod.gam*pow(x2[2],imod.p-1)*dW2[2];
-    y2a[0] -= pow(x2a[2],imod.p)*x2a[0]*dW2[0];
-    y2a[1] -= imod.eta*dW2[1];
-    y2a[2] -= imod.gam*pow(x2a[2],imod.p-1)*dW2[2];
-    for(i=0;i<3;i++){
-      x2[i] = y2[i];
-      x2a[i] = y2a[i];
-    }
+    schoebelZhuHullWhiteUpdateCVar(dt*2,x2,cVar+1);
+    schoebelZhuHullWhiteUpdateCVar(dt*2,x2a,cVar+3);
+    schoebelZhuHullWhiteUpdateDiscount(dt*2,x2,discount+1);
+    schoebelZhuHullWhiteUpdateDiscount(dt*2,x2a,discount+3);
+    schoebelZhuHullWhiteEllStep(dt*2,imod,x2,y2,x2a,y2a,dW2);
     // Evaluate the payoff, if condition satisfied
-    if ((g[1]<0.0)&&(cVar[1]>=targetVar)) g[1]= exp(-1*discount[1])*((x2[0]-K>0.0)?x2[0]-K:0.0);
-    if ((g[3]<0.0)&&(cVar[3]>=targetVar)) g[3]= exp(-1*discount[3])*((x2a[0]-K>0.0)?x2a[0]-K:0.0);
+    schoebelZhuHullWhiteUpdateEvaluate(x2,discount+1,cVar+1,&targetVar,g+1,&K);
+    schoebelZhuHullWhiteUpdateEvaluate(x2a,discount+3,cVar+3,&targetVar,g+3,&K);
     t += 2*dt;
     //std :: cout << "cumVar2 " << cVar[0] << " " << cVar[2] << " (" << targetVar << ")\n";
     //std :: cout << "gs " << g[0] << " " << g[1] << " " << g[2] << " " << g[3] << "\n";
 
     //std :: cout << t << " " << x1[0] << " " << x1[1] << " " << x1[2] << " " << " " << cVar[0]<< " " << g[0]  << " " << x2[0] << " " << x2[1] << " " << x2[2]<< " " << g[1] << " " << cVar[1]<< " " << targetVar << "\n";
+    //std :: cout << "Components " << x1[0] << " " << x1[1]  << " " << x1[2]  << " " <<  x1a[0]  << " " <<  x1a[1]  << " " <<  x1a[2] << "\n";
   }
 
   retVal = 0.5*(g[0]+g[2]-g[1]-g[3]);
@@ -294,7 +278,7 @@ double bsPrice(double S,double sigma, double r, double T, double K,double TOL){
   var /= M[0];
   var -= mu*mu;
   lV[0] = var/M[0];
-  bias = M[0] + sqrt(lV[0]);
+  bias = 2*TOL;
 
   while(abs(bias)+sqrt(varErr)>TOL){
     // Improve bias

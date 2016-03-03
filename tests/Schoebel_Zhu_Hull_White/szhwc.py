@@ -9,8 +9,15 @@ lib.bsDt.restype = ctypes.c_double
 lib.bsNoStep.restype = ctypes.c_double
 lib.bsNoStep.argtypes = [ctypes.c_double]*5
 
+# Function pointers to the C functions
 BS = lib.bsDt 
 BS0 = lib.bsNoStep
+
+# Compute the Black-Scholes option price using
+# Multilevel Monte Carlo
+# and solving a special case of
+# the stochastic process in equation 2.1 of
+# http://ta.twi.tudelft.nl/mf/users/oosterle/oosterlee/Hybrid_SZHW.pdf
 
 def MultiLevelBlackScholes(S,K,sig,T,r,TOL,Ca=2.0):
     L = 1
@@ -64,5 +71,4 @@ def MultiLevelBlackScholes(S,K,sig,T,r,TOL,Ca=2.0):
     plt.legend()
     plt.ylabel('$\mu$')
     plt.grid(1)
-
     return price
