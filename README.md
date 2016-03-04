@@ -65,3 +65,5 @@ Then
 
 It seems that installation of mimclib is successful.
 
+>test1
+`test
