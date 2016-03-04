@@ -65,5 +65,7 @@ Then
 
 It seems that installation of mimclib is successful.
 
->test1
-`test
+To be able to run tests/pde example, you have to:
+1) Create by hand libraries. Go to each directory which contain file makefile and run command make. These libraries will be necessary to compile  tests/pde example.
+2) Change everywhere "abdo" onto your MYSQL login name. Start with file tests/pde/run.py  . You may need to recompile everything after changes.
+
