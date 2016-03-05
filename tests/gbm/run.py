@@ -60,6 +60,10 @@ def MLMCPDE(DB=True):
                          fnItrDone=fnItrDone)
 
     mimcRun.doRun()
+
+    if mimcRun.params.db:
+        db.markRunSuccessful(run_id)
+
     return mimcRun.data.calcEg()
 
 try:

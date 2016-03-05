@@ -6,7 +6,7 @@ cmd = "python run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5 -mimc_verbose False  \
 
 import numpy as np
 realizations = 50
-TOLs = 0.1*2**-np.arange(0, 10)
+TOLs = 0.1*2.**-np.arange(0., 10.)
 for TOL in TOLs:
     for i in range(0, realizations):
         print cmd.format(bayesian=True, tag="GBM_bayes", TOL=TOL,

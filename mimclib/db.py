@@ -78,10 +78,12 @@ CREATE TABLE IF NOT EXISTS {runTable} (
     run_id                INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
     creation_date           DATETIME NOT NULL,
     TOL                   REAL,
+    successful            INTEGER NOT NULL,
     dim                   INTEGER,
     tag                   VARCHAR(128),
     params                mediumblob
 );
+CREATE VIEW vw_runs AS SELECT run_id, creation_date, TOL, successful, dim, tag FROM {runTable};
 
 CREATE TABLE IF NOT EXISTS {dataTable} (
     data_id                 INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
@@ -97,6 +99,8 @@ CREATE TABLE IF NOT EXISTS {dataTable} (
     FOREIGN KEY (run_id) REFERENCES run(run_id) ON DELETE CASCADE,
     UNIQUE KEY idx_itr_idx (run_id, iteration_idx)
 );
+CREATE VIEW vw_data AS SELECT data_id, run_id, TOL,
+creation_date, bias, stat_error, totalTime, iteration_idx FROM {dataTable};
 
 CREATE TABLE IF NOT EXISTS {lvlTable} (
     data_id       INTEGER NOT NULL,
@@ -110,7 +114,11 @@ CREATE TABLE IF NOT EXISTS {lvlTable} (
     psums         mediumblob,
     FOREIGN KEY (data_id) REFERENCES data(data_id) ON DELETE CASCADE,
     UNIQUE KEY idx_run_lvl (data_id, lvl_hash)
-);'''.format(DBName=self.DBName, runTable=self.runTable,
+);
+
+CREATE VIEW vw_lvls AS SELECT data_id, lvl,
+El, Vl, Wl, Tl, Ml FROM {lvlTable};
+'''.format(DBName=self.DBName, runTable=self.runTable,
              dataTable=self.dataTable, lvlTable=self.lvlTable)
 
         return script
@@ -122,10 +130,15 @@ CREATE TABLE IF NOT EXISTS {lvlTable} (
         dim = dim or mimc_run.data.dim
         with DBConn(**self.connArgs) as cur:
             cur.execute('''
-INSERT INTO {runTable}(creation_date, TOL, tag, dim, params)
-VALUES(datetime(), ?, ?, ?, ?)'''.format(runTable=self.runTable),
+INSERT INTO {runTable}(creation_date, TOL, tag, dim, params, successful)
+VALUES(datetime(), ?, ?, ?, ?, 0)'''.format(runTable=self.runTable),
                         [TOL, tag, dim, _pickle(params)])
             return cur.getLastRowID()
+
+    def markRunSuccessful(self, run_id):
+        with DBConn(**self.connArgs) as cur:
+            cur.execute(''' UPDATE {runTable} SET successful=1 WHERE
+            run_id={run_id}'''.format(runTable=self.runTable, run_id=run_id))
 
     def writeRunData(self, run_id, mimc_run, iteration_idx, TOL,
                      totalTime, userdata=None):
