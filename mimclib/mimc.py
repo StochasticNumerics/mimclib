@@ -413,7 +413,7 @@ estimate optimal number of levels"
             mods, inds = lvl_to_inds_general(lvls[i])
             psums[i, :], t[i] = self.fnSampleLvl(p, mods, inds,
                                                  totalM[i] - self.data.M[i])
-            M[i] = totalM[i]
+            M[i] = totalM[i] - self.data.M[i]
         self.data.addSamples(psums, M, t)
         self.all_data.addSamples(psums, M, t)
         self._estimateAll()

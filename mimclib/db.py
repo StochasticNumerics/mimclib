@@ -78,12 +78,12 @@ CREATE TABLE IF NOT EXISTS {runTable} (
     run_id                INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
     creation_date           DATETIME NOT NULL,
     TOL                   REAL,
-    successful            INTEGER NOT NULL,
+    done_flag            INTEGER NOT NULL,
     dim                   INTEGER,
     tag                   VARCHAR(128),
     params                mediumblob
 );
-CREATE VIEW vw_runs AS SELECT run_id, creation_date, TOL, successful, dim, tag FROM {runTable};
+CREATE VIEW vw_runs AS SELECT run_id, creation_date, TOL, done_flag, dim, tag FROM {runTable};
 
 CREATE TABLE IF NOT EXISTS {dataTable} (
     data_id                 INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
@@ -130,14 +130,14 @@ El, Vl, Wl, Tl, Ml FROM {lvlTable};
         dim = dim or mimc_run.data.dim
         with DBConn(**self.connArgs) as cur:
             cur.execute('''
-INSERT INTO {runTable}(creation_date, TOL, tag, dim, params, successful)
+INSERT INTO {runTable}(creation_date, TOL, tag, dim, params, done_flag)
 VALUES(datetime(), ?, ?, ?, ?, -1)'''.format(runTable=self.runTable),
                         [TOL, tag, dim, _pickle(params)])
             return cur.getLastRowID()
 
     def markRunDone(self, run_id, flag=1):
         with DBConn(**self.connArgs) as cur:
-            cur.execute(''' UPDATE {runTable} SET successful={flag}
+            cur.execute(''' UPDATE {runTable} SET done_flag={flag}
             WHERE run_id={run_id}'''.format(runTable=self.runTable,
                                             flag=flag, run_id=run_id))
 
@@ -259,7 +259,7 @@ FROM {lvlTable} WHERE data_id=?'''.format(lvlTable=self.lvlTable), [data_id]).fe
         return ids
 
     def getRunDataIDs(self, run_id=None, minTOL=None, maxTOL=None,
-                      dim=None, tag=None):
+                      dim=None, tag=None, done_flag=None):
         if (run_id is not None) and (dim is not None or tag is not None):
             raise Exception("Cannot specify dimensions and \
 tag after specifying run_id")
@@ -275,6 +275,11 @@ tag after specifying run_id")
         if run_id is not None:
             qs.append('r.run_id in ({})'.
                       format(','.join(map(str, np.array(run_id).
+                                          astype(np.int).reshape(-1)))))
+
+        if done_flag is not None:
+            qs.append('r.done_flag in ({})'.
+                      format(','.join(map(str, np.array(done_flag).
                                           astype(np.int).reshape(-1)))))
 
         if minTOL is not None:

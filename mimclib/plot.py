@@ -354,7 +354,7 @@ def genPDFBooklet(fileName, runs_data, exact=None):
         pdf.savefig(fig)
 
         fig = plt.figure()
-        plotTimeVsLvls(fig.gca(), runs_data)
+        plotTimeVsLvls(fig.gca(), runs_data, '-o')
         pdf.savefig(fig)
 
         fig = plt.figure()
