@@ -11,7 +11,7 @@ warnings.filterwarnings('error')
 
 
 def TestDB():
-    db = mimcdb.MIMCDatabase(user="abdo")
+    db = mimcdb.MIMCDatabase(user="luis")
     data = db.readRunData(db.getRunDataIDs(tag="D1_poisson"))
 
     import matplotlib.pyplot as plt
@@ -30,7 +30,7 @@ def MLMCPDE(DB=True):
     mimc.MIMCRun.addOptionsToParser(parser)
     sf = SField()
     if DB:
-        db = mimcdb.MIMCDatabase(user="abdo")
+        db = mimcdb.MIMCDatabase(user="luis")
 
     mimcRun = mimc.MIMCRun(**vars(parser.parse_known_args()[0]))
     if DB:
