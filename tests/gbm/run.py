@@ -39,9 +39,8 @@ def addExtraArguments(parser):
                         action="store", help="Seed for random generator")
 
 
-def MLMCPDE(DB=True):
+def main():
     import argparse
-
     parser = argparse.ArgumentParser(add_help=True)
     addExtraArguments(parser)
     mimc.MIMCRun.addOptionsToParser(parser)
@@ -77,22 +76,21 @@ try:
     __lib__ = npct.load_library("_libwcumsum.so", __libdir)
     __lib__.wcumsum.restype = None
     __lib__.wcumsum.argtypes = [__arr_double__, __arr_double__,
-                                ct.c_uint32, ct.c_double, __arr_double__]
+                                ct.c_uint32, __arr_double__]
 
-    def wcumsum(x, w, x0=0):
+    def wcumsum(x, w):
         output = np.empty(len(x))
-        __lib__.wcumsum(x, w, len(x), x0, output)
+        __lib__.wcumsum(x, w, len(x), output)
         return output
 
 except:
-    raise
     warnings.warn("Using Python (very slow) version for wcumsum. Consider running make")
-    def wcumsum(x, w, x0=0):
+    def wcumsum(x, w):
         output = np.empty(len(x))
-        output[0] = w[0]*x0 + x[0]
+        output[0] = x[0]
         for i in range(1, len(output)):
             output[i] = w[i]*output[i-1] + x[i]
-            return output
+        return output
 
 
 def mySampleLvl(run, moments, mods, inds, M):
@@ -105,15 +103,16 @@ def mySampleLvl(run, moments, mods, inds, M):
         dW = np.random.normal(size=maxN)/np.sqrt(maxN)
         solves = np.empty(len(mods))
         for i, mesh in enumerate(meshes):
+            assert(maxN % mesh == 0)
             dWl = np.sum(dW.reshape((-1, maxN//mesh)), axis=1)
-            solves[i] = wcumsum(run.params.qoi_sigma*dWl,
-                                np.ones(len(dWl)) +
-                                run.params.qoi_mu/mesh,
-                                x0=run.params.qoi_S0)[-1]
+            solves[i] = wcumsum(np.concatenate(([run.params.qoi_S0],
+                                               np.zeros(len(dWl)))),
+                                np.concatenate(([0],
+                                               run.params.qoi_sigma*dWl +
+                                               1 + run.params.qoi_mu/mesh)))[-1]
         psums += np.sum(mods*solves)**moments
 
     return psums, time.time() - timeStart
 
 if __name__ == "__main__":
-    MLMCPDE()
-    #TestDB()
+    main()

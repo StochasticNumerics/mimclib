@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pylab as plt
 
+
 class FunctionLine2D(plt.Line2D):
     def __init__(self, fn, data=None, **kwargs):
         self.flip = kwargs.pop('flip', False)
@@ -42,6 +43,7 @@ class FunctionLine2D(plt.Line2D):
     def ExpLine(rate, data=None, **kwargs):
         return FunctionLine2D(lambda x, r=rate: np.array(x)**r,
                               data=data, **kwargs)
+
 
 class StepFunction(object):
     """
@@ -113,12 +115,11 @@ class StepFunction(object):
         self.n = self.x.shape[0]
 
     def __call__(self, time):
-
         tind = np.searchsorted(self.x, time, self.side) - 1
         return self.y[tind]
 
-class ECDF(StepFunction):
 
+class ECDF(StepFunction):
     """
     Return the Empirical CDF of an array as a step function.
 
@@ -152,7 +153,8 @@ class ECDF(StepFunction):
         y = np.linspace(1. / nobs, 1, nobs)
         super(ECDF, self).__init__(x, y, side=side, sorted=True)
 
-def plotTOLvsErrors(ax, runs_data, *args, **kwargs):
+
+def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
     """Plots Errors vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
@@ -190,12 +192,9 @@ run_data[i].run.data is an instance of mimc.MIMCData
     sel = np.logical_and(np.isfinite(xy[:, 1]), xy[:, 1] >=
                          np.finfo(float).eps)
     return ax.scatter(xy[sel, 0], xy[sel, 1], *args, **kwargs)
-  
-def plotExpectVsLvls(ax, runs_data, *args, **kwargs):
-    """Plots El, Vl vs TOL of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-"""
+
+
+def __calc_moments(runs_data):
     maxL = np.max([len(r.run.data.lvls) for r in runs_data])
     max_dim = np.max([r.run.data.dim for r in runs_data])
     if max_dim > 1:
@@ -204,43 +203,40 @@ ax is in instance of matplotlib.axes
     M = np.zeros(maxL)
     for r in runs_data:
         L = len(r.run.data.lvls)
-        psums[:L, :] += r.run.data.psums[:, :1]
+        psums[:L, :] += r.run.data.psums[:, :2]
         M[:L] += r.run.data.M
 
+    El = psums[:, 0]/M
+    Vl = psums[:, 1]/M - El**2
+    return El, Vl, M
+
+
+def plotExpectVsLvls(ax, runs_data, *args, **kwargs):
+    """Plots El, Vl vs TOL of @runs_data, as
+returned by MIMCDatabase.readRunData()
+ax is in instance of matplotlib.axes
+"""
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$E_\ell$')
     ax.set_yscale('log')
-    El = psums[:, 0]/M
-    Vl = psums[:, 1]/M - El**2
-    return ax.errorbar(np.arange(0, maxL), El, *args,
-                       yerr=3*np.sqrt(np.abs(Vl/M)),
-                       **kwargs) 
+    El, Vl, M = __calc_moments(runs_data)
+    return ax.errorbar(np.arange(0, len(El)), El, *args,
+                       yerr=3*np.sqrt(np.abs(Vl/M)), **kwargs)
+
 
 def plotVarVsLvls(ax, runs_data, *args, **kwargs):
     """Plots El, Vl vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    maxL = np.max([len(r.run.data.lvls) for r in runs_data])
-    max_dim = np.max([r.run.data.dim for r in runs_data])
-    if max_dim > 1:
-        raise Exception("This function is only for 1D MIMC")
-    psums = np.zeros((maxL, 2))
-    M = np.zeros(maxL)
-    for r in runs_data:
-        L = len(r.run.data.lvls)
-        psums[:L, :] += r.run.data.psums[:, :1]
-        M[:L] += r.run.data.M
-
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
-    El = psums[:, 0]/M
-    Vl = psums[:, 1]/M - El**2
-    return ax.plot(np.arange(0, maxL), Vl, *args,
-                   **kwargs) 
+    _, Vl, _ = __calc_moments(runs_data)
+    return ax.plot(np.arange(0, len(Vl)), Vl, *args, **kwargs)
 
-def plotLvlsVsTime(ax, runs_data, *args, **kwargs):
+
+def plotTimeVsLvls(ax, runs_data, *args, **kwargs):
     """Plots Time vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
@@ -259,7 +255,7 @@ ax is in instance of matplotlib.axes
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel('Time (s)')
     ax.set_yscale('log')
-    return ax.plot(Tl/M, np.arange(0, maxL),
+    return ax.plot(np.arange(0, maxL), Tl/M,
                    *args, **kwargs)
 
 def plotTimeVsTOL(ax, runs_data, *args, **kwargs):
@@ -276,7 +272,7 @@ ax is in instance of matplotlib.axes
 
     import itertools
     xy = sorted(xy, key=lambda xx: xx[0])
-    
+
     TOLs = []
     times = []
     for TOL, itr in itertools.groupby(xy, key=lambda xx: xx[0]):
@@ -289,11 +285,11 @@ ax is in instance of matplotlib.axes
     ax.set_xlabel('TOL')
     ax.set_ylabel('Time (s)')
     return ax.errorbar(TOLs, times[:, 1], *args,
-                       yerr=[times[:,1]-times[:,0], 
+                       yerr=[times[:,1]-times[:,0],
                              times[:,2]-times[:,1]],
                        **kwargs)
 
-def plotLvlsVsTOL(ax, runs_data, *args, **kwargs):
+def plotLvlsNumVsTOL(ax, runs_data, *args, **kwargs):
     """Plots L vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
@@ -308,7 +304,7 @@ ax is in instance of matplotlib.axes
     ax.set_xlabel('TOL')
     ax.set_ylabel(r'$\ell$')
     return ax.scatter(TOL, L)
-  
+
 def plotErrorsQQ(ax, runs_data, *args, **kwargs): #(runs, tol, marker='o', color="b", fig=None, label=None):
     """Plots Normal vs Empirical CDF of @runs_data, as
 returned by MIMCDatabase.readRunData()
@@ -329,3 +325,38 @@ ax is in instance of matplotlib.axes
                                            label='ref'))
 
     return ax.scatter(norm.cdf(x), ec(x))
+
+
+def genPDFBooklet(fileName, runs_data, exact=None):
+    from matplotlib.backends.backend_pdf import PdfPages
+    from mimclib.plot import *
+    import matplotlib.pyplot as plt
+
+    with PdfPages(fileName) as pdf:
+        fig = plt.figure()
+        plotErrorsVsTOL(fig.gca(), runs_data, exact=exact)
+        pdf.savefig(fig)
+
+        # fig = plt.figure()
+        # plotErrorsQQ(fig.gca(), runs_data, exact=exact)
+        # pdf.savefig(fig)
+
+        fig = plt.figure()
+        plotTimeVsTOL(fig.gca(), runs_data)
+        pdf.savefig(fig)
+
+        fig = plt.figure()
+        plotExpectVsLvls(fig.gca(), runs_data, fmt='-o')
+        pdf.savefig(fig)
+
+        fig = plt.figure()
+        plotVarVsLvls(fig.gca(), runs_data, '-o')
+        pdf.savefig(fig)
+
+        fig = plt.figure()
+        plotTimeVsLvls(fig.gca(), runs_data)
+        pdf.savefig(fig)
+
+        fig = plt.figure()
+        plotLvlsNumVsTOL(fig.gca(), runs_data)
+        pdf.savefig(fig)
