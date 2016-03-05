@@ -23,7 +23,7 @@ def addExtraArguments(parser):
                         action="store", help="Database User")
     parser.add_argument("-db_host", type=str, default='localhost',
                         action="store", help="Database Host")
-    parser.add_argument("-db_tag", type=str,
+    parser.add_argument("-db_tag", type=str, default="NoTag",
                         action="store", help="Database Tag")
     parser.add_argument("-db", type='bool', default=False,
                         action="store", help="Save in Database")
@@ -53,16 +53,19 @@ def MLMCPDE(DB=True):
     if mimcRun.params.db:
         db = mimcdb.MIMCDatabase(user=mimcRun.params.db_user,
                                  host=mimcRun.params.db_host)
-        run_id = db.createRun(mimc_run=mimcRun, tag="NoTag")
+        run_id = db.createRun(mimc_run=mimcRun,
+                              tag=mimcRun.params.db_tag)
         fnItrDone = lambda *a: db.writeRunData(run_id, mimcRun, *a)
 
     mimcRun.setFunctions(fnSampleLvl=lambda *a: mySampleLvl(mimcRun, *a),
                          fnItrDone=fnItrDone)
 
-    mimcRun.doRun()
-
-    if mimcRun.params.db:
-        db.markRunSuccessful(run_id)
+    try:
+        mimcRun.doRun()
+        if mimcRun.params.db:
+            db.markRunDone(run_id)
+    except:
+        db.markRunDone(run_id, 0)
 
     return mimcRun.data.calcEg()
 

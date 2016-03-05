@@ -131,14 +131,15 @@ El, Vl, Wl, Tl, Ml FROM {lvlTable};
         with DBConn(**self.connArgs) as cur:
             cur.execute('''
 INSERT INTO {runTable}(creation_date, TOL, tag, dim, params, successful)
-VALUES(datetime(), ?, ?, ?, ?, 0)'''.format(runTable=self.runTable),
+VALUES(datetime(), ?, ?, ?, ?, -1)'''.format(runTable=self.runTable),
                         [TOL, tag, dim, _pickle(params)])
             return cur.getLastRowID()
 
-    def markRunSuccessful(self, run_id):
+    def markRunDone(self, run_id, flag=1):
         with DBConn(**self.connArgs) as cur:
-            cur.execute(''' UPDATE {runTable} SET successful=1 WHERE
-            run_id={run_id}'''.format(runTable=self.runTable, run_id=run_id))
+            cur.execute(''' UPDATE {runTable} SET successful={flag}
+            WHERE run_id={run_id}'''.format(runTable=self.runTable,
+                                            flag=flag, run_id=run_id))
 
     def writeRunData(self, run_id, mimc_run, iteration_idx, TOL,
                      totalTime, userdata=None):
