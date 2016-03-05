@@ -1,14 +1,21 @@
 import numpy as np
 import matplotlib.pylab as plt
 
+__all__ = []
+
+
+def public(sym):
+    __all__.append(sym.__name__)
+    return sym
+
 
 class FunctionLine2D(plt.Line2D):
     def __init__(self, fn, data=None, **kwargs):
         self.flip = kwargs.pop('flip', False)
         self.fn = fn
         if data is not None:
-            x = np.array(sum([list(d[0]) for d in data], []))
-            y = np.array(sum([list(d[1]) for d in data], []))
+            x = np.array([d[0] for d in data])
+            y = np.array([d[1] for d in data])
             if len(x) > 0 and len(y) > 0:
                 const = [np.mean(y/fn(x)), 0]
                 # const = np.polyfit(fn(x), y, 1)
@@ -154,6 +161,7 @@ class ECDF(StepFunction):
         super(ECDF, self).__init__(x, y, side=side, sorted=True)
 
 
+@public
 def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
     """Plots Errors vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
@@ -181,8 +189,7 @@ run_data[i].run.data is an instance of mimc.MIMCData
                    in runs_data if r.iteration_index+1 == r.total_iterations])
 
     if not kwargs.pop('no_ref', False):
-        ax.add_line(FunctionLine2D.ExpLine(1, [],
-                                           linestyle='--', c='k',
+        ax.add_line(FunctionLine2D.ExpLine(1, linestyle='--', c='k',
                                            label='TOL'))
 
     ax.set_xlabel('TOL')
@@ -211,6 +218,7 @@ def __calc_moments(runs_data):
     return El, Vl, M
 
 
+@public
 def plotExpectVsLvls(ax, runs_data, *args, **kwargs):
     """Plots El, Vl vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
@@ -224,6 +232,7 @@ ax is in instance of matplotlib.axes
                        yerr=3*np.sqrt(np.abs(Vl/M)), **kwargs)
 
 
+@public
 def plotVarVsLvls(ax, runs_data, *args, **kwargs):
     """Plots El, Vl vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
@@ -236,6 +245,7 @@ ax is in instance of matplotlib.axes
     return ax.plot(np.arange(0, len(Vl)), Vl, *args, **kwargs)
 
 
+@public
 def plotTimeVsLvls(ax, runs_data, *args, **kwargs):
     """Plots Time vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
@@ -258,6 +268,7 @@ ax is in instance of matplotlib.axes
     return ax.plot(np.arange(0, maxL), Tl/M,
                    *args, **kwargs)
 
+@public
 def plotTimeVsTOL(ax, runs_data, *args, **kwargs):
     """Plots Tl vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
@@ -289,6 +300,7 @@ ax is in instance of matplotlib.axes
                              times[:,2]-times[:,1]],
                        **kwargs)
 
+@public
 def plotLvlsNumVsTOL(ax, runs_data, *args, **kwargs):
     """Plots L vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
@@ -305,6 +317,7 @@ ax is in instance of matplotlib.axes
     ax.set_ylabel(r'$\ell$')
     return ax.scatter(TOL, L)
 
+@public
 def plotErrorsQQ(ax, runs_data, *args, **kwargs): #(runs, tol, marker='o', color="b", fig=None, label=None):
     """Plots Normal vs Empirical CDF of @runs_data, as
 returned by MIMCDatabase.readRunData()
@@ -320,16 +333,15 @@ ax is in instance of matplotlib.axes
     ax.set_ylabel("Normal CDF")
 
     if not kwargs.pop('no_ref', False):
-        ax.add_line(FunctionLine2D.ExpLine(1, [],
-                                           linestyle='--', c='k',
+        ax.add_line(FunctionLine2D.ExpLine(1, linestyle='--', c='k',
                                            label='ref'))
 
     return ax.scatter(norm.cdf(x), ec(x))
 
 
-def genPDFBooklet(fileName, runs_data, exact=None):
+@public
+def genPDFBooklet(fileName, runs_data, exact=None, **kwargs):
     from matplotlib.backends.backend_pdf import PdfPages
-    from mimclib.plot import *
     import matplotlib.pyplot as plt
 
     with PdfPages(fileName) as pdf:
@@ -346,11 +358,27 @@ def genPDFBooklet(fileName, runs_data, exact=None):
         pdf.savefig(fig)
 
         fig = plt.figure()
-        plotExpectVsLvls(fig.gca(), runs_data, fmt='-o')
+        ax = fig.gca()
+        line = plotExpectVsLvls(ax, runs_data, fmt='-o')
+        if "expect_ref_rate" in kwargs:
+            rate = kwargs.pop("expect_ref_rate")
+            label = r'$\exp(-{}\ell)$'.format("" if rate == 1 else str(rate))
+            ax.add_line(FunctionLine2D(lambda x, r=rate: np.exp(-r*x),
+                                       data=line[0].get_xydata(),
+                                       linestyle='--', c='k',
+                                       label=label))
         pdf.savefig(fig)
 
         fig = plt.figure()
-        plotVarVsLvls(fig.gca(), runs_data, '-o')
+        ax = fig.gca()
+        line, = plotVarVsLvls(ax, runs_data, '-o')
+        if "var_ref_rate" in kwargs:
+            rate = kwargs.pop("var_ref_rate")
+            label = r'$\exp(-{}\ell)$'.format("" if rate == 1 else str(rate))
+            ax.add_line(FunctionLine2D(lambda x, r=rate: np.exp(-r*x),
+                                       data=line.get_xydata(),
+                                       linestyle='--', c='k',
+                                       label=label))
         pdf.savefig(fig)
 
         fig = plt.figure()
