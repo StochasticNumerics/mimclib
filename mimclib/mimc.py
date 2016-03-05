@@ -298,12 +298,13 @@ Bias={:.12e}\nStatErr={:.12e}\
         E = self.data.calcEl()
         T = self.data.calcTl()
 
-        output += ("{:<8}{:^20}{:^20}{:>8}{:>15}{:>8}\n".format(
-            "Level", "E", "V", "M", "Time", "Var%"))
+        output += ("{:<8}{:^20}{:^20}{:>8}{:>15}\n".format(
+            "Level", "E", "V", "M", "Time"))
         for i in range(0, len(self.data.lvls)):
-            output += ("{:<8}{:>+20.12e}{:>20.12e}{:>8}{:>15.6e}{:>8.2f}%\n".format(
-                str(self.data.lvls[i]), E[i], V[i], self.data.M[i], T[i],
-                100 * np.sqrt(V[i]) / np.abs(E[i])))
+            assert(V[i]>=0)
+            #,100 * np.sqrt(V[i]) / np.abs(E[i])
+            output += ("{:<8}{:>+20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
+                str(self.data.lvls[i]), E[i], V[i], self.data.M[i], T[i]))
         return output
 
     ################## Bayesian specific functions
@@ -396,7 +397,6 @@ estimate optimal number of levels"
     def _addLevels(self, lvls):
         self.data.addLevels(lvls)
         self.all_data.addLevels(lvls)
-        self._estimateAll()
 
     def _genSamples(self, totalM, verbose):
         lvls = self.data.lvls
@@ -463,6 +463,7 @@ estimate optimal number of levels"
                     if L > len(self.data.lvls):
                         self._addLevels(np.arange(len(self.data.lvls),
                                                   L+1).reshape((-1, 1)))
+                        self._estimateAll()
                 elif self.bias > (1 - theta) * TOL:
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
@@ -471,6 +472,7 @@ estimate optimal number of levels"
                     self._addLevels(newlvls)
                     self._genSamples(np.concatenate((self.data.M[:prev],
                                                      newTodoM)), verbose)
+                    self._estimateAll()
 
                 todoM, theta = self._calcTheoryM(TOL,
                                                  self.bias,

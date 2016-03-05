@@ -10,5 +10,5 @@ clean:
 	-$(RM) -r build dist mimclib.egg-info
 
 deluser:
-	-$(RM) -r $(shell python -m site --user-site)/mimclib
-	-$(RM) -r $(shell python -m site --user-site)/mimclib-*-py*.egg-info
+	-$(RM) -r $(shell python -m site --user-site)/mimclib*
+#-$(RM) -r $(shell python -m site --user-site)/mimclib-*-py*.egg-info
