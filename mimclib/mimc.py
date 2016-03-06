@@ -493,9 +493,7 @@ estimate optimal number of levels"
                     print("------------------------------------------------")
                 if self.params.bayesian or (self.totalErrorEst() < TOL):
                     break
-                elif verbose:
-                    print("##### {}+{}={} > {}".format(self.bias, self.stat_error,
-                                                       self.totalErrorEst(), TOL))
+
             totalTime = time.time() - tic
             tic = time.time()
             if verbose:

@@ -11,14 +11,12 @@ import mimclib.db as mimcdb
 warnings.formatwarning = lambda msg, cat, filename, lineno, line: \
                          "{}:{}: ({}) {}\n".format(os.path.basename(filename),
                                                    lineno, cat.__name__, msg)
-warnings.filterwarnings('error')
+#warnings.filterwarnings('error')
 
 
 def addExtraArguments(parser):
-    def str2bool(v):
-        # susendberg's function
-        return v.lower() in ("yes", "true", "t", "1")
-    parser.register('type', 'bool', str2bool)
+    parser.register('type', 'bool',
+                    lambda v: v.lower() in ("yes", "true", "t", "1"))
     parser.add_argument("-db_user", type=str,
                         action="store", help="Database User")
     parser.add_argument("-db_host", type=str, default='localhost',
@@ -65,13 +63,17 @@ def main():
     try:
         mimcRun.doRun()
         if mimcRun.params.db:
+            # The run succeeded, mark it as done in the database
             db.markRunDone(run_id)
     except:
-        db.markRunDone(run_id, 0)
+        # The run failed, mark it as failed in the database
+        db.markRunDone(run_id, flag=0)
 
     return mimcRun.data.calcEg()
 
 try:
+    # Try to import the DLL version of wcumsum,
+    # This makes solving the SDE much faster
     import ctypes as ct
     import numpy.ctypeslib as npct
     __arr_double__ = npct.ndpointer(dtype=np.double, flags='C_CONTIGUOUS')
@@ -88,6 +90,7 @@ try:
 
 except:
     warnings.warn("Using Python (very slow) version for wcumsum. Consider running make")
+    # wcumsum is like cumsum, but weighted.
     def wcumsum(x, w):
         output = np.empty(len(x))
         output[0] = x[0]
@@ -106,6 +109,7 @@ def mySampleLvl(run, moments, mods, inds, M):
         dW = np.random.normal(size=maxN)/np.sqrt(maxN)
         solves = np.empty(len(mods))
         for i, mesh in enumerate(meshes):
+            # Simple Code to solve SDE!
             assert(maxN % mesh == 0)
             dWl = np.sum(dW.reshape((-1, maxN//mesh)), axis=1)
             solves[i] = wcumsum(np.concatenate(([run.params.qoi_S0],
