@@ -16,7 +16,7 @@ args = parser.parse_known_args()[0]
 # Note that 0.6931 is np.log(2)
 base = "run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  \
 -qoi_sigma 0.1 -qoi_mu 1 -qoi_seed {seed} \
--mimc_dim 1 -mimc_w 0.6931 -mimc_s 0.6931 -mimc_gamma 0.6931 -mimc_beta 2 \
+-mimc_dim 1 -mimc_w 1 -mimc_s 1 -mimc_gamma 1 -mimc_beta 2 \
 -mimc_bayesian {bayesian} "
 
 cmd_multi = "python " + base + "-mimc_verbose False -db True -db_tag {tag} " + " -db_host {} ".format(args.db_host)

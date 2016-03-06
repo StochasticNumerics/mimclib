@@ -35,8 +35,7 @@ def main():
                 d.total_iterations]
     if len(run_data) == 0:
         raise Exception("No runs!!!")
-    miplot.genPDFBooklet(args.o, run_data, exact=np.exp(1.),
-                         var_ref_rate=np.log(2), expect_ref_rate=np.log(2))
+    miplot.genPDFBooklet(args.o, run_data, exact=np.exp(1.))
 
 if __name__ == "__main__":
     main()

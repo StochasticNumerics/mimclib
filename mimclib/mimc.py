@@ -137,7 +137,7 @@ supported in one dimensional problem")
         # all_data will always equal data
         if self.fnWorkModel is None and hasattr(self.params, "gamma"):
             self.fnWorkModel = lambda lvls: work_estimate(lvls,
-                                                          self.params.gamma)
+                                                          self.params.beta*self.params.gamma)
 
         if self.fnHierarchy is None:
             self.fnHierarchy = lambda lvls: get_geometric_hl(lvls,

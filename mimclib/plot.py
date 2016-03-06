@@ -315,7 +315,7 @@ ax is in instance of matplotlib.axes
     ax.set_xscale('log')
     ax.set_xlabel('TOL')
     ax.set_ylabel(r'$\ell$')
-    return ax.scatter(TOL, L)
+    return ax.scatter(TOL, L, *args, **kwargs)
 
 @public
 def plotErrorsQQ(ax, runs_data, *args, **kwargs): #(runs, tol, marker='o', color="b", fig=None, label=None):
@@ -323,7 +323,7 @@ def plotErrorsQQ(ax, runs_data, *args, **kwargs): #(runs, tol, marker='o', color
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    tol = kwargs.pop("tol", 0.0)
+    tol = kwargs.pop("tol", np.min([r.TOL for r in runs_data]))
     from scipy.stats import norm
     x = [r.run.data.calcEg() for r in runs_data if r.TOL == tol]
     x = np.array(x)
@@ -333,10 +333,28 @@ ax is in instance of matplotlib.axes
     ax.set_ylabel("Normal CDF")
 
     if not kwargs.pop('no_ref', False):
-        ax.add_line(FunctionLine2D.ExpLine(1, linestyle='--', c='k',
-                                           label='ref'))
+        ax.add_line(FunctionLine2D.ExpLine(1, linestyle='--', c='k'))
+    ax.set_xlim([0, 1.])
+    ax.set_ylim([0, 1.])
+    return ax.scatter(norm.cdf(x), ec(x), *args, **kwargs)
 
-    return ax.scatter(norm.cdf(x), ec(x))
+
+def __add_legend(ax, handles=None, labels=None, alpha=0.5,
+                 outside=False, loc='best', *args, **kwargs):
+    import matplotlib.font_manager as fm
+    if not handles:
+        handles, labels = ax.get_legend_handles_labels()
+        if not handles:
+            return
+    if outside:
+        # Shrink current axis by 20%
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        ax.legend(handles, labels, loc='center left', fancybox=True,
+                  shadow=True, bbox_to_anchor=(1, 0.5)).draggable(True)
+    else:
+        ax.legend(handles, labels, loc=loc, fancybox=True,
+                  shadow=True).draggable(True)
 
 
 @public
@@ -344,47 +362,82 @@ def genPDFBooklet(fileName, runs_data, exact=None, **kwargs):
     from matplotlib.backends.backend_pdf import PdfPages
     import matplotlib.pyplot as plt
 
+    if "params" in kwargs:
+        params = kwargs.pop(params)
+    else:
+        maxTOL = np.max([r.TOL for r in runs_data])        
+        params = next(r.run.params for r in runs_data if r.TOL == maxTOL)
+
+    dim = params.dim
+    has_gamma_rate = hasattr(params, 'gamma')
+    has_w_rate = hasattr(params, 'w')
+    has_s_rate = hasattr(params, 's')
+    has_beta = hasattr(params, 'beta')
+    
+    import matplotlib as mpl
+    mpl.rc('text', usetex=True)
+    mpl.rc('font', **{'family': 'normal', 'weight': 'demibold',
+                      'size': 15})
+
+
+    figures = []
+    def add_fig():
+        figures.append(plt.figure())
+        return figures[-1].gca()
+
+    ax = add_fig()
+    plotErrorsVsTOL(ax, runs_data, exact=exact)
+
+    ax = add_fig()
+    plotErrorsQQ(ax, runs_data)
+
+    ax = add_fig()
+    line = plotTimeVsTOL(ax, runs_data)[0]
+    if has_s_rate and has_gamma_rate and has_w_rate:
+        rate = 2   # Should compute this rate from s,w,gamma
+        label = r'$\textrm{{TOL}}^{{ -{} }}$'.format(rate)
+        ax.add_line(FunctionLine2D(lambda x, r=rate: x**-r,
+                                   data=line.get_xydata(),
+                                   linestyle='--', c='k',
+                                   label=label))
+
+    ax = add_fig()
+    line = plotExpectVsLvls(ax, runs_data, fmt='-o')[0]
+    if has_beta and has_w_rate:
+        assert(dim == 1)
+        rate = np.sum(np.log(params.beta) * np.array(params.w))
+        label = r'$\exp(-{}\ell)$'.format("" if rate == 1 else "{:.2g}".format(rate))
+        ax.add_line(FunctionLine2D(lambda x, r=rate: np.exp(-r*x),
+                                   data=line.get_xydata(),
+                                   linestyle='--', c='k',
+                                   label=label))
+
+    ax = add_fig()
+    line, = plotVarVsLvls(ax, runs_data, '-o')
+    if has_beta and has_s_rate:
+        assert(dim == 1)
+        rate = np.sum(np.log(params.beta) * np.array(params.s))
+        label = r'$\exp(-{}\ell)$'.format("" if rate == 1 else "{:.2g}".format(rate))
+        ax.add_line(FunctionLine2D(lambda x, r=rate: np.exp(-r*x),
+                                   data=line.get_xydata(),
+                                   linestyle='--', c='k',
+                                   label=label))
+
+    plotTimeVsLvls(add_fig(), runs_data, '-o')
+
+    ax = add_fig()
+    line = plotLvlsNumVsTOL(ax, runs_data)
+    if has_beta and has_w_rate and has_gamma_rate:
+        assert(dim == 1)
+        eta = np.sum(np.array(params.w) / np.array(params.gamma))
+        rate = 1./(2.*eta)
+        label = r'${:.2g}\log\left(\textrm{{TOL}}^{{-1}}\right)$'.format(rate)
+        ax.add_line(FunctionLine2D(lambda x, r=rate: -rate*np.log(x),
+                                   data=line.get_offsets(),
+                                   linestyle='--', c='k',
+                                   label=label))
+
     with PdfPages(fileName) as pdf:
-        fig = plt.figure()
-        plotErrorsVsTOL(fig.gca(), runs_data, exact=exact)
-        pdf.savefig(fig)
-
-        # fig = plt.figure()
-        # plotErrorsQQ(fig.gca(), runs_data, exact=exact)
-        # pdf.savefig(fig)
-
-        fig = plt.figure()
-        plotTimeVsTOL(fig.gca(), runs_data)
-        pdf.savefig(fig)
-
-        fig = plt.figure()
-        ax = fig.gca()
-        line = plotExpectVsLvls(ax, runs_data, fmt='-o')
-        if "expect_ref_rate" in kwargs:
-            rate = kwargs.pop("expect_ref_rate")
-            label = r'$\exp(-{}\ell)$'.format("" if rate == 1 else str(rate))
-            ax.add_line(FunctionLine2D(lambda x, r=rate: np.exp(-r*x),
-                                       data=line[0].get_xydata(),
-                                       linestyle='--', c='k',
-                                       label=label))
-        pdf.savefig(fig)
-
-        fig = plt.figure()
-        ax = fig.gca()
-        line, = plotVarVsLvls(ax, runs_data, '-o')
-        if "var_ref_rate" in kwargs:
-            rate = kwargs.pop("var_ref_rate")
-            label = r'$\exp(-{}\ell)$'.format("" if rate == 1 else str(rate))
-            ax.add_line(FunctionLine2D(lambda x, r=rate: np.exp(-r*x),
-                                       data=line.get_xydata(),
-                                       linestyle='--', c='k',
-                                       label=label))
-        pdf.savefig(fig)
-
-        fig = plt.figure()
-        plotTimeVsLvls(fig.gca(), runs_data, '-o')
-        pdf.savefig(fig)
-
-        fig = plt.figure()
-        plotLvlsNumVsTOL(fig.gca(), runs_data)
-        pdf.savefig(fig)
+        for fig in figures:
+            __add_legend(fig.gca())
+            pdf.savefig(fig)
