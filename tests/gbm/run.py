@@ -19,7 +19,7 @@ def addExtraArguments(parser):
         # susendberg's function
         return v.lower() in ("yes", "true", "t", "1")
     parser.register('type', 'bool', str2bool)
-    parser.add_argument("-db_user", type=str, default=None,
+    parser.add_argument("-db_user", type=str,
                         action="store", help="Database User")
     parser.add_argument("-db_host", type=str, default='localhost',
                         action="store", help="Database Host")
@@ -50,8 +50,11 @@ def main():
 
     fnItrDone = None
     if mimcRun.params.db:
-        db = mimcdb.MIMCDatabase(user=mimcRun.params.db_user,
-                                 host=mimcRun.params.db_host)
+        if hasattr(mimcRun.params, "db_user"):
+            db = mimcdb.MIMCDatabase(user=mimcRun.params.db_user,
+                                     host=mimcRun.params.db_host)
+        else:
+            db = mimcdb.MIMCDatabase(host=mimcRun.params.db_host)
         run_id = db.createRun(mimc_run=mimcRun,
                               tag=mimcRun.params.db_tag)
         fnItrDone = lambda *a: db.writeRunData(run_id, mimcRun, *a)
