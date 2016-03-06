@@ -185,8 +185,8 @@ run_data[i].run.data is an instance of mimc.MIMCData
         exact = np.mean([r.run.data.calcEg() for r in runs_data if
                          r.finalTOL == minTOL])
 
-    xy = np.array([[r.finalTOL, np.abs(exact - r.run.data.calcEg())] for r
-                   in runs_data if r.iteration_index+1 == r.total_iterations])
+    xy = np.array([[r.finalTOL, np.abs(exact - r.run.data.calcEg())/exact]
+                   for r in runs_data])
 
     if not kwargs.pop('no_ref', False):
         ax.add_line(FunctionLine2D.ExpLine(1, linestyle='--', c='k',

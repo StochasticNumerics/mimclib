@@ -372,10 +372,14 @@ Bias={:.12e}\nStatErr={:.12e}\
 estimate optimal number of levels"
         minL = len(self.data)
         minWork = np.inf
-        for L in range(len(self.data.lvls), len(self.data.lvls)+1+self.params.incL):
+        LsRange = range(len(self.data.lvls), len(self.data.lvls)+1+self.params.incL)
+        for L in LsRange:
+            bias_est = self._estimateBayesianBias(L)
+            if bias_est > TOL and L < LsRange[-1]:
+                continue
             Wl = self.fnWorkModel(np.arange(0, L+1).reshape((-1, 1)))
             M, _ = self._calcTheoryM(TOL,
-                                     bias_est=self._estimateBayesianBias(L),
+                                     bias_est=bias_est,
                                      Vl=self._estimateBayesianVl(L), Wl=Wl)
             totalWork = np.sum(Wl*M)
             if totalWork < minWork:
@@ -428,7 +432,7 @@ estimate optimal number of levels"
             np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
         M = np.maximum(M, minM)
         if ceil:
-            return M.astype(np.int), theta
+            M = np.ceil(M).astype(np.int)
         return M, theta
 
     def doRun(self, finalTOL=None, TOLs=None, verbose=None):
@@ -489,6 +493,9 @@ estimate optimal number of levels"
                     print("------------------------------------------------")
                 if self.params.bayesian or (self.totalErrorEst() < TOL):
                     break
+                elif verbose:
+                    print("##### {}+{}={} > {}".format(self.bias, self.stat_error,
+                                                       self.totalErrorEst(), TOL))
             totalTime = time.time() - tic
             tic = time.time()
             if verbose:

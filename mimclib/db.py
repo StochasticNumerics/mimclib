@@ -58,8 +58,8 @@ class DBConn(object):
 
 @public
 class MIMCDatabase(object):
-    def __init__(self, db='mimc', runTable='run', dataTable='data',
-                 lvlTable='lvl', **kwargs):
+    def __init__(self, db='mimc', runTable='tbl_runs', dataTable='tbl_data',
+                 lvlTable='tbl_lvls', **kwargs):
         self.DBName = db
         self.runTable = runTable
         self.dataTable = dataTable
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS {dataTable} (
     Qparams                 mediumblob,
     userdata                mediumblob,
     iteration_idx           INTEGER NOT NULL,
-    FOREIGN KEY (run_id) REFERENCES run(run_id) ON DELETE CASCADE,
+    FOREIGN KEY (run_id) REFERENCES {runTable}(run_id) ON DELETE CASCADE,
     UNIQUE KEY idx_itr_idx (run_id, iteration_idx)
 );
 CREATE VIEW vw_data AS SELECT data_id, run_id, TOL,
@@ -112,14 +112,14 @@ CREATE TABLE IF NOT EXISTS {lvlTable} (
     Tl            REAL,
     Ml            INTEGER,
     psums         mediumblob,
-    FOREIGN KEY (data_id) REFERENCES data(data_id) ON DELETE CASCADE,
+    FOREIGN KEY (data_id) REFERENCES {dataTable}(data_id) ON DELETE CASCADE,
     UNIQUE KEY idx_run_lvl (data_id, lvl_hash)
 );
 
 CREATE VIEW vw_lvls AS SELECT data_id, lvl,
 El, Vl, Wl, Tl, Ml FROM {lvlTable};
 '''.format(DBName=self.DBName, runTable=self.runTable,
-             dataTable=self.dataTable, lvlTable=self.lvlTable)
+           dataTable=self.dataTable, lvlTable=self.lvlTable)
 
         return script
 
@@ -191,6 +191,7 @@ FROM {dataTable} dr WHERE data_id=?'''.format(dataTable=self.dataTable), [data_i
                         format(dataTable=self.dataTable), [run_id]).fetchall()
                     dictParams[run_id] = [_unpickle(dataTmp[0][0]),
                                           dataTmp[0][1], dataTmp2[0][0]]
+                val["data_id"] = data_id
                 val["finalTOL"] = dictParams[run_id][1]
                 val["total_iterations"] = dictParams[run_id][2]
                 val["TOL"] = dataAll[0][1]
