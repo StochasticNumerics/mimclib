@@ -11,7 +11,7 @@ import mimclib.db as mimcdb
 warnings.formatwarning = lambda msg, cat, filename, lineno, line: \
                          "{}:{}: ({}) {}\n".format(os.path.basename(filename),
                                                    lineno, cat.__name__, msg)
-#warnings.filterwarnings('error')
+warnings.filterwarnings('error')
 
 
 def addExtraArguments(parser):

@@ -340,6 +340,7 @@ Bias={:.12e}\nStatErr={:.12e}\
         hl = self.fnHierarchy(np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
         M = np.concatenate((self.all_data[1:].M, np.zeros(L-oL)))
         s1 = np.concatenate((self.all_data.psums[1:, 0], np.zeros(L-oL)))
+        m1 = np.concatenate((self.all_data[1:].calcEl(), np.zeros(L-oL)))
         s2 = np.concatenate((self.all_data.psums[1:, 1],
                              np.zeros(L-oL)))
         mu = self.Q.W*(hl[:-1]**self.Q.w[0] - hl[1:]**self.Q.w[0])
@@ -349,9 +350,8 @@ Bias={:.12e}\nStatErr={:.12e}\
         #       0.5*M*(s2 + self.params.bayes_k0 * (m1 - mu)**2 /
         #              (self.params.bayes_k0 + M)) - 0.5*m1**2
         G_4 = self.params.bayes_k1 + \
-              0.5*(s2 -2*s1*s1/M + s1**2/M +
-                   M*self.params.bayes_k0*(s1/M-mu)**2 /
-                   (self.params.bayes_k0*M))
+              0.5*(s2 -2*s1*m1 + s1*m1 +
+                   M*self.params.bayes_k0*(m1-mu)**2 / (self.params.bayes_k0+M) )
         return np.concatenate((self.all_data[0].calcVl(), G_4 / G_3))
 
     def _estimateQParams(self):
