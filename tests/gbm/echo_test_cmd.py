@@ -26,7 +26,7 @@ if not args.multi:
     print(cmd_single.format(seed=0, bayesian=True, TOL=0.001))
 else:
     realizations = 35
-    TOLs = 0.1*2.**-np.arange(0., 15.)
+    TOLs = 0.1*2.**-np.arange(0., 10.)
     for TOL in TOLs:
         for i in range(0, realizations):
             print cmd_multi.format(bayesian=True, tag="GBM_bayes", TOL=TOL,

@@ -67,7 +67,9 @@ def main():
             db.markRunDone(run_id)
     except:
         # The run failed, mark it as failed in the database
-        db.markRunDone(run_id, flag=0)
+        if mimcRun.params.db:
+            db.markRunDone(run_id, flag=0)
+        raise
 
     return mimcRun.data.calcEg()
 

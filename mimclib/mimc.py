@@ -137,12 +137,13 @@ supported in one dimensional problem")
         # all_data will always equal data
         if self.fnWorkModel is None and hasattr(self.params, "gamma"):
             self.fnWorkModel = lambda lvls: work_estimate(lvls,
-                                                          self.params.beta*self.params.gamma)
+                                                          np.log(self.params.beta) *
+                                                          np.array(self.params.gamma))
 
         if self.fnHierarchy is None:
             self.fnHierarchy = lambda lvls: get_geometric_hl(lvls,
                                                              self.params.h0inv,
-                                                             self.params.beta)
+                                                             np.array(self.params.beta))
 
         if self.params.bayesian and self.fnWorkModel is None:
             raise NotImplementedError("Bayesian parameter fitting is only \
@@ -457,6 +458,8 @@ estimate optimal number of levels"
         self.bias = np.inf
         self.stat_error = np.inf
         import gc
+        eqfloat = lambda x, y: np.abs(x-y) <= np.finfo(float).eps # Machine epsilon
+
         for itrIndex, TOL in enumerate(TOLs):
             if verbose:
                 print("# TOL", TOL)
@@ -491,7 +494,7 @@ estimate optimal number of levels"
                 if verbose:
                     print(self, end="")
                     print("------------------------------------------------")
-                if self.params.bayesian or (self.totalErrorEst() < TOL):
+                if self.params.bayesian or self.totalErrorEst() < TOL:
                     break
 
             totalTime = time.time() - tic
@@ -501,7 +504,7 @@ estimate optimal number of levels"
                 print("################################################")
             if self.fnItrDone:
                 self.fnItrDone(itrIndex, TOL, totalTime)
-            if TOL <= finalTOL:
+            if eqfloat(TOL, finalTOL) and self.totalErrorEst() < finalTOL:
                 break
 
 
