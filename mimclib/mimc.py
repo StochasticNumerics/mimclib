@@ -247,6 +247,9 @@ Not needed if -bayesian is False.")
                   help="Variance in prior of the power \
 in the weak convergence model, negative values lead to disabling the fitting. \
 Not needed if -bayesian is False.")
+        add_store('bayes_fit_lvls', type=float, default=1000,
+                  help="Maximum number of levels used to fit data. \
+Not needed if -bayesian is False.")
 
         if additional:
             add_store('TOL', type=float,
@@ -325,7 +328,7 @@ Bias={:.12e}\nStatErr={:.12e}\
         if L <= 1:
             raise Exception("Must have at least 2 levels")
         hl = self.fnHierarchy(np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
-        return np.abs(self.Q.W) * hl[-1]**self.Q.w[0]
+        return self.Q.W * hl[-1]**self.Q.w[0]
 
     def _estimateBayesianVl(self, L=None):
         if np.sum(self.all_data.M) == 0:
@@ -336,15 +339,19 @@ Bias={:.12e}\nStatErr={:.12e}\
             raise Exception("Must have at least 2 levels")
         hl = self.fnHierarchy(np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
         M = np.concatenate((self.all_data[1:].M, np.zeros(L-oL)))
-        m1 = np.concatenate((self.all_data[1:].calcEl(), np.zeros(L-oL)))
-        m2 = np.concatenate((self.all_data[1:].calcEl(moment=2),
+        s1 = np.concatenate((self.all_data.psums[1:, 0], np.zeros(L-oL)))
+        s2 = np.concatenate((self.all_data.psums[1:, 1],
                              np.zeros(L-oL)))
-        mu = self.Q.W*(hl[1:]**self.Q.w[0] - hl[:-1]**self.Q.w[0])
-        Lambda = 1./(self.Q.S*(hl[1:]**(self.Q.s[0]/2.) - hl[:-1]**(self.Q.s[0]/2.))**2)
-        G_3 = self.params.bayes_k1 * Lambda + M
+        mu = self.Q.W*(hl[:-1]**self.Q.w[0] - hl[1:]**self.Q.w[0])
+        Lambda = 1./(self.Q.S*(hl[:-1]**(self.Q.s[0]/2.) - hl[1:]**(self.Q.s[0]/2.))**2)
+        G_3 = self.params.bayes_k1 * Lambda + M/2.0
+        # G_4 = self.params.bayes_k1 + \
+        #       0.5*M*(s2 + self.params.bayes_k0 * (m1 - mu)**2 /
+        #              (self.params.bayes_k0 + M)) - 0.5*m1**2
         G_4 = self.params.bayes_k1 + \
-              0.5*M*(m2 + self.params.bayes_k0 * (m1 - mu)**2 /
-                     (self.params.bayes_k0 + M)) - 0.5*m1**2
+              0.5*(s2 -2*s1*s1/M + s1**2/M +
+                   M*self.params.bayes_k0*(s1/M-mu)**2 /
+                   (self.params.bayes_k0*M))
         return np.concatenate((self.all_data[0].calcVl(), G_4 / G_3))
 
     def _estimateQParams(self):
@@ -356,14 +363,20 @@ Bias={:.12e}\nStatErr={:.12e}\
         if L <= 1:
             raise Exception("Must have at least 2 levels")
         hl = self.fnHierarchy(np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
-        begin = 1
+        begin = np.maximum(1, L-self.params.bayes_fit_lvls)
         M = self.all_data[begin:].M
-        m1 = self.all_data[begin:].calcEl()
-        m2 = self.all_data[begin:].calcEl(moment=2)
-        wl = hl[begin:]**self.Q.w[0] - hl[(begin-1):-1]**self.Q.w[0]
-        sl = (hl[begin:]**(self.Q.s[0]/2.) - hl[(begin-1):-1]**(self.Q.s[0]/2.))**-2
-        self.Q.W = np.sum(wl * sl * M * m1) / np.sum(M * wl**2 * sl)
-        self.Q.S = np.sum(sl * (m2 - 2*m1*self.Q.W*wl + self.Q.W**2*wl**2)) / np.sum(M)
+        # m1 = self.all_data[begin:].calcEl()
+        # m2 = self.all_data[begin:].calcEl(moment=2)
+        # wl = hl[begin:]**self.Q.w[0] - hl[(begin-1):-1]**self.Q.w[0]
+        # sl = (hl[begin:]**(self.Q.s[0]/2.) - hl[(begin-1):-1]**(self.Q.s[0]/2.))**-2
+        # self.Q.W = np.abs(np.sum(wl * sl * M * m1) / np.sum(M * wl**2 * sl))
+        # self.Q.S = np.sum(sl * (m2 - 2*m1*self.Q.W*wl + self.Q.W**2*wl**2)) / np.sum(M)
+        s1 = self.all_data.psums[begin:, 0]
+        s2 = self.all_data.psums[begin:, 1]
+        t1 = hl[(begin-1):-1]**self.Q.w[0] - hl[begin:]**self.Q.w[0]
+        t2 = (hl[(begin-1):-1]**(self.Q.s[0]/2.) - hl[begin:]**(self.Q.s[0]/2.))**-2
+        self.Q.W = np.abs(np.sum(s1 * t1 * t2) / np.sum(M * t1**2 * t2))
+        self.Q.S = np.sum(t2*(s2 - 2*s1*t1*self.Q.W + M*self.Q.W**2*t1**2)) / np.sum(M)
         if self.params.bayes_w_sig > 0 or self.params.bayes_s_sig > 0:
             # TODO: Estimate w=q_1, s=q_2
             raise NotImplemented("TODO, estimate w and s")
@@ -458,7 +471,8 @@ estimate optimal number of levels"
         self.bias = np.inf
         self.stat_error = np.inf
         import gc
-        eqfloat = lambda x, y: np.abs(x-y) <= np.finfo(float).eps # Machine epsilon
+        def isclose(a, b, rel_tol=1e-09, abs_tol=0.0):
+            return abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
 
         for itrIndex, TOL in enumerate(TOLs):
             if verbose:
@@ -504,7 +518,7 @@ estimate optimal number of levels"
                 print("################################################")
             if self.fnItrDone:
                 self.fnItrDone(itrIndex, TOL, totalTime)
-            if eqfloat(TOL, finalTOL) and self.totalErrorEst() < finalTOL:
+            if isclose(TOL, finalTOL) and self.totalErrorEst() < finalTOL:
                 break
 
 
