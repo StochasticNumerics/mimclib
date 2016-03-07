@@ -8,7 +8,7 @@ def public(sym):
     __all__.append(sym.__name__)
     return sym
 
-
+@public
 class FunctionLine2D(plt.Line2D):
     def __init__(self, fn, data=None, **kwargs):
         self.flip = kwargs.pop('flip', False)
@@ -47,8 +47,8 @@ class FunctionLine2D(plt.Line2D):
         self.set_ydata([])
 
     @staticmethod
-    def ExpLine(rate, data=None, **kwargs):
-        return FunctionLine2D(lambda x, r=rate: np.array(x)**r,
+    def ExpLine(rate, const=1, data=None, **kwargs):
+        return FunctionLine2D(lambda x, r=rate: const*np.array(x)**r,
                               data=data, **kwargs)
 
 
@@ -160,6 +160,17 @@ class ECDF(StepFunction):
         y = np.linspace(1. / nobs, 1, nobs)
         super(ECDF, self).__init__(x, y, side=side, sorted=True)
 
+def __get_stats(data, groupby=0, staton=1):
+    import itertools
+    data = sorted(data, key=lambda xx: xx[groupby])
+    x = []
+    y = []
+    for k, itr in itertools.groupby(data, key=lambda xx: xx[groupby]):
+        all_y = [d[staton] for d in itr]
+        y.append([np.min(all_y), np.mean(all_y), np.max(all_y)])
+        x.append(k)
+    return np.array(x), np.array(y)
+
 
 @public
 def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
@@ -185,11 +196,15 @@ run_data[i].run.data is an instance of mimc.MIMCData
         exact = np.mean([r.run.data.calcEg() for r in runs_data if
                          r.finalTOL == minTOL])
 
-    xy = np.array([[r.finalTOL, np.abs(exact - r.run.data.calcEg())/exact]
+    xy = np.array([[r.finalTOL, np.abs(exact - r.run.data.calcEg()),
+                    r.run.totalErrorEst()]
                    for r in runs_data])
+    TOLs, error_est = __get_stats(xy, staton=2)
 
+    relative_error = kwargs.pop('relative', True)
     if not kwargs.pop('no_ref', False):
-        ax.add_line(FunctionLine2D.ExpLine(1, linestyle='--', c='k',
+        ax.add_line(FunctionLine2D.ExpLine(1, const=1./exact if relative_error else 1.,
+                                           linestyle='--', c='k',
                                            label='TOL'))
 
     ax.set_xlabel('TOL')
@@ -198,6 +213,13 @@ run_data[i].run.data is an instance of mimc.MIMCData
     ax.set_xscale('log')
     sel = np.logical_and(np.isfinite(xy[:, 1]), xy[:, 1] >=
                          np.finfo(float).eps)
+
+    if relative_error:
+        error_est = error_est/exact
+        xy[sel, 1] = xy[sel, 1]/exact
+    ax.errorbar(TOLs, error_est[:, 1], yerr=[error_est[:, 1]-error_est[:, 0],
+                                             error_est[:, 2]-error_est[:, 1]],
+                label="Error Estimate")
     return ax.scatter(xy[sel, 0], xy[sel, 1], *args, **kwargs)
 
 
@@ -280,17 +302,7 @@ ax is in instance of matplotlib.axes
         xy = [[r.TOL, r.totalTime] for r in runs_data]
     else:
         xy = [[r.TOL, np.sum(r.run.data.t)] for r in runs_data]
-
-    import itertools
-    xy = sorted(xy, key=lambda xx: xx[0])
-
-    TOLs = []
-    times = []
-    for TOL, itr in itertools.groupby(xy, key=lambda xx: xx[0]):
-        all_times = [d[1] for d in itr]
-        times.append([np.min(all_times), np.mean(all_times), np.max(all_times)])
-        TOLs.append(TOL)
-    times = np.array(times)
+    TOLs, times = __get_stats(xy)
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel('TOL')
@@ -365,7 +377,7 @@ def genPDFBooklet(fileName, runs_data, exact=None, **kwargs):
     if "params" in kwargs:
         params = kwargs.pop(params)
     else:
-        maxTOL = np.max([r.TOL for r in runs_data])        
+        maxTOL = np.max([r.TOL for r in runs_data])
         params = next(r.run.params for r in runs_data if r.TOL == maxTOL)
 
     dim = params.dim
@@ -373,7 +385,7 @@ def genPDFBooklet(fileName, runs_data, exact=None, **kwargs):
     has_w_rate = hasattr(params, 'w')
     has_s_rate = hasattr(params, 's')
     has_beta = hasattr(params, 'beta')
-    
+
     import matplotlib as mpl
     mpl.rc('text', usetex=True)
     mpl.rc('font', **{'family': 'normal', 'weight': 'demibold',
