@@ -38,8 +38,8 @@ __arr_ind_t__ = npct.ndpointer(dtype=ind_t, flags='C_CONTIGUOUS')
 #         newInd.extend(opt_ind)
 #     return VarSizeList(newInd, sizes=sizes)
 
-__libdir = os.path.join(os.path.dirname(__file__))
-__lib__ = npct.load_library("_libset_util.so", __libdir)
+__lib__ = npct.load_library("_libset_util", __file__)
+
 __lib__.CheckAdmissibility.restype = None
 __lib__.CheckAdmissibility.argtypes = [ct.c_voidp, __ct_ind_t__,
                                        __ct_ind_t__, __arr_bool__]
