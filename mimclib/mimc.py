@@ -115,9 +115,9 @@ class MIMCRun(object):
         self.fnSampleLvl = None
         self.fnItrDone = None
         self.fnExtendLvls = None
-        self.bias = np.inf           # Approximation of the discretization error
         self.Vl_estimate = None
         self.Wl_estimate = None
+        self.bias = np.inf           # Approximation of the discretization error
         self.stat_error = np.inf     # Sampling error (based on M)
         self.data = MIMCData(dim=self.params.dim)
         self.all_data = MIMCData(dim=self.params.dim)
@@ -127,10 +127,11 @@ class MIMCRun(object):
 supported in one dimensional problem")
 
         if self.params.bayesian:
-            self.Q = MyDefaultDict(S=np.inf, W=np.inf, w=self.params.w,
-                                   s=self.params.s)
+            self.Q = MyDefaultDict(S=np.inf, W=np.inf,
+                                   w=self.params.w, s=self.params.s,
+                                   theta=np.nan)
         else:
-            self.Q = MyDefaultDict()
+            self.Q = MyDefaultDict(theta=np.nan)
 
     def _checkFunctions(self):
         # If self.params.reuse_samples is True then
@@ -436,12 +437,16 @@ estimate optimal number of levels"
         self.all_data.addSamples(psums, M, t)
         self._estimateAll()
 
-    def _calcTheoryM(self, TOL, bias_est, Vl, Wl, ceil=True, minM=1):
+    def _calcTheta(self, TOL, bias_est):
         theta = -1
         if not self.params.const_theta:
             theta = 1 - bias_est/TOL
         if theta <= 0:
             theta = self.params.theta   # Bias too large or const_theta
+        return theta
+
+    def _calcTheoryM(self, TOL, bias_est, Vl, Wl, ceil=True, minM=1):
+        theta = self._calcTheta(TOL, bias_est)
         M = (theta * TOL / self.params.Ca)**-2 *\
             np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
         M = np.maximum(M, minM)
@@ -467,7 +472,7 @@ estimate optimal number of levels"
 
         import time
         tic = time.time()
-        theta = self.params.theta
+        self.Q.theta = self.params.theta
         self.bias = np.inf
         self.stat_error = np.inf
         import gc
@@ -485,7 +490,7 @@ estimate optimal number of levels"
                         self._addLevels(np.arange(len(self.data.lvls),
                                                   L+1).reshape((-1, 1)))
                         self._estimateAll()
-                elif self.bias > (1 - theta) * TOL:
+                elif self.bias > (1 - self.Q.theta) * TOL:
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
                     newlvls, newTodoM = self.fnExtendLvls()
@@ -495,12 +500,12 @@ estimate optimal number of levels"
                                                      newTodoM)), verbose)
                     self._estimateAll()
 
-                todoM, theta = self._calcTheoryM(TOL,
-                                                 self.bias,
-                                                 self.Vl_estimate,
-                                                 self.Wl_estimate)
+                todoM, self.Q.theta = self._calcTheoryM(TOL,
+                                                        self.bias,
+                                                        self.Vl_estimate,
+                                                        self.Wl_estimate)
                 if verbose:
-                    print("# theta", theta)
+                    print("# theta", self.Q.theta)
                     print("# New M: ", todoM)
                 if not self.params.reuse_samples:
                     self.data.zero_samples()
