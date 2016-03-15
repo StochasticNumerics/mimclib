@@ -20,7 +20,7 @@ base = "run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  \
 -mimc_bayesian {bayesian} "
 
 cmd_multi = "python " + base + "-mimc_verbose False -db True -db_tag {tag} " + " -db_host {} ".format(args.db_host)
-cmd_single = "ipython -- " + base + " -mimc_verbose True -db False "
+cmd_single = "python " + base + " -mimc_verbose True -db False "
 
 if not args.multi:
     print(cmd_single.format(seed=0, bayesian=True, TOL=0.001))
