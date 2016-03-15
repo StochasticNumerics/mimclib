@@ -77,10 +77,10 @@ __lib__.GetAnisoProfit.restype = ct.c_voidp
 __lib__.GetAnisoProfit.argtypes = [__ct_ind_t__, __arr_double__, __arr_double__]
 
 __lib__.FreeProfitCalculator.restype = None
-__lib__.FreeProfitCalculator.argtype = [ct.c_voidp]
+__lib__.FreeProfitCalculator.argtypes = [ct.c_voidp]
 
 __lib__.FreeIndexSet.restype = None
-__lib__.FreeIndexSet.argtype = [ct.c_voidp]
+__lib__.FreeIndexSet.argtypes = [ct.c_voidp]
 
 __lib__.GetIndexSet.restype = ct.c_voidp
 __lib__.GetIndexSet.argtypes = [ct.c_voidp, ct.c_double,
