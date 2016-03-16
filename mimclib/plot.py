@@ -302,8 +302,17 @@ def plotTimeVsTOL(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
+    real_time = kwargs.pop("real_time", False)
+    work_estimate = kwargs.pop("work_estimate", False)
     if kwargs.pop("real_time", False):
+        if work_estimate:
+            raise ValueError("real_time or work_estimate cannot be both True")
         xy = [[r.TOL, r.totalTime] for r in runs_data]
+    elif work_estimate:
+        xy = [[r.TOL, np.sum(r.run.data.M*r.run.Wl_estimate),
+               r.run.Wl_estimate[-1] * r.run.params.Ca *
+               r.run.data.calcVl()[0] * r.TOL**-2.]
+              for r in runs_data]
     else:
         xy = [[r.TOL, np.sum(r.run.data.t), r.run.data.t[-1] *
                r.run.params.Ca * r.run.data.calcVl()[0] * r.TOL**-2.]
@@ -311,7 +320,10 @@ ax is in instance of matplotlib.axes
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel('TOL')
-    ax.set_ylabel('Time (s)')
+    if work_estimate:
+        ax.set_ylabel('Work estimate')
+    else:
+        ax.set_ylabel('Time (s)')
 
     if "MC_kwargs" in kwargs:
         TOLs, times = __get_stats(xy, staton=2)
@@ -446,6 +458,11 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     ax = add_fig()
     line = plotTimeVsTOL(ax, runs_data, label="MIMC",
                          MC_kwargs={"label": "MC Estimate", "fmt": "--r"})[0]
+    ax_est = add_fig()
+    line_est = plotTimeVsTOL(ax_est, runs_data, label="MIMC",
+                             work_estimate=True,
+                             MC_kwargs={"label": "MC Estimate", "fmt":
+                                        "--r"})[0]
     if has_s_rate and has_gamma_rate and has_w_rate:
         s = np.array(params.s)
         w = np.array(params.w)
@@ -455,10 +472,13 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
             w = w * np.log(params.beta)
             gamma = gamma * np.log(params.beta)
         func, label = __formatMIMCRate(*mimc.calcMIMCRate(w, s, gamma))
-        ax.add_line(FunctionLine2D(func,
-                                   data=line.get_xydata(),
+        ax.add_line(FunctionLine2D(func, data=line.get_xydata(),
                                    linestyle='--', c='k',
                                    label=label))
+        ax_est.add_line(FunctionLine2D(func,
+                                       data=line_est.get_xydata(),
+                                       linestyle='--', c='k',
+                                       label=label))
 
     def formatPower(rate):
         rate = "{:.2g}".format(rate)
