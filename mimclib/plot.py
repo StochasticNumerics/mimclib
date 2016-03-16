@@ -302,7 +302,6 @@ def plotTimeVsTOL(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    real_time = kwargs.pop("real_time", False)
     work_estimate = kwargs.pop("work_estimate", False)
     if kwargs.pop("real_time", False):
         if work_estimate:
