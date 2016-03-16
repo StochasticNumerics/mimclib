@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pylab as plt
+from . import mimc
+from matplotlib.ticker import MaxNLocator
 
 __all__ = []
 
@@ -249,6 +251,7 @@ ax is in instance of matplotlib.axes
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$E_\ell$')
     ax.set_yscale('log')
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     El, Vl, M = __calc_moments(runs_data)
     return ax.errorbar(np.arange(0, len(El)), El, *args,
                        yerr=3*np.sqrt(np.abs(Vl/M)), **kwargs)
@@ -264,6 +267,7 @@ ax is in instance of matplotlib.axes
     ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
     _, Vl, _ = __calc_moments(runs_data)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     return ax.plot(np.arange(0, len(Vl)), Vl, *args, **kwargs)
 
 
@@ -287,8 +291,8 @@ ax is in instance of matplotlib.axes
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel('Time (s)')
     ax.set_yscale('log')
-    return ax.plot(np.arange(0, maxL), Tl/M,
-                   *args, **kwargs)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    return ax.plot(np.arange(0, maxL), Tl/M, *args, **kwargs)
 
 @public
 def plotTimeVsTOL(ax, runs_data, *args, **kwargs):
@@ -327,6 +331,7 @@ ax is in instance of matplotlib.axes
     ax.set_xscale('log')
     ax.set_xlabel('TOL')
     ax.set_ylabel(r'$\ell$')
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     return ax.scatter(TOL, L, *args, **kwargs)
 
 @public
@@ -368,14 +373,22 @@ def __add_legend(ax, handles=None, labels=None, alpha=0.5,
         ax.legend(handles, labels, loc=loc, fancybox=True,
                   shadow=True).draggable(True)
 
+def __formatMIMCRate(rate, log_rate, lbl_base=r"\textrm{TOL}", lbl_log_base=None):
+    lbl_log_base = lbl_log_base or "{}^{{-1}}".format(lbl_base)
+    label = lbl_base
+    if rate != 1:
+        label += r'^{{ {:.2g} }}'.format(rate)
+    if log_rate != 1:
+        label += r'\log\left({}\right)^{{ {:.2g} }}'.format(lbl_log_base, log_rate)
+    return (lambda x, r=rate, lr=log_rate: x**r * np.abs(np.log(x))**lr), \
+        "${}$".format(label)
 
 @public
-def genPDFBooklet(fileName, runs_data, exact=None, **kwargs):
-    from matplotlib.backends.backend_pdf import PdfPages
+def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     import matplotlib.pyplot as plt
 
     if "params" in kwargs:
-        params = kwargs.pop(params)
+        params = kwargs.pop("params")
     else:
         maxTOL = np.max([r.TOL for r in runs_data])
         params = next(r.run.params for r in runs_data if r.TOL == maxTOL)
@@ -391,7 +404,6 @@ def genPDFBooklet(fileName, runs_data, exact=None, **kwargs):
     mpl.rc('font', **{'family': 'normal', 'weight': 'demibold',
                       'size': 15})
 
-
     figures = []
     def add_fig():
         figures.append(plt.figure())
@@ -406,20 +418,46 @@ def genPDFBooklet(fileName, runs_data, exact=None, **kwargs):
     ax = add_fig()
     line = plotTimeVsTOL(ax, runs_data)[0]
     if has_s_rate and has_gamma_rate and has_w_rate:
-        rate = 2   # Should compute this rate from s,w,gamma
-        label = r'$\textrm{{TOL}}^{{ -{} }}$'.format(rate)
-        ax.add_line(FunctionLine2D(lambda x, r=rate: x**-r,
+        s = np.array(params.s)
+        w = np.array(params.w)
+        gamma = np.array(params.gamma)
+        if has_beta:
+            s = s * np.log(params.beta)
+            w = w * np.log(params.beta)
+            gamma = gamma * np.log(params.beta)
+        func, label = __formatMIMCRate(*mimc.calcMIMCRate(w, s, gamma))
+        ax.add_line(FunctionLine2D(func,
                                    data=line.get_xydata(),
                                    linestyle='--', c='k',
                                    label=label))
 
+    def formatPower(rate):
+        rate = "{:.2g}".format(rate)
+        if rate == "-1":
+            return "-"
+        elif rate == "1":
+            return ""
+        return rate
+
+    def getLevelRate(rates):
+        assert(len(rates) == 1)
+        rate = np.sum(rates)
+        if has_beta:
+            func = lambda x, r=rate, b=params.beta[0]: b ** (r*x)
+            label = r'${:.2g}^{{ {}\ell }}$'.format(params.beta[0],
+                                                    formatPower(rate))
+        else:
+            func = lambda x, r=rate: np.exp(-r*x)
+            label = r'$\exp({}\ell)$'.format(formatPower(rate))
+        return func, label
+
+
     ax = add_fig()
     line = plotExpectVsLvls(ax, runs_data, fmt='-o')[0]
-    if has_beta and has_w_rate:
+    if has_w_rate:
         assert(dim == 1)
-        rate = np.sum(np.log(params.beta) * np.array(params.w))
-        label = r'$\exp(-{}\ell)$'.format("" if rate == 1 else "{:.2g}".format(rate))
-        ax.add_line(FunctionLine2D(lambda x, r=rate: np.exp(-r*x),
+        func, label = getLevelRate(-np.array(params.w))
+        ax.add_line(FunctionLine2D(func,
                                    data=line.get_xydata(),
                                    linestyle='--', c='k',
                                    label=label))
@@ -428,28 +466,45 @@ def genPDFBooklet(fileName, runs_data, exact=None, **kwargs):
     line, = plotVarVsLvls(ax, runs_data, '-o')
     if has_beta and has_s_rate:
         assert(dim == 1)
-        rate = np.sum(np.log(params.beta) * np.array(params.s))
-        label = r'$\exp(-{}\ell)$'.format("" if rate == 1 else "{:.2g}".format(rate))
-        ax.add_line(FunctionLine2D(lambda x, r=rate: np.exp(-r*x),
+        func, label = getLevelRate(-np.array(params.s))
+        ax.add_line(FunctionLine2D(func,
                                    data=line.get_xydata(),
                                    linestyle='--', c='k',
                                    label=label))
 
-    plotTimeVsLvls(add_fig(), runs_data, '-o')
+    ax = add_fig()
+    line, = plotTimeVsLvls(ax, runs_data, '-o')
+    if has_beta and has_gamma_rate:
+        assert(dim == 1)
+        # TODO: The following if statement is for compatibility with
+        # old data and should be removed
+        func, label = getLevelRate(np.array([params.gamma] if
+                                            np.isscalar(params.gamma)
+                                            else params.gamma))
+        ax.add_line(FunctionLine2D(func,
+                                   data=line.get_xydata(),
+                                   linestyle='--', c='k',
+                                   label=label))
 
     ax = add_fig()
     line = plotLvlsNumVsTOL(ax, runs_data)
     if has_beta and has_w_rate and has_gamma_rate:
         assert(dim == 1)
-        eta = np.sum(np.array(params.w) / np.array(params.gamma))
-        rate = 1./(2.*eta)
-        label = r'${:.2g}\log\left(\textrm{{TOL}}^{{-1}}\right)$'.format(rate)
+        eta = np.array(params.w)
+        if has_beta:
+            eta = eta * np.log(params.beta)
+        rate = 1./eta[0]
+        label = r'${}\log\left(\textrm{{TOL}}^{{-1}}\right)$'.format(formatPower(rate))
         ax.add_line(FunctionLine2D(lambda x, r=rate: -rate*np.log(x),
                                    data=line.get_offsets(),
                                    linestyle='--', c='k',
                                    label=label))
 
-    with PdfPages(fileName) as pdf:
-        for fig in figures:
-            __add_legend(fig.gca())
-            pdf.savefig(fig)
+    if fileName is not None:
+        from matplotlib.backends.backend_pdf import PdfPages
+        with PdfPages(fileName) as pdf:
+            for fig in figures:
+                __add_legend(fig.gca())
+                pdf.savefig(fig)
+
+    return figures

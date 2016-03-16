@@ -8,19 +8,20 @@ from matplotlib.cbook import MatplotlibDeprecationWarning
 warnings.simplefilter('ignore', MatplotlibDeprecationWarning)
 
 def addExtraArguments(parser):
-    parser.register('type', 'bool', lambda v: v.lower() in ("yes", "true", "t", "1"))
-    parser.add_argument("-db_name", type=str, default='mimc',
-                        action="store", help="Database Name")
-    parser.add_argument("-db_user", type=str, default=None,
-                        action="store", help="Database User")
-    parser.add_argument("-db_host", type=str, default='localhost',
-                        action="store", help="Database Host")
-    parser.add_argument("-db_tag", type=str, default="NoTag",
-                        action="store", help="Database Tag")
-    parser.add_argument("-qoi_exact", type=float, default=np.exp(1.),
-                        action="store", help="Exact value")
-
-    parser.add_argument("-o", type=str, default="out.pdf",
+    parser.register('type', 'bool', lambda v: v.lower() in ("yes",
+                                                            "true",
+                                                            "t", "1"))
+    parser.add_argument("-db_name", type=str, action="store",
+                        help="Database Name")
+    parser.add_argument("-db_user", type=str, action="store",
+                        help="Database User")
+    parser.add_argument("-db_host", type=str, action="store",
+                        help="Database Host")
+    parser.add_argument("-db_tag", type=str, action="store",
+                        help="Database Tag")
+    parser.add_argument("-qoi_exact", type=float, action="store",
+                        help="Exact value")
+    parser.add_argument("-o", type=str, default="mimc_results.pdf",
                         action="store", help="Output file")
 
 
@@ -29,16 +30,21 @@ def main():
     parser = argparse.ArgumentParser(add_help=True)
     addExtraArguments(parser)
     args = parser.parse_known_args()[0]
-    db = mimcdb.MIMCDatabase(db=args.db_name,
-                             user=args.db_user,
-                             host=args.db_host)
+    db_args = dict()
+    if args.db_name is not None:
+        db_args["db"] = args.db_name
+    if args.db_user is not None:
+        db_args["user"] = args.db_user
+    if args.db_host is not None:
+        db_args["host"] = args.db_host
+    db = mimcdb.MIMCDatabase(**db_args)
 
     run_data = db.readRunData(db.getRunDataIDs(tag=args.db_tag, done_flag=[1]))
     run_data = [d for d in run_data if d.iteration_index+1 ==
                 d.total_iterations]
     if len(run_data) == 0:
         raise Exception("No runs!!!")
-    miplot.genPDFBooklet(args.o, run_data, exact=args.qoi_exact)
+    miplot.genPDFBooklet(run_data, fileName=args.o, exact=args.qoi_exact)
 
 # import mimclib.db as mimcdb
 # import mimclib.plot as miplot

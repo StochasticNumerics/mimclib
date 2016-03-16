@@ -194,7 +194,7 @@ are the same as the argument ones")
             setattr(self, k, kwargs[k])
 
     @staticmethod
-    def addOptionsToParser(parser, pre='-mimc_', additional=True):
+    def addOptionsToParser(parser, pre='-mimc_', additional=True, default_bayes=True):
         def str2bool(v):
             # susendberg's function
             return v.lower() in ("yes", "true", "t", "1")
@@ -234,27 +234,38 @@ Not needed if fnExtendLvls is specified and -bayesian is False.")
         add_store('s', nargs='+', type=float,
                   help="Strong convergence rates. Must be a scalar or of size -dim. \
 Not needed if fnExtendLvls is specified and -bayesian is False.")
-        add_store('bayes_k0', type=float, default=0.1,
-                  help="Variance in prior of the constant \
+        add_store('TOL', type=float,
+                  help="The required tolerance for the MIMC run")
+        add_store('beta', type=float, nargs='+',
+                  help="Level separation parameter. to be used \
+with get_geometric_hl. Not needed if fnHierarchy is provided.")
+        add_store('gamma', type=float, nargs='+',
+                  help="Work exponent to be used with work_estimate.\
+Not needed if fnWorkModel and fnExtendLvls are provided.")
+
+        # The following arguments are not needed if bayes is False
+        if default_bayes:
+            add_store('bayes_k0', type=float, default=0.1,
+                      help="Variance in prior of the constant \
 in the weak convergence model. Not needed if -bayesian is False.")
-        add_store('bayes_k1', type=float, default=0.1,
-                  help="Variance in prior of the constant \
+            add_store('bayes_k1', type=float, default=0.1,
+                      help="Variance in prior of the constant \
 in the strong convergence model. Not needed if -bayesian is False.")
-        add_store('bayes_w_sig', type=float, default=-1,
-                  help="Variance in prior of the power \
+            add_store('bayes_w_sig', type=float, default=-1,
+                      help="Variance in prior of the power \
 in the weak convergence model, negative values lead to disabling the fitting. \
 Not needed if -bayesian is False.")
-        add_store('bayes_s_sig', type=float, default=-1,
-                  help="Variance in prior of the power \
+            add_store('bayes_s_sig', type=float, default=-1,
+                      help="Variance in prior of the power \
 in the weak convergence model, negative values lead to disabling the fitting. \
 Not needed if -bayesian is False.")
-        add_store('bayes_fit_lvls', type=float, default=1000,
-                  help="Maximum number of levels used to fit data. \
+            add_store('bayes_fit_lvls', type=float, default=1000,
+                      help="Maximum number of levels used to fit data. \
 Not needed if -bayesian is False.")
 
+        # The following arguments are not always needed, and they have
+        # a default value
         if additional:
-            add_store('TOL', type=float,
-                      help="The required tolerance for the MIMC run")
             add_store('max_TOL', type=float, default=0.1,
                       help="The (approximate) tolerance for \
 the first iteration. Not needed if TOLs is provided to doRun.")
@@ -274,15 +285,9 @@ for tolerance larger than TOL. Not needed if TOLs is provided to doRun.")
             add_store('r2', type=float, default=1.1,
                       help="A parameters to control to tolerance sequence \
 for tolerance smaller than TOL. Not needed if TOLs is provided to doRun.")
-            add_store('beta', type=float, nargs='+', default=[2],
-                      help="Level separation parameter. to be used \
-with get_geometric_hl. Not needed if fnHierarchy is provided.")
-            add_store('h0inv', type=float, nargs='+',default=2,
+            add_store('h0inv', type=float, nargs='+', default=2,
                       help="Minimum element size get_geometric_hl. \
 Not needed if fnHierarchy is provided.")
-            add_store('gamma', type=float,
-                      help="Work exponent to be used with work_estimate.\
-Not needed if fnWorkModel and fnExtendLvls are provided.")
         return mimcgrp
 
     def calcTotalWork(self):
@@ -619,3 +624,26 @@ def get_optimal_hl(mimc):
 
     # TODO: Get formula from HajiAli 2015, Optimizing MLMC hierarchies
     raise NotImplemented("TODO: get_optimal_hl")
+
+
+@public
+def calcMIMCRate(w, s, gamma):
+    d = len(w)
+    if len(s) != d or len(gamma) != d:
+        raise ValueError("w,s and gamma must have the same size")
+    delta = (gamma-s)/(2*w)
+    zeta = np.max(delta)
+    xi = np.min((2.*w - s) / gamma)
+    d2 = np.sum(delta == 0)
+    dz = np.sum(delta == zeta)
+    rate = -2.*(1. + np.maximum(0, zeta))
+    log_rate = np.nan
+    if (zeta <= 0 and zeta < xi) or (zeta == xi and zeta == 0 and d <= 2):
+        log_rate = 2*d2
+    elif zeta > 0 and xi > 0:
+        log_rate = 2*(dz-1)*(zeta+1)
+    elif zeta == 0 and xi == 0 and d > 2:
+        log_rate = 2*d2 + d - 3
+    elif zeta > 0 and xi == 0:
+        log_rate = d-1 + 2*(dz-1)*(1+zeta)
+    return rate, log_rate
