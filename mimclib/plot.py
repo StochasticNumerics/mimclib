@@ -162,6 +162,7 @@ class ECDF(StepFunction):
         y = np.linspace(1. / nobs, 1, nobs)
         super(ECDF, self).__init__(x, y, side=side, sorted=True)
 
+
 def __get_stats(data, groupby=0, staton=1):
     import itertools
     data = sorted(data, key=lambda xx: xx[groupby])
@@ -294,27 +295,37 @@ ax is in instance of matplotlib.axes
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     return ax.plot(np.arange(0, maxL), Tl/M, *args, **kwargs)
 
+
 @public
 def plotTimeVsTOL(ax, runs_data, *args, **kwargs):
     """Plots Tl vs TOL of @runs_data, as
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    real_time = kwargs.pop("real_time", False)
-
-    if real_time:
+    if kwargs.pop("real_time", False):
         xy = [[r.TOL, r.totalTime] for r in runs_data]
     else:
-        xy = [[r.TOL, np.sum(r.run.data.t)] for r in runs_data]
-    TOLs, times = __get_stats(xy)
+        xy = [[r.TOL, np.sum(r.run.data.t), r.run.data.t[-1] *
+               r.run.params.Ca * r.run.data.calcVl()[0] * r.TOL**-2.]
+              for r in runs_data]
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel('TOL')
     ax.set_ylabel('Time (s)')
+
+    if "MC_kwargs" in kwargs:
+        TOLs, times = __get_stats(xy, staton=2)
+        ax.errorbar(TOLs, times[:, 1], *args,
+                    yerr=[times[:, 1]-times[:, 0],
+                          times[:, 2]-times[:, 1]],
+                    **kwargs.pop("MC_kwargs"))
+
+    TOLs, times = __get_stats(xy)
     return ax.errorbar(TOLs, times[:, 1], *args,
-                       yerr=[times[:,1]-times[:,0],
-                             times[:,2]-times[:,1]],
+                       yerr=[times[:, 1]-times[:, 0],
+                             times[:, 2]-times[:, 1]],
                        **kwargs)
+
 
 @public
 def plotLvlsNumVsTOL(ax, runs_data, *args, **kwargs):
@@ -322,17 +333,35 @@ def plotLvlsNumVsTOL(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    L = [len(r.run.data.lvls) for r in runs_data]
-    TOL = [r.TOL for r in runs_data]
-    max_dim = np.max([r.run.data.dim for r in runs_data])
-    if max_dim > 1:
+    summary = np.array([[r.TOL, len(r.run.data.lvls), r.run.data.dim]
+                        for r in runs_data])
+    if np.max(summary[:, 2]) > 1:
         raise Exception("This function is only for 1D MIMC")
 
     ax.set_xscale('log')
     ax.set_xlabel('TOL')
-    ax.set_ylabel(r'$\ell$')
+    ax.set_ylabel(r'$L$')
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-    return ax.scatter(TOL, L, *args, **kwargs)
+    return ax.scatter(summary[:, 0], summary[:, 1], *args, **kwargs)
+
+
+@public
+def plotThetaVsTOL(ax, runs_data, *args, **kwargs):
+    """Plots theta vs TOL of @runs_data, as
+returned by MIMCDatabase.readRunData()
+ax is in instance of matplotlib.axes
+"""
+    summary = np.array([[r.TOL,
+                         r.run.Q.theta if hasattr(r.run.Q, 'theta') else
+                         r.run._calcTheta(r.TOL, r.run.bias)]
+                        for r in runs_data])
+
+    ax.set_xscale('log')
+    ax.set_xlabel('TOL')
+    ax.set_ylabel(r'$\theta$')
+    ax.set_ylim([0, 1.])
+    return ax.scatter(summary[:, 0], summary[:, 1], *args, **kwargs)
+
 
 @public
 def plotErrorsQQ(ax, runs_data, *args, **kwargs): #(runs, tol, marker='o', color="b", fig=None, label=None):
@@ -358,7 +387,6 @@ ax is in instance of matplotlib.axes
 
 def __add_legend(ax, handles=None, labels=None, alpha=0.5,
                  outside=False, loc='best', *args, **kwargs):
-    import matplotlib.font_manager as fm
     if not handles:
         handles, labels = ax.get_legend_handles_labels()
         if not handles:
@@ -416,7 +444,8 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     plotErrorsQQ(ax, runs_data)
 
     ax = add_fig()
-    line = plotTimeVsTOL(ax, runs_data)[0]
+    line = plotTimeVsTOL(ax, runs_data, label="MIMC",
+                         MC_kwargs={"label": "MC Estimate", "fmt": "--r"})[0]
     if has_s_rate and has_gamma_rate and has_w_rate:
         s = np.array(params.s)
         w = np.array(params.w)
@@ -450,7 +479,6 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
             func = lambda x, r=rate: np.exp(-r*x)
             label = r'$\exp({}\ell)$'.format(formatPower(rate))
         return func, label
-
 
     ax = add_fig()
     line = plotExpectVsLvls(ax, runs_data, fmt='-o')[0]
@@ -499,6 +527,9 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                                    data=line.get_offsets(),
                                    linestyle='--', c='k',
                                    label=label))
+
+    ax = add_fig()
+    line = plotThetaVsTOL(ax, runs_data)
 
     if fileName is not None:
         from matplotlib.backends.backend_pdf import PdfPages
