@@ -121,7 +121,7 @@ def mySampleLvl(run, moments, mods, inds, M):
                                                1 + run.params.qoi_mu/mesh)))[-1]
         psums += np.sum(mods*solves)**moments
 
-    return psums, time.time() - timeStart
+    return M, psums, time.time() - timeStart
 
 if __name__ == "__main__":
     main()

@@ -180,7 +180,7 @@ are the same as the argument ones")
         # fnExtendLvls(): Returns new lvls and number of samples on each.
         #    called only once if the Bayesian method is used
         # fnSampleLvl(moments, mods, inds, M):
-        #    Returns array: M sums of mods*inds, and total
+        #    Returns M, array: M sums of mods*inds, and total
         #    (linear) time it took to compute them
         # fnItrDone(i, TOLs, totalTime): Called at the end of iteration
         #    i out of TOLs
@@ -435,9 +435,9 @@ estimate optimal number of levels"
             if verbose:
                 print("# Doing", totalM[i]-self.data.M[i], "of level", lvls[i])
             mods, inds = lvl_to_inds_general(lvls[i])
-            psums[i, :], t[i] = self.fnSampleLvl(p, mods, inds,
-                                                 totalM[i] - self.data.M[i])
-            M[i] = totalM[i] - self.data.M[i]
+            M[i], psums[i, :], t[i] = self.fnSampleLvl(p, mods, inds,
+                                                       totalM[i] -
+                                                       self.data.M[i])
         self.data.addSamples(psums, M, t)
         self.all_data.addSamples(psums, M, t)
         self._estimateAll()
