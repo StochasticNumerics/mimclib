@@ -23,14 +23,17 @@ setup(
     url="http://stochastic_numerics.kaust.edu.sa/",
     packages=find_packages(),
     long_description=read('README'),
+    install_requires=['matplotlib>=1.5', 'numpy'],
+    extras_require={
+        'DB':  ["MySQL-python"]
+    },
     ext_modules=[
-        Extension('mimclib._libset_util',
+        Extension('mimclib.libset_util',
                   ['mimclib/libsetutil/src/set_util.cpp',
                    'mimclib/libsetutil/src/var_list.cpp',],
                   include_dirs=[''],
                   library_dirs=['/'],
                   libraries=[],
-                  extra_compile_args=['-g', '-std=c++11']
-                 )],
+                  extra_compile_args=['-std=c++11'])],
     cmdclass={'install': install},
 )

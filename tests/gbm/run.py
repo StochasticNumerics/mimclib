@@ -11,7 +11,7 @@ import mimclib.db as mimcdb
 warnings.formatwarning = lambda msg, cat, filename, lineno, line: \
                          "{}:{}: ({}) {}\n".format(os.path.basename(filename),
                                                    lineno, cat.__name__, msg)
-# warnings.filterwarnings('error')
+#warnings.filterwarnings('error')
 
 
 def addExtraArguments(parser):
@@ -80,7 +80,7 @@ try:
     import numpy.ctypeslib as npct
     __arr_double__ = npct.ndpointer(dtype=np.double, flags='C_CONTIGUOUS')
     __libdir = os.path.join(os.path.dirname(__file__))
-    __lib__ = npct.load_library("_libwcumsum.so", __libdir)
+    __lib__ = npct.load_library("libwcumsum.so", __libdir)
     __lib__.wcumsum.restype = None
     __lib__.wcumsum.argtypes = [__arr_double__, __arr_double__,
                                 ct.c_uint32, __arr_double__]
@@ -91,6 +91,7 @@ try:
         return output
 
 except:
+    raise
     warnings.warn("Using Python (very slow) version for wcumsum. Consider running make")
     # wcumsum is like cumsum, but weighted.
     def wcumsum(x, w):
