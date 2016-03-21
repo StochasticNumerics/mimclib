@@ -10,6 +10,7 @@ def public(sym):
     __all__.append(sym.__name__)
     return sym
 
+
 @public
 class FunctionLine2D(plt.Line2D):
     def __init__(self, fn, data=None, **kwargs):
@@ -204,11 +205,8 @@ run_data[i].run.data is an instance of mimc.MIMCData
                    for r in runs_data])
     TOLs, error_est = __get_stats(xy, staton=2)
 
+    plotObj = []
     relative_error = kwargs.pop('relative', True)
-    if not kwargs.pop('no_ref', False):
-        ax.add_line(FunctionLine2D.ExpLine(1, const=1./exact if relative_error else 1.,
-                                           linestyle='--', c='k',
-                                           label='TOL'))
 
     ax.set_xlabel('TOL')
     ax.set_ylabel('Errors')
@@ -220,27 +218,53 @@ run_data[i].run.data is an instance of mimc.MIMCData
     if relative_error:
         error_est = error_est/exact
         xy[sel, 1] = xy[sel, 1]/exact
-    ax.errorbar(TOLs, error_est[:, 1], yerr=[error_est[:, 1]-error_est[:, 0],
-                                             error_est[:, 2]-error_est[:, 1]],
-                label="Error Estimate")
-    return ax.scatter(xy[sel, 0], xy[sel, 1], *args, **kwargs)
+    ErrEst_kwargs = kwargs.pop('ErrEst_kwargs')
+    TOLRef_kwargs = kwargs.pop('TOLRef_kwargs')
+    plotObj.append(ax.scatter(xy[sel, 0], xy[sel, 1], *args, **kwargs))
+    if ErrEst_kwargs is not None:
+        plotObj.append(ax.errorbar(TOLs, error_est[:, 1],
+                                   yerr=[error_est[:, 1]-error_est[:, 0],
+                                         error_est[:, 2]-error_est[:, 1]],
+                                   **ErrEst_kwargs))
+    if TOLRef_kwargs is not None:
+        plotObj.append(ax.add_line(FunctionLine2D.ExpLine(1, const=1./exact
+                                                          if relative_error
+                                                          else 1.,
+                                                          **TOLRef_kwargs)))
+    return xy[sel, :2], plotObj
 
 
-def __calc_moments(runs_data):
-    maxL = np.max([len(r.run.data.lvls) for r in runs_data])
-    max_dim = np.max([r.run.data.dim for r in runs_data])
-    if max_dim > 1:
-        raise Exception("This function is only for 1D MIMC")
-    psums = np.zeros((maxL, 2))
-    M = np.zeros(maxL)
-    for r in runs_data:
-        L = len(r.run.data.lvls)
-        psums[:L, :] += r.run.data.psums[:, :2]
-        M[:L] += r.run.data.M
+def __calc_moments(runs_data, seed=None, direction=None):
+    dim = runs_data[0].run.data.dim
+    seed = np.array(seed) if seed is not None else np.zeros(dim, dtype=np.uint32)
+    direction = np.array(direction) if direction is not None else np.ones(dim, dtype=np.uint32)
+
+    psums = np.zeros((0, 2))
+    Tl = np.zeros(0)
+    M = np.zeros(0)
+    for curRun in runs_data:
+        cur = seed
+        inds = []
+        while True:
+            ii = next((i for i, l in enumerate(curRun.run.data.lvls)
+                       if np.all(l == cur)), None)
+            if ii is None:
+                break
+            inds.append(ii)
+            cur = cur + direction
+        L = len(inds)
+        if L > len(M):
+            psums.resize((L, 2), refcheck=False)
+            M.resize(L, refcheck=False)
+            Tl.resize(L, refcheck=False)
+        psums[:L, :] += curRun.run.data.psums[inds, :2]
+        M[:L] += curRun.run.data.M[inds]
+        Tl[:L] += curRun.run.data.t[inds]
 
     El = psums[:, 0]/M
     Vl = psums[:, 1]/M - El**2
-    return El, Vl, M
+    Tl /= M
+    return El, Vl, Tl, M
 
 
 @public
@@ -253,9 +277,12 @@ ax is in instance of matplotlib.axes
     ax.set_ylabel(r'$E_\ell$')
     ax.set_yscale('log')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    El, Vl, M = __calc_moments(runs_data)
-    return ax.errorbar(np.arange(0, len(El)), El, *args,
-                       yerr=3*np.sqrt(np.abs(Vl/M)), **kwargs)
+    El, Vl, _, M = __calc_moments(runs_data,
+                                  seed=kwargs.pop('seed', None),
+                                  direction=kwargs.pop('direction', None))
+    errorBar = ax.errorbar(np.arange(0, len(El)), El, *args,
+                           yerr=3*np.sqrt(np.abs(Vl/M)), **kwargs)
+    return errorBar[0].get_xydata(), [errorBar]
 
 
 @public
@@ -264,12 +291,17 @@ def plotVarVsLvls(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
+    if "fmt" in kwargs:        # Normalize behavior of errorbar() and plot()
+        args = (kwargs.pop('fmt'), ) + args
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
-    _, Vl, _ = __calc_moments(runs_data)
+    _, Vl, _, _ = __calc_moments(runs_data,
+                                 seed=kwargs.pop('seed', None),
+                                 direction=kwargs.pop('direction', None))
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    return ax.plot(np.arange(0, len(Vl)), Vl, *args, **kwargs)
+    line = ax.plot(np.arange(0, len(Vl)), Vl, *args, **kwargs)
+    return line[0].get_xydata(), [line]
 
 
 @public
@@ -278,22 +310,17 @@ def plotTimeVsLvls(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    maxL = np.max([len(r.run.data.lvls) for r in runs_data])
-    max_dim = np.max([r.run.data.dim for r in runs_data])
-    if max_dim > 1:
-        raise Exception("This function is only for 1D MIMC")
-    Tl = np.zeros(maxL)
-    M = np.zeros(maxL)
-    for r in runs_data:
-        L = len(r.run.data.lvls)
-        Tl[:L] += r.run.data.t
-        M[:L] += r.run.data.M
-
+    if "fmt" in kwargs:        # Normalize behavior of errorbar() and plot()
+        args = (kwargs.pop('fmt'), ) + args
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel('Time (s)')
     ax.set_yscale('log')
+    _, _, Tl, _ = __calc_moments(runs_data,
+                                 seed=kwargs.pop('seed', None),
+                                 direction=kwargs.pop('direction', None))
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    return ax.plot(np.arange(0, maxL), Tl/M, *args, **kwargs)
+    line = ax.plot(np.arange(0, len(Tl)), Tl, *args, **kwargs)
+    return line[0].get_xydata(), [line]
 
 
 @public
@@ -324,18 +351,22 @@ ax is in instance of matplotlib.axes
     else:
         ax.set_ylabel('Time (s)')
 
-    if "MC_kwargs" in kwargs:
-        TOLs, times = __get_stats(xy, staton=2)
-        ax.errorbar(TOLs, times[:, 1], *args,
-                    yerr=[times[:, 1]-times[:, 0],
-                          times[:, 2]-times[:, 1]],
-                    **kwargs.pop("MC_kwargs"))
-
+    plotObj = []
     TOLs, times = __get_stats(xy)
-    return ax.errorbar(TOLs, times[:, 1], *args,
-                       yerr=[times[:, 1]-times[:, 0],
-                             times[:, 2]-times[:, 1]],
-                       **kwargs)
+    MC_kwargs = kwargs.pop("MC_kwargs", None)
+
+    plotObj.append(ax.errorbar(TOLs, times[:, 1], *args,
+                               yerr=[times[:, 1]-times[:, 0],
+                                     times[:, 2]-times[:, 1]],
+                               **kwargs))
+    if MC_kwargs is not None:
+        TOLs, times = __get_stats(xy, staton=2)
+        plotObj.append(ax.errorbar(TOLs, times[:, 1], *args,
+                                   yerr=[times[:, 1]-times[:, 0],
+                                         times[:, 2]-times[:, 1]],
+                                   **MC_kwargs))
+
+    return plotObj[0][0].get_xydata(), plotObj
 
 
 @public
@@ -353,7 +384,8 @@ ax is in instance of matplotlib.axes
     ax.set_xlabel('TOL')
     ax.set_ylabel(r'$L$')
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-    return ax.scatter(summary[:, 0], summary[:, 1], *args, **kwargs)
+    scatter = ax.scatter(summary[:, 0], summary[:, 1], *args, **kwargs)
+    return summary, [scatter]
 
 
 @public
@@ -371,7 +403,8 @@ ax is in instance of matplotlib.axes
     ax.set_xlabel('TOL')
     ax.set_ylabel(r'$\theta$')
     ax.set_ylim([0, 1.])
-    return ax.scatter(summary[:, 0], summary[:, 1], *args, **kwargs)
+    scatter = ax.scatter(summary[:, 0], summary[:, 1], *args, **kwargs)
+    return summary, [scatter]
 
 
 @public
@@ -389,11 +422,13 @@ ax is in instance of matplotlib.axes
     ax.set_xlabel(r'Empirical CDF')
     ax.set_ylabel("Normal CDF")
 
-    if not kwargs.pop('no_ref', False):
-        ax.add_line(FunctionLine2D.ExpLine(1, linestyle='--', c='k'))
+    plotObj = []
+    plotObj.append(ax.scatter(norm.cdf(x), ec(x), *args, **kwargs))
     ax.set_xlim([0, 1.])
     ax.set_ylim([0, 1.])
-    return ax.scatter(norm.cdf(x), ec(x), *args, **kwargs)
+    if not kwargs.pop('no_ref', False):
+        plotObj.append(ax.add_line(FunctionLine2D.ExpLine(1, linestyle='--', c='k')))
+    return plotObj[0].get_offsets(), plotObj
 
 
 def __add_legend(ax, handles=None, labels=None, alpha=0.5,
@@ -412,15 +447,20 @@ def __add_legend(ax, handles=None, labels=None, alpha=0.5,
         ax.legend(handles, labels, loc=loc, fancybox=True,
                   shadow=True).draggable(True)
 
+
 def __formatMIMCRate(rate, log_rate, lbl_base=r"\textrm{TOL}", lbl_log_base=None):
+    txt_rate = '{:.2g}'.format(rate)
+    txt_log_rate = '{:.2g}'.format(log_rate)
     lbl_log_base = lbl_log_base or "{}^{{-1}}".format(lbl_base)
     label = lbl_base
-    if rate != 1:
-        label += r'^{{ {:.2g} }}'.format(rate)
-    if log_rate != 1:
-        label += r'\log\left({}\right)^{{ {:.2g} }}'.format(lbl_log_base, log_rate)
+    if txt_rate != "1":
+        label += r'^{{ {} }}'.format(txt_rate)
+    if txt_log_rate != "0":
+        label += r'\log\left({}\right)^{{ {} }}'.format(lbl_log_base,
+                                                        txt_log_rate)
     return (lambda x, r=rate, lr=log_rate: x**r * np.abs(np.log(x))**lr), \
         "${}$".format(label)
+
 
 @public
 def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
@@ -449,19 +489,21 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
         return figures[-1].gca()
 
     ax = add_fig()
-    plotErrorsVsTOL(ax, runs_data, exact=exact)
+    plotErrorsVsTOL(ax, runs_data, exact=exact,
+                    ErrEst_kwargs={'label': 'Error Estimate'},
+                    TOLRef_kwargs={'linestyle': '--', 'c': 'k', 'label': 'TOL'})
 
     ax = add_fig()
     plotErrorsQQ(ax, runs_data)
 
     ax = add_fig()
-    line = plotTimeVsTOL(ax, runs_data, label="MIMC",
-                         MC_kwargs={"label": "MC Estimate", "fmt": "--r"})[0]
+    data_mimc, _ = plotTimeVsTOL(ax, runs_data, label="MIMC",
+                                 MC_kwargs={"label": "MC Estimate", "fmt": "--r"})
     ax_est = add_fig()
-    line_est = plotTimeVsTOL(ax_est, runs_data, label="MIMC",
-                             work_estimate=True,
-                             MC_kwargs={"label": "MC Estimate", "fmt":
-                                        "--r"})[0]
+    data_mc, _ = plotTimeVsTOL(ax_est, runs_data, label="MIMC",
+                               work_estimate=True,
+                               MC_kwargs={"label": "MC Estimate", "fmt":
+                                          "--r"})
     if has_s_rate and has_gamma_rate and has_w_rate:
         s = np.array(params.s)
         w = np.array(params.w)
@@ -471,11 +513,11 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
             w = w * np.log(params.beta)
             gamma = gamma * np.log(params.beta)
         func, label = __formatMIMCRate(*mimc.calcMIMCRate(w, s, gamma))
-        ax.add_line(FunctionLine2D(func, data=line.get_xydata(),
+        ax.add_line(FunctionLine2D(func, data=data_mimc,
                                    linestyle='--', c='k',
                                    label=label))
         ax_est.add_line(FunctionLine2D(func,
-                                       data=line_est.get_xydata(),
+                                       data=data_mc,
                                        linestyle='--', c='k',
                                        label=label))
 
@@ -499,56 +541,42 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
             label = r'$\exp({}\ell)$'.format(formatPower(rate))
         return func, label
 
-    ax = add_fig()
-    line = plotExpectVsLvls(ax, runs_data, fmt='-o')[0]
-    if has_w_rate:
-        assert(dim == 1)
-        func, label = getLevelRate(-np.array(params.w))
-        ax.add_line(FunctionLine2D(func,
-                                   data=line.get_xydata(),
-                                   linestyle='--', c='k',
-                                   label=label))
+    lvl_funcs = [[plotExpectVsLvls, -np.array(params.w) if has_w_rate else None],
+                 [plotVarVsLvls, -np.array(params.s) if has_s_rate else None],
+                 [plotTimeVsLvls, params.gamma if has_gamma_rate else None]]
 
-    ax = add_fig()
-    line, = plotVarVsLvls(ax, runs_data, '-o')
-    if has_beta and has_s_rate:
-        assert(dim == 1)
-        func, label = getLevelRate(-np.array(params.s))
-        ax.add_line(FunctionLine2D(func,
-                                   data=line.get_xydata(),
-                                   linestyle='--', c='k',
-                                   label=label))
-
-    ax = add_fig()
-    line, = plotTimeVsLvls(ax, runs_data, '-o')
-    if has_beta and has_gamma_rate:
+    for plotFunc, rate in lvl_funcs:
+        ax = add_fig()
+        line_data, _ = plotFunc(ax, runs_data, fmt='-o')
+        if rate is None:
+            continue
         assert(dim == 1)
         # TODO: The following if statement is for compatibility with
         # old data and should be removed
-        func, label = getLevelRate(np.array([params.gamma] if
-                                            np.isscalar(params.gamma)
-                                            else params.gamma))
+        func, label = getLevelRate(np.array(np.array([rate] if
+                                                     np.isscalar(rate)
+                                                     else rate)))
         ax.add_line(FunctionLine2D(func,
-                                   data=line.get_xydata(),
+                                   data=line_data,
                                    linestyle='--', c='k',
                                    label=label))
 
     ax = add_fig()
-    line = plotLvlsNumVsTOL(ax, runs_data)
+    line_data, _ = plotLvlsNumVsTOL(ax, runs_data)
     if has_beta and has_w_rate and has_gamma_rate:
         assert(dim == 1)
         eta = np.array(params.w)
         if has_beta:
             eta = eta * np.log(params.beta)
-        rate = 1./eta[0]
+        rate = 1./np.minimum(eta)
         label = r'${}\log\left(\textrm{{TOL}}^{{-1}}\right)$'.format(formatPower(rate))
         ax.add_line(FunctionLine2D(lambda x, r=rate: -rate*np.log(x),
-                                   data=line.get_offsets(),
+                                   data=line_data,
                                    linestyle='--', c='k',
                                    label=label))
 
     ax = add_fig()
-    line = plotThetaVsTOL(ax, runs_data)
+    plotThetaVsTOL(ax, runs_data)
 
     if fileName is not None:
         from matplotlib.backends.backend_pdf import PdfPages
