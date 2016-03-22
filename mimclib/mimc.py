@@ -123,6 +123,12 @@ class MIMCRun(object):
         self.data = MIMCData(dim=self.params.dim)
         self.all_data = MIMCData(dim=self.params.dim)
 
+        if (hasattr(self.params, "w") and len(self.params.w) != self.data.dim) or \
+           (hasattr(self.params, "s") and len(self.params.s) != self.data.dim) or \
+           (hasattr(self.params, "gamma") and len(self.params.gamma) != self.data.dim) or \
+           (hasattr(self.params, "beta") and len(self.params.beta) != self.data.dim):
+                raise ValueError("Size of beta, w, s and gamma must be of size dim")
+
         if self.params.bayesian and self.data.dim > 1:
             raise NotImplementedError("Bayesian parameter fitting is only \
 supported in one dimensional problem")
@@ -473,7 +479,6 @@ estimate optimal number of levels"
                                         r2=self.params.r2)
         if verbose is None:
             verbose = self.params.verbose
-
         if len(self.data.lvls) != 0:
             warnings.warn("Running the same object twice, resetting")
             self.data = MIMCData(self.data.dim)

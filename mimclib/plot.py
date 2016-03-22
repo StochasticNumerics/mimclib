@@ -385,10 +385,9 @@ def plotLvlsNumVsTOL(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    summary = np.array([[r.TOL, len(r.run.data.lvls), r.run.data.dim]
+    summary = np.array([[r.TOL,
+                         np.max([np.sum(l) for l in r.run.data.lvls])]
                         for r in runs_data])
-    if np.max(summary[:, 2]) > 1:
-        raise Exception("This function is only for 1D MIMC")
 
     ax.set_xscale('log')
     ax.set_xlabel('TOL')
@@ -404,11 +403,7 @@ def plotThetaVsTOL(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    import IPython
-    IPython.embed()
-    summary = np.array([[r.TOL,
-                         r.run.Q.theta if hasattr(r.run.Q, 'theta') else
-                         r.run._calcTheta(r.TOL, r.run.bias)]
+    summary = np.array([[r.TOL, r.run.Q.theta]
                         for r in runs_data])
 
     ax.set_xscale('log')
@@ -555,19 +550,17 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
 
     lvl_funcs = [[plotExpectVsLvls, -np.array(params.w) if has_w_rate else None],
                  [plotVarVsLvls, -np.array(params.s) if has_s_rate else None],
-                 [plotTimeVsLvls, params.gamma if has_gamma_rate else None]]
+                 [plotTimeVsLvls, np.array(params.gamma) if has_gamma_rate else None]]
 
     for plotFunc, rate in lvl_funcs:
+        if dim != 1:
+            continue
         ax = add_fig()
         line_data, _ = plotFunc(ax, runs_data, fmt='-o')
         if rate is None:
             continue
         assert(dim == 1)
-        # TODO: The following if statement is for compatibility with
-        # old data and should be removed
-        func, label = getLevelRate(np.array(np.array([rate] if
-                                                     np.isscalar(rate)
-                                                     else rate)))
+        func, label = getLevelRate(np.array(np.array(rate)))
         ax.add_line(FunctionLine2D(func,
                                    data=line_data,
                                    linestyle='--', c='k',
@@ -576,7 +569,6 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     ax = add_fig()
     line_data, _ = plotLvlsNumVsTOL(ax, runs_data)
     if has_beta and has_w_rate and has_gamma_rate:
-        assert(dim == 1)
         eta = np.array(params.w)
         if has_beta:
             eta = eta * np.log(params.beta)
