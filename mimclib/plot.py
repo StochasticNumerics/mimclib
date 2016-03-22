@@ -212,20 +212,30 @@ run_data[i].run.data is an instance of mimc.MIMCData
     ax.set_ylabel('Errors')
     ax.set_yscale('log')
     ax.set_xscale('log')
-    sel = np.logical_and(np.isfinite(xy[:, 1]), xy[:, 1] >=
-                         np.finfo(float).eps)
 
     if relative_error:
         error_est = error_est/exact
-        xy[sel, 1] = xy[sel, 1]/exact
+        xy[:, 1:] = xy[:, 1:]/exact
+
     ErrEst_kwargs = kwargs.pop('ErrEst_kwargs')
     TOLRef_kwargs = kwargs.pop('TOLRef_kwargs')
-    plotObj.append(ax.scatter(xy[sel, 0], xy[sel, 1], *args, **kwargs))
+    sel = np.logical_and(np.isfinite(xy[:, 1]), xy[:, 1] >=
+                         np.finfo(float).eps)
+    if np.sum(sel) == 0:
+        plotObj.append(None)
+    else:
+        plotObj.append(ax.scatter(xy[sel, 0], xy[sel, 1], *args, **kwargs))
+
     if ErrEst_kwargs is not None:
-        plotObj.append(ax.errorbar(TOLs, error_est[:, 1],
-                                   yerr=[error_est[:, 1]-error_est[:, 0],
-                                         error_est[:, 2]-error_est[:, 1]],
-                                   **ErrEst_kwargs))
+        sel = np.logical_and(np.isfinite(xy[:, 2]), xy[:, 2] >=
+                             np.finfo(float).eps)
+        if np.sum(sel) == 0:
+            plotObj.append(None)
+        else:
+            plotObj.append(ax.errorbar(TOLs, error_est[:, 1],
+                                       yerr=[error_est[:, 1]-error_est[:, 0],
+                                             error_est[:, 2]-error_est[:, 1]],
+                                       **ErrEst_kwargs))
     if TOLRef_kwargs is not None:
         plotObj.append(ax.add_line(FunctionLine2D.ExpLine(1, const=1./exact
                                                           if relative_error
@@ -394,6 +404,8 @@ def plotThetaVsTOL(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
+    import IPython
+    IPython.embed()
     summary = np.array([[r.TOL,
                          r.run.Q.theta if hasattr(r.run.Q, 'theta') else
                          r.run._calcTheta(r.TOL, r.run.bias)]
@@ -568,7 +580,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
         eta = np.array(params.w)
         if has_beta:
             eta = eta * np.log(params.beta)
-        rate = 1./np.minimum(eta)
+        rate = 1./np.min(eta)
         label = r'${}\log\left(\textrm{{TOL}}^{{-1}}\right)$'.format(formatPower(rate))
         ax.add_line(FunctionLine2D(lambda x, r=rate: -rate*np.log(x),
                                    data=line_data,

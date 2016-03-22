@@ -398,9 +398,9 @@ estimate optimal number of levels"
             if bias_est > TOL and L < LsRange[-1]:
                 continue
             Wl = self.fnWorkModel(np.arange(0, L+1).reshape((-1, 1)))
-            M, _ = self._calcTheoryM(TOL,
-                                     bias_est=bias_est,
-                                     Vl=self._estimateBayesianVl(L), Wl=Wl)
+            M = self._calcTheoryM(TOL,
+                                  theta=self._calcTheta(TOL, bias_est),
+                                  Vl=self._estimateBayesianVl(L), Wl=Wl)
             totalWork = np.sum(Wl*M)
             if totalWork < minWork:
                 minL = L
@@ -450,14 +450,13 @@ estimate optimal number of levels"
             theta = self.params.theta   # Bias too large or const_theta
         return theta
 
-    def _calcTheoryM(self, TOL, bias_est, Vl, Wl, ceil=True, minM=1):
-        theta = self._calcTheta(TOL, bias_est)
+    def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
         M = (theta * TOL / self.params.Ca)**-2 *\
             np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
         M = np.maximum(M, minM)
         if ceil:
             M = np.ceil(M).astype(np.int)
-        return M, theta
+        return M
 
     def doRun(self, finalTOL=None, TOLs=None, verbose=None):
         self._checkFunctions()
@@ -495,7 +494,10 @@ estimate optimal number of levels"
                         self._addLevels(np.arange(len(self.data.lvls),
                                                   L+1).reshape((-1, 1)))
                         self._estimateAll()
-                elif self.bias > (1 - self.Q.theta) * TOL:
+
+                self.Q.theta = self._calcTheta(TOL, self.bias)
+                if len(self.data.lvls) == 0 or \
+                   (not self.params.bayesian and self.bias > (1 - self.Q.theta) * TOL):
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
                     newlvls, newTodoM = self.fnExtendLvls()
@@ -504,11 +506,11 @@ estimate optimal number of levels"
                     self._genSamples(np.concatenate((self.data.M[:prev],
                                                      newTodoM)), verbose)
                     self._estimateAll()
+                    self.Q.theta = self._calcTheta(TOL, self.bias)
 
-                todoM, self.Q.theta = self._calcTheoryM(TOL,
-                                                        self.bias,
-                                                        self.Vl_estimate,
-                                                        self.Wl_estimate)
+                todoM = self._calcTheoryM(TOL, self.Q.theta,
+                                          self.Vl_estimate,
+                                          self.Wl_estimate)
                 if verbose:
                     print("# theta", self.Q.theta)
                     print("# New M: ", todoM)
