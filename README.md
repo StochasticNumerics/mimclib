@@ -4,7 +4,7 @@
 2. Implement vector quantities of interest
 3. Logical checks on the convergence of the variance, work and
    expectation while MLMC is running and printing useful messages to
-   indicate possible solutions.
+   indicate possible solutions. Also a check if TOL << QoI.
 4. Computing and using the kurtosis when possible to give a confidence
    interval for the variance.
 5. Implementing some form of parallelization support.

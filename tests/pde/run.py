@@ -36,6 +36,8 @@ def main():
     sf = SField()
 
     mimcRun = mimc.MIMCRun(**vars(parser.parse_known_args()[0]))
+    if mimcRun.params.qoi_seed >= 0:
+        np.random.seed(mimcRun.params.qoi_seed)
 
     fnItrDone = None
     if mimcRun.params.db:

@@ -290,7 +290,7 @@ ax is in instance of matplotlib.axes
     El, Vl, _, M = __calc_moments(runs_data,
                                   seed=kwargs.pop('seed', None),
                                   direction=kwargs.pop('direction', None))
-    errorBar = ax.errorbar(np.arange(0, len(El)), El, *args,
+    errorBar = ax.errorbar(np.arange(0, len(El)), np.abs(El), *args,
                            yerr=3*np.sqrt(np.abs(Vl/M)), **kwargs)
     return errorBar[0].get_xydata(), [errorBar]
 

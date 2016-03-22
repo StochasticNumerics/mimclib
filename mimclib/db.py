@@ -105,7 +105,7 @@ creation_date, bias, stat_error, totalTime, iteration_idx FROM {dataTable};
 CREATE TABLE IF NOT EXISTS {lvlTable} (
     data_id       INTEGER NOT NULL,
     lvl           text NOT NULL,
-    lvl_hash      varchar(20) NOT NULL,
+    lvl_hash      varchar(35) NOT NULL,
     El            REAL,
     Vl            REAL,
     Wl            REAL,
@@ -164,7 +164,7 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?)'''.format(dataTable=self.dataTable),
                                 enumerate(mimc_run.data.lvls[k]) if j > base])
                 cur.execute('''
 INSERT INTO {lvlTable}(lvl, lvl_hash, El, Vl, Wl, Tl, Ml, psums, data_id)
-VALUES(?, old_password('{lvl}'), ?, ?, ?, ?, ?, ?, ?)
+VALUES(?, md5('{lvl}'), ?, ?, ?, ?, ?, ?, ?)
 '''.format(lvlTable=self.lvlTable, lvl=lvl),
                             [lvl, El[k], Vl[k], Wl[k], Tl[k], Ml[k],
                              _pickle(mimc_run.data.psums[k, :]), data_id])
