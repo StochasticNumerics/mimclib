@@ -22,7 +22,7 @@ setup(
     license="BSD",
     url="http://stochastic_numerics.kaust.edu.sa/",
     packages=find_packages(),
-    long_description=read('README'),
+    long_description=read('README.md'),
     install_requires=['matplotlib>=1.5', 'numpy'],
     extras_require={
         'DB':  ["MySQL-python"]
