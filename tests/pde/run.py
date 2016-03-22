@@ -10,37 +10,60 @@ warnings.formatwarning = lambda msg, cat, filename, lineno, line: \
 warnings.filterwarnings('error')
 
 
-def TestDB():
-    db = mimcdb.MIMCDatabase(user="luis")
-    data = db.readRunData(db.getRunDataIDs(tag="D1_poisson"))
+def addExtraArguments(parser):
+    parser.register('type', 'bool',
+                    lambda v: v.lower() in ("yes", "true", "t", "1"))
+    parser.add_argument("-db_user", type=str,
+                        action="store", help="Database User")
+    parser.add_argument("-db_host", type=str, default='localhost',
+                        action="store", help="Database Host")
+    parser.add_argument("-db_tag", type=str, default="NoTag",
+                        action="store", help="Database Tag")
+    parser.add_argument("-db", type='bool', default=False,
+                        action="store", help="Save in Database")
+    parser.add_argument("-qoi_seed", type=int, default=-1,
+                        action="store", help="Seed for random generator")
 
-    import matplotlib.pyplot as plt
-    import mimclib.plot as miplt
-    fig = plt.figure()
-    miplt.plotTOLvsErrors(fig.gca(), data)
-    plt.show()
 
-
-def MLMCPDE(DB=True):
+def main():
     import argparse
     from pdelib.SField import SField
     SField.Init()
 
     parser = argparse.ArgumentParser(add_help=True)
+    addExtraArguments(parser)
     mimc.MIMCRun.addOptionsToParser(parser)
     sf = SField()
-    if DB:
-        db = mimcdb.MIMCDatabase(user="luis")
 
     mimcRun = mimc.MIMCRun(**vars(parser.parse_known_args()[0]))
-    if DB:
-        run_id = db.createRun(mimc_run=mimcRun, tag="NoTag")
-    mimcRun.setFunctions(fnSampleLvl=lambda *a: SamplePDE(sf, mimcRun, *a),
-                         fnItrDone=lambda *a: db.writeRunData(run_id, mimcRun,
-                                                              *a))
 
-    mimcRun.doRun()
+    fnItrDone = None
+    if mimcRun.params.db:
+        if hasattr(mimcRun.params, "db_user"):
+            db = mimcdb.MIMCDatabase(user=mimcRun.params.db_user,
+                                     host=mimcRun.params.db_host)
+        else:
+            db = mimcdb.MIMCDatabase(host=mimcRun.params.db_host)
+        run_id = db.createRun(mimc_run=mimcRun,
+                              tag=mimcRun.params.db_tag)
+        fnItrDone = lambda *a: db.writeRunData(run_id, mimcRun, *a)
+
+    mimcRun.setFunctions(fnSampleLvl=lambda *a: SamplePDE(sf, mimcRun, *a),
+                         fnItrDone=fnItrDone)
+
+    try:
+        mimcRun.doRun()
+        if mimcRun.params.db:
+            # The run succeeded, mark it as done in the database
+            db.markRunDone(run_id)
+    except:
+        # The run failed, mark it as failed in the database
+        if mimcRun.params.db:
+            db.markRunDone(run_id, flag=0)
+        raise
+
     SField.Final()
+
     return mimcRun.data.calcEg()
 
 
@@ -52,8 +75,7 @@ def SamplePDE(sf, run, moments, mods, inds, M):
     for m in range(0, M):
         psums += sf.Sample()**moments
     sf.EndRuns()
-    return psums, time.time() - timeStart
+    return M, psums, time.time() - timeStart
 
 if __name__ == "__main__":
-    MLMCPDE()
-    #TestDB()
+    main()
