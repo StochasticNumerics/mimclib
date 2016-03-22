@@ -49,15 +49,7 @@ double randTest(unsigned int Nt,double dt){
     x2 += x2*r*dt*2+x2*sig*temp2;
     x2a += x2a*r*dt*2-x2a*sig*temp2;
   }
-  //std :: cout << "tt " << t << "\n";
-
-  //return 0.5*(((x1-K>0.0)?x1-K:0.0 ) - ((x2-K>0.0)?x2-K:0.0 ) + ((x1a-K>0.0)?x1a-K:0.0 ) - ((x2a-K>0.0)?x2a-K:0.0 ));
-  //return ((x1-K>0.0)?x1-K:0.0 ) ;
-  //return ((x1a-K>0.0)?x1a-K:0.0 ) - ((x2a-K>0.0)?x2a-K:0.0 );
-  //return ((x1-K>0.0)?x1-K:0.0 ) - ((x2-K>0.0)?x2-K:0.0 );
-  //return x1-x2;
   return exp(-1*r)*0.5*((x1a>K?x1a-K:0.0)+(x1>K?x1-K:0.0));
-  return exp(-1*r)*0.5*(x1a+x1);
 }
 
 double schoebelZhuHullWhite0(szhw imod,double targetVar,double K){
@@ -117,7 +109,7 @@ void schoebelZhuHullWhiteUpdateEvaluate(double * x, double * disc, double *cVar,
   }
 }
 
-double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K){
+double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K,bool diff){
   
   //std :: cout << "targetVar vittu " << targetVar << "\n";
 
@@ -169,28 +161,19 @@ double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K){
   //std :: cout << "square root dt " << sqrtDt << " dt " << dt  << "\n";
   
   while(((g[0]<0.0)||(g[1]<0.0))||((g[2]<0.0)||(g[3]<0.0))){
-    //if (t>=1.0){    std :: cout << "a t " << t << " " << g[0] << " " << g[1] <<  " " << g[2] << " " << g[3] << " " << cVar[0] << " " << cVar[1] << " " << cVar[2] << " " << cVar[3] << "\n";}
-    //std :: cout << "t=" << t << "\n";
-    //std :: cout << "gs " << g[0] << " " <<  g[1] << " " << g[2] << " " << g[3] << "\n";
-    //std :: cout << "cumVar " << cVar[0] << " " << cVar[2] << " (" << targetVar << ")\n";
     // Generate the random variables
     for(i=0;i<3;i++) dW1[i] = sqrtDt*normalDouble();
     //dW1[0] = imod.corrStructure[0]*dW1[0]+imod.corrStructure[1]*dW1[1]+imod.corrStructure[2]*dW1[2];
     //dW1[1] = imod.corrStructure[3]*dW1[1]+imod.corrStructure[4]*dW1[2];
     //dW1[2] = imod.corrStructure[5]*dW1[2];
-    //std :: cout << "The dW components 1 " << dW1[0] << " " << dW1[1]  << " " << dW1[2]  << "\n";
     // Store random increments for simulation of the coarse process
     for(i=0;i<3;i++) dW2[i]=dW1[i];
     // Update cumulative variance and discount
-    //if (x1[0]<100.0) std :: cout << "alarm a \n";
     schoebelZhuHullWhiteUpdateCVar(dt,x1,cVar);
     schoebelZhuHullWhiteUpdateCVar(dt,x1a,cVar+2);
     schoebelZhuHullWhiteUpdateDiscount(dt,x1,discount);
     schoebelZhuHullWhiteUpdateDiscount(dt,x1a,discount+2);
-    //if (x1[0]<100.0) std :: cout << "alarm a2 \n";
     schoebelZhuHullWhiteEllStep(dt,imod,x1,y1,x1a,y1a,dW1);
-    //if (x1[0]<100.0) std :: cout << "alarm a3 \n";
-    //x1[0] += x1[0]*x1[2]*dW1[0];
     // Check if volatility target is reached
     schoebelZhuHullWhiteUpdateEvaluate(x1,discount,cVar,&targetVar,g,&K,&dt);
     schoebelZhuHullWhiteUpdateEvaluate(x1a,discount+2,cVar+2,&targetVar,g+2,&K,&dt);
@@ -200,7 +183,6 @@ double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K){
     //dW1[0] = imod.corrStructure[0]*dW1[0]+imod.corrStructure[1]*dW1[1]+imod.corrStructure[2]*dW1[2];
     //dW1[1] = imod.corrStructure[3]*dW1[1]+imod.corrStructure[4]*dW1[2];
     //W1[2] = imod.corrStructure[5]*dW1[2];
-    //std :: cout << "The dW components 2 " << dW1[0] << " " << dW1[1]  << " " << dW1[2]  << "\n";
     // Increment the random increments for the coarse process
     for(i=0;i<3;i++) dW2[i]+=dW1[i];
     // Update compounded variance and discount factor
@@ -209,30 +191,12 @@ double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K){
     schoebelZhuHullWhiteUpdateCVar(dt,x1a,cVar+2);
     schoebelZhuHullWhiteUpdateDiscount(dt,x1,discount);
     schoebelZhuHullWhiteUpdateDiscount(dt,x1a,discount+2);
-    //if (x1[0]<100.0) std :: cout << "alarm b2 \n";
     schoebelZhuHullWhiteEllStep(dt,imod,x1,y1,x1a,y1a,dW1);
-    //if (x1[0]<100.0) std :: cout << "alarm b3 \n";
-    //x1[0] += x1[0]*x1[2]*dW1[0];
-    //std :: cout << "Components " << x1[0] << " " << x1[1]  << " " << x1[2]  << " " <<  x1a[0]  << " " <<  x1a[1]  << " " <<  x1a[2] << "\n";
-    //std :: cout << "cumVar " << cVar[0] << " " << cVar[2] << " (" << targetVar << ")\n";
-    
-    // Re-check if volatility budget is full
-    //schoebelZhuHullWhiteUpdateEvaluate(x1,discount,cVar,&targetVar,g,&K);
-    //if (t>=1.0){    std :: cout << "k t " << t << " " << g[0] << " " << g[1] <<  " " << g[2] << " " << g[3] << " " << cVar[0] << " " << cVar[1] << " " << cVar[2] << " " << cVar[3] << "\n";}
-    //schoebelZhuHullWhiteUpdateEvaluate(x1a,discount+2,cVar+2,&targetVar,g+2,&K);
-    //if (t>=1.0){    std :: cout << "l t " << t << " " << g[0] << " " << g[1] <<  " " << g[2] << " " << g[3] << " " << cVar[0] << " " << cVar[1] << " " << cVar[2] << " " << cVar[3] << "\n";}
-    // Update the compounded variance and discount for the coarse process
     schoebelZhuHullWhiteUpdateCVar(dt*2,x2,cVar+1);
     schoebelZhuHullWhiteUpdateCVar(dt*2,x2a,cVar+3);
     schoebelZhuHullWhiteUpdateDiscount(dt*2,x2,discount+1);
     schoebelZhuHullWhiteUpdateDiscount(dt*2,x2a,discount+3);
     schoebelZhuHullWhiteEllStep(dt*2,imod,x2,y2,x2a,y2a,dW2);
-    //if (x1[0]<100.0) std :: cout << "alarm c \n";
-    //x2[0] += x2[0]*x2[2]*dW2[0];
-    // Evaluate the payoff, if condition satisfied
-    //schoebelZhuHullWhiteUpdateEvaluate(x2,discount+1,cVar+1,&targetVar,g+1,&K);
-    //schoebelZhuHullWhiteUpdateEvaluate(x2a,discount+3,cVar+3,&targetVar,g+3,&K);
-    //if (t>=1.0){    std :: cout << "v t " << t << " " << g[0] << " " << g[1] <<  " " << g[2] << " " << g[3] << " " << cVar[0] << " " << cVar[1] << " " << cVar[2] << " " << cVar[3] << "\n";}
     schoebelZhuHullWhiteUpdateEvaluate(x1,discount,cVar,&targetVar,g,&K,&dt);
     schoebelZhuHullWhiteUpdateEvaluate(x2,discount+1,cVar+1,&targetVar,g+1,&K,&dt);
     schoebelZhuHullWhiteUpdateEvaluate(x1a,discount+2,cVar+2,&targetVar,g+2,&K,&dt);
@@ -240,23 +204,12 @@ double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K){
     schoebelZhuHullWhiteUpdateEvaluate(x2a,discount+3,cVar+3,&targetVar,g+3,&K,&dt);
     tp = t;
     t += 2*dt;
-    //if (t>1.0){    std :: cout << "x t " << t << " tp " << tp << " " << g[0] << " " << g[1] <<  " " << g[2] << " " << g[3] << " " << cVar[0] << " " << cVar[1] << " " << cVar[2] << " " << cVar[3] << "\n";}
-    //std :: cout << "cumVar2 " << cVar[0] << " " << cVar[2] << " (" << targetVar << ")\n";
-    //std :: cout << "gs " << g[0] << " " << g[1] << " " << g[2] << " " << g[3] << "\n";
-    //std :: cout << t << " " << x1[0] << " " << x1[1] << " " << x1[2] << " " << " " << cVar[0]<< " " << g[0]  << " " << x2[0] << " " << x2[1] << " " << x2[2]<< " " << g[1] << " " << cVar[1]<< " " << targetVar << "\n";
-    //std :: cout << "Components " << x1[0] << " " << x1[1]  << " " << x1[2]  << " " <<  x1a[0]  << " " <<  x1a[1]  << " " <<  x1a[2] << "\n";
-    //std :: cout << K << "\n";
+
   }
-  //if (t<1.0){    std :: cout << "y t " << t << " tp " << tp << " dt " <<dt << " " << g[0] << " " << g[1] <<  " " << g[2] << " " << g[3] << " " << cVar[0] << " " << cVar[1] << " " << cVar[2] << " " << cVar[3] << "\n";}
-  //std :: cout << "t " << t << "\n"; 
-  retVal = 0.5*(g[0]+g[2]-g[1]-g[3]);
-  //retVal = g[0]-g[1];
-  //retVal = g[2]-g[3];
-  //std :: cout << "y t " << t << " tp " << tp << " dt " <<dt << " " << g[0] << " " << g[1] <<  " " << g[2] << " " << g[3] << " " << cVar[0] << " " << cVar[1] << " " << cVar[2] << " " << cVar[3] << "\n";
-  //std :: cout  << g[0] << " " << K << " disc " << discount[0]  << "\n";
-  //retVal = g[0];
-  //retVal = 0.5*(g[0]+g[2]);
-  return retVal;
+  if(diff){
+    return  0.5*(g[0]+g[2]-g[1]-g[3]);
+  }
+  return 0.5*(g[0]+g[2]);
 }
 
 double bsModel0(double S,double sigma,double r, double T,double K){
@@ -301,11 +254,11 @@ double bsModelDt(double dt, double S,double sigma, double r, double T, double K)
   //std :: cout << "sigma " << sigma << "\n";
   //std :: cout << "T " << T << "\n";
   //std :: cout << "targetVar " << T*sigma*sigma << "\n";
-  return schoebelZhuHullWhiteEll(dt,testModel,T*sigma*sigma,K);
+  return schoebelZhuHullWhiteEll(dt,testModel,T*sigma*sigma,K,1);
 }
 
 
-double szhwModelDt(double dt, double S,double sigma, double r, double T, double K,double kappa,double lambda,double gamma,double p,double theta, double sbar, double eta){
+double szhwModelDt(double dt, double S,double sigma, double r, double T, double K,double kappa,double lambda,double gamma,double p,double theta, double sbar, double eta,bool diff){
   szhw testModel;
   testModel.kap = kappa;
   testModel.lam = lambda;
@@ -317,24 +270,21 @@ double szhwModelDt(double dt, double S,double sigma, double r, double T, double 
   testModel.corrStructure[0] = 1.0;
   testModel.corrStructure[1] = 0.0;
   testModel.corrStructure[2] = 0.0;
-  testModel.corrStructure[3] = 1.0;
+q  testModel.corrStructure[3] = 1.0;
   testModel.corrStructure[4] = 0.0;
   testModel.corrStructure[5] = 1.0;
   testModel.x0[0] = S;
   testModel.x0[1] = r;
   testModel.x0[2] = sigma;
-  //std :: cout << "sigma " << sigma << "\n";                                                                                                                                                                                     
-  //std :: cout << "T " << T << "\n";                                                                                                                                                                                             
-  //std :: cout << "targetVar " << T*sigma*sigma << "\n";                                                                                                                                                                         
-  return schoebelZhuHullWhiteEll(dt,testModel,T*sigma*sigma,K);
+  return schoebelZhuHullWhiteEll(dt,testModel,T*sigma*sigma,K,diff);
 }
 
 extern "C" {
   double bsDt(double dt, double S,double sigma, double r, double T, double K){
     return bsModelDt(dt,S,sigma,r,T,K);
   };
-  double szhwDt(double dt, double S,double sigma, double r, double T, double K,double kappa,double lambda,double gamma,double p,double theta, double sbar, double eta){
-    return szhwModelDt(dt,S,sigma,r,T,K,kappa,lambda,gamma,p,theta,sbar,eta);
+  double szhwDt(double dt, double S,double sigma, double r, double T, double K,double kappa,double lambda,double gamma,double p,double theta, double sbar, double eta,bool diff){
+    return szhwModelDt(dt,S,sigma,r,T,K,kappa,lambda,gamma,p,theta,sbar,eta,diff);
   };
   double bsNoStep(double S,double sigma, double r, double T, double K){
     return bsModel0(S,sigma,r,T,K);

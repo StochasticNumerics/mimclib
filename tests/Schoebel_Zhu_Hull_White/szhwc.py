@@ -12,7 +12,7 @@ lib.bsNoStep.argtypes = [ctypes.c_double]*5
 lib.test.argtypes = [ctypes.c_uint,ctypes.c_double]
 lib.test.restype = ctypes.c_double
 lib.szhwDt.restype = ctypes.c_double
-lib.szhwDt.argtypes = [ctypes.c_double]*13
+lib.szhwDt.argtypes = [ctypes.c_double]*13 + [ctypes.c_bool]
 
 # Function pointers to the C functions
 BS = lib.bsDt 
@@ -20,7 +20,9 @@ BS0 = lib.bsNoStep
 randTest = lib.test
 SZHW = lib.szhwDt
 
-strongConvergenceTest = lambda ell: lib.test(2**(ell-1),1.0/(2.0**(ell)))
+def g_ell(ell):
+    dt = 1.0/32/(2**ell)
+    return SZHW(dt,100.0,0.2,0.1,0.25,100.0,1.0,1.0,0.0,1.0,0.05,0.2,0.1,ell)  
 
 # Compute the Black-Scholes option price using
 # Multilevel Monte Carlo

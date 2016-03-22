@@ -36,9 +36,17 @@ def main():
     sf = SField()
 
     mimcRun = mimc.MIMCRun(**vars(parser.parse_known_args()[0]))
+<<<<<<< HEAD
     if mimcRun.params.qoi_seed >= 0:
         np.random.seed(mimcRun.params.qoi_seed)
 
+=======
+
+    if mimcRun.params.qoi_seed >= 0:
+        np.random.seed(mimcRun.params.qoi_seed)
+
+
+>>>>>>> nohit
     fnItrDone = None
     if mimcRun.params.db:
         if hasattr(mimcRun.params, "db_user"):
