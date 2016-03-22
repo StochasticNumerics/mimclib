@@ -113,6 +113,7 @@ class MIMCRun(object):
         self.fnHierarchy = None
         self.fnWorkModel = None
         self.fnSampleLvl = None
+        self.fnSampleQoI = None
         self.fnItrDone = None
         self.fnExtendLvls = None
         self.Vl_estimate = None
@@ -173,8 +174,13 @@ are the same as the argument ones")
                                                                  self.data.lvls,
                                                                  self.params.M0,
                                                                  self.params.min_lvls/self.params.dim)
+        if self.fnSampleQoI is not None:
+            if self.fnSampleLvl is not None:
+                raise ValueError("Cannot set both fnSampleLvl and fnSampleQoI")
+            self.fnSampleLvl = lambda *a: GenericSampleLvl(self.fnSampleQoI, *a)
+
         if self.fnSampleLvl is None:
-            raise ValueError("Must set the sampling function fnSampleLvl")
+            raise ValueError("Must set the sampling functions fnSampleLvl or fnSampleQoI")
 
     def setFunctions(self, **kwargs):
         # fnExtendLvls(): Returns new lvls and number of samples on each.
@@ -189,7 +195,7 @@ are the same as the argument ones")
         for k in kwargs.keys():
             if k not in ["fnExtendLvls", "fnSampleLvl",
                          "fnItrDone", "fnWorkModel",
-                         "fnHierarchy"]:
+                         "fnHierarchy", "fnSampleQoI"]:
                 raise KeyError("Invalid function name")
             setattr(self, k, kwargs[k])
 
@@ -532,6 +538,17 @@ estimate optimal number of levels"
                 self.fnItrDone(itrIndex, TOL, totalTime)
             if isclose(TOL, finalTOL) and self.totalErrorEst() < finalTOL:
                 break
+
+
+@public
+def GenericSampleLvl(fnSampleQoI, moments, mods, inds, M):
+    import time
+    timeStart = time.time()
+    psums = np.zeros(len(moments))
+    for m in range(0, M):
+        solves = fnSampleQoI(inds)
+        psums += np.sum(mods*solves)**moments
+    return M, psums, time.time() - timeStart
 
 
 @public

@@ -57,7 +57,7 @@ def main():
                               tag=mimcRun.params.db_tag)
         fnItrDone = lambda *a: db.writeRunData(run_id, mimcRun, *a)
 
-    mimcRun.setFunctions(fnSampleLvl=lambda *a: mySampleLvl(mimcRun, *a),
+    mimcRun.setFunctions(fnSampleQoI=lambda *a: mySampleQoI(mimcRun, *a),
                          fnItrDone=fnItrDone)
 
     try:
@@ -102,27 +102,21 @@ except:
         return output
 
 
-def mySampleLvl(run, moments, mods, inds, M):
-    import time
-    timeStart = time.time()
-    psums = np.zeros(len(moments))
+def mySampleQoI(run, inds):
     meshes = (run.params.qoi_T/run.fnHierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
-    for m in range(0, M):
-        dW = np.random.normal(size=maxN)/np.sqrt(maxN)
-        solves = np.empty(len(mods))
-        for i, mesh in enumerate(meshes):
-            # Simple Code to solve SDE!
-            assert(maxN % mesh == 0)
-            dWl = np.sum(dW.reshape((-1, maxN//mesh)), axis=1)
-            solves[i] = wcumsum(np.concatenate(([run.params.qoi_S0],
-                                               np.zeros(len(dWl)))),
-                                np.concatenate(([0],
-                                               run.params.qoi_sigma*dWl +
-                                               1 + run.params.qoi_mu/mesh)))[-1]
-        psums += np.sum(mods*solves)**moments
-
-    return M, psums, time.time() - timeStart
+    dW = np.random.normal(size=maxN)/np.sqrt(maxN)
+    solves = np.empty(len(inds))
+    for i, mesh in enumerate(meshes):
+        # Simple Code to solve SDE!
+        assert(maxN % mesh == 0)
+        dWl = np.sum(dW.reshape((-1, maxN//mesh)), axis=1)
+        solves[i] = wcumsum(np.concatenate(([run.params.qoi_S0],
+                                            np.zeros(len(dWl)))),
+                            np.concatenate(([0],
+                                            run.params.qoi_sigma*dWl +
+                                            1 + run.params.qoi_mu/mesh)))[-1]
+    return solves
 
 if __name__ == "__main__":
     main()
