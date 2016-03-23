@@ -5,10 +5,10 @@ import scipy as sp
 import matplotlib.pyplot as plt
 
 def hoLeeExample3(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
-    return hoLeeExample([[foo[0]]*3 for foo in inds],t_max=t_max,tau_max=tau_max,r0=0.05,sig=0.01,verbose=verbose)
+    return hoLeeExample([[foo[0]]*3 for foo in inds],t_max=t_max,tau_max=tau_max,r0=r0,sig=sig,verbose=verbose)
 
 def hoLeeExample2(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
-    return hoLeeExample([[foo[0],foo[1],foo[1]] for foo in inds],t_max=t_max,tau_max=tau_max,r0=0.05,sig=0.01,verbose=verbose)
+    return hoLeeExample([[foo[0],foo[1],foo[1]] for foo in inds],t_max=t_max,tau_max=tau_max,r0=r0,sig=sig,verbose=verbose)
 
 def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
     
@@ -16,7 +16,8 @@ def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
     Compute the Ho Lee Example in Beck-Tempone-Szepessy-Zouraris
     '''
     
-    f0 = lambda tau: r0-sig*sig*0.5*tau*tau+0.1*(1.0-np.exp(-1*tau))
+    thi = lambda tau: 0.1*(1-np.exp(-1*tau))
+    f0 = lambda tau: r0-sig*sig*0.5*tau*tau+thi(tau)
 
     if verbose:
         print('Evaluating the Ho Lee example.')
@@ -74,12 +75,12 @@ def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
         dt_eff = t_eff[1]-t_eff[0]
         if verbose:
             plt.figure()
-            plt.plot(tau_eff,f_eff[0,:-2]+f0(tau_eff),'b-')
+            plt.plot(tau_eff,f_eff[0,:-2]+f0(tau_eff),'r-')
         # Time stepping
         lstar = 0
         for j in range(1,len(f_eff)):
             if verbose:
-                pass
+                print('Time step No %d, t=%.4f. tau_n=%.4f'%(j,t_eff[j],tau_eff[lstar]))
                 #print('Time step No %d , t=%f'%(j,t_eff[j]))
             f_eff[j,lstar:] = 1*f_eff[j-1,lstar:]
             f_eff[j,lstar:-2] += sig*sig*(tau_eff[lstar:]-t_eff[j-1])*dt_eff
@@ -93,6 +94,7 @@ def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
             # the last component unchanged
         if verbose:
             plt.plot(tau_eff[lstar:],f_eff[-1,lstar:-2]+f0(tau_eff[lstar:]),'r--')
+            plt.plot(tau_eff[lstar:],r0-0.5*sig*sig*(tau_eff[lstar:]-t_max)**2+thi(tau_eff[lstar:]),'k-.')
             # plot the short rate
             lstar = 0
             tPlot = 1*t_eff
@@ -115,8 +117,8 @@ def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
             lstar += 1
         if verbose:
             print('The underlying term equals %f'%(np.sum(f_eff[-1,lstar:-3])*(tau_eff[-1]-tau_eff[-2])))
-            print('dtau term %f'%((tau_eff[-1]-tau_eff[-2])))
-            print('average forward curve %f'%(np.mean(f_eff[-1,lstar:-3])))
+            #print('dtau term %f'%((tau_eff[-1]-tau_eff[-2])))
+            #print('average forward curve %f'%(np.mean(f_eff[-1,lstar:-3])))
         rv[-1] *= np.sum(f_eff[-1,lstar:-3])*(tau_eff[-1]-tau_eff[-2])
         if verbose:
             print('The quantity of interest is %f'%(rv[-1]))
