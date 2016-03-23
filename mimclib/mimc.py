@@ -17,6 +17,16 @@ def public(sym):
 
 @public
 class MIMCData(object):
+
+    '''
+    MIMC Data is a class for describing necessary data
+    for a MIMC data, such as the dimension of the problem,
+    list of levels, times exerted, sample sizes, etc...
+
+    In a MIMC Run object, the data is stored in a MIMCData object
+
+    '''
+
     def __init__(self, dim, lvls=None,
                  psums=None, t=None, M=None):
         self.dim = dim
@@ -56,7 +66,13 @@ class MIMCData(object):
         idx = self.M == 0
         val = self.calcEl(moment=2) - (self.calcEl())**2
         val[idx] = np.inf
-        assert (np.min(val)<0.0), "Negative variance encountered in calcVl!"
+        if np.min(val)<0.0:
+            idx = abs(val) < 1.0e-14
+            val[idx] *= 0
+            print(self.calcEl(moment=2))
+            print((self.calcEl())**2)
+            print(val)
+        assert (np.min(val)>=0.0), "Negative variance encountered in calcVl!"
         return val
 
     def calcEl(self, moment=1):
@@ -117,6 +133,15 @@ provided!".format(name))
 
 @public
 class MIMCRun(object):
+
+    '''
+    Object for a Multi-Index Monte Carlo run.
+
+    Data levels, moment estimators, sample sizes etc. are
+    stored in the *.data attribute that is of the MIMCData type
+
+    '''
+
     def __init__(self, **kwargs):
         self.params = MyDefaultDict(**kwargs)
         self.fnHierarchy = None
@@ -472,7 +497,7 @@ estimate optimal number of levels"
         return theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
-        assert (np.min(Vl)<0), "Negative variance"
+        assert (np.min(Vl)>=0), "Negative variance"
         M = (theta * TOL / self.params.Ca)**-2 *\
             np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
         M = np.maximum(M, minM)
@@ -532,6 +557,7 @@ estimate optimal number of levels"
                 todoM = self._calcTheoryM(TOL, self.Q.theta,
                                           self.Vl_estimate,
                                           self.Wl_estimate)
+
                 if verbose:
                     print("# theta", self.Q.theta)
                     print("# New M: ", todoM)
