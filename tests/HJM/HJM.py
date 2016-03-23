@@ -42,10 +42,20 @@ def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
     # initial values
 
     dt = times[1]-times[0]
+<<<<<<< HEAD
     Ws = np.sqrt(dt)*sp.randn(N_t-1)
     plt.figure()
     Ws = np.concatenate((np.zeros(1),np.cumsum(Ws)))
     plt.plot(times,Ws)
+=======
+    Ws = np.concatenate((np.zeros(1),np.sqrt(dt)*np.cumsum(sp.randn(N_t-1))))
+    if verbose:
+        plt.figure()
+        plt.plot(times,Ws)
+        plt.xlabel('$t$')
+        plt.ylabel('$W_t$')
+        plt.grid(1)
+>>>>>>> nohit
 
     rv = []
     
@@ -90,9 +100,15 @@ def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
                 fttPlot[j] = f_eff[j,lstar]
                 while tau_eff[lstar+1]<= t_eff[j]:
                     lstar += 1
+<<<<<<< HEAD
             plt.plot(tPlot,fttPlot+f0(tPlot),'r--')
             plt.xlabel('$\\tau$')
             plt.ylabel('$g(t,\\tau)$')
+=======
+            plt.plot(tPlot,fttPlot+f0(tPlot),'r-')
+            plt.xlabel('$\\tau$')
+            plt.ylabel('$f(t,\\tau)$')
+>>>>>>> nohit
             plt.grid(1)
 
         rv.append(1.0-f_eff[-1,-2])
