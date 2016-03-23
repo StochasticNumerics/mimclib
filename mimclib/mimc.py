@@ -49,12 +49,20 @@ class MIMCData(object):
         return self.dim
 
     def calcVl(self):
+        '''
+        Returns the variances of each level in the MIMC run,
+        levels with zero samples are infinite.
+        '''
         idx = self.M == 0
         val = self.calcEl(moment=2) - (self.calcEl())**2
         val[idx] = np.inf
         return val
 
     def calcEl(self, moment=1):
+        '''
+        Returns the sample estimators for moments
+        for each level.
+        '''
         assert(moment > 0)
         idx = self.M != 0
         val = np.zeros_like(self.M, dtype=np.float)
@@ -71,7 +79,7 @@ class MIMCData(object):
         return np.sum(self.t)
 
     def addSamples(self, psums, M, t):
-        assert psums.shape[0] == len(M) and len(M) == len(t), \
+        assert psums.shape[0] == len(M) and len(M) == len(t) and np.min(M) >= 0, \
             "Inconsistent arguments "
 
         self.psums += psums
@@ -463,6 +471,7 @@ estimate optimal number of levels"
         return theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
+        assert (np.min(Vl)<0), "Negative variance"
         M = (theta * TOL / self.params.Ca)**-2 *\
             np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
         M = np.maximum(M, minM)
