@@ -79,9 +79,10 @@ def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
         lstar = 0
         for j in range(1,len(f_eff)):
             if verbose:
-                print('Time step No %d , t=%f'%(j,t_eff[j]))
+                pass
+                #print('Time step No %d , t=%f'%(j,t_eff[j]))
             f_eff[j,lstar:] = 1*f_eff[j-1,lstar:]
-            f_eff[j,lstar:-2] += sig*sig*(tau_eff[lstar:]-t_eff[j-1])
+            f_eff[j,lstar:-2] += sig*sig*(tau_eff[lstar:]-t_eff[j-1])*dt_eff
             f_eff[j,lstar:-2] += sig*(W_eff[j]-W_eff[j-1])
             if verbose:
                 plt.plot(tau_eff[lstar:],f_eff[j,lstar:-2]+f0(tau_eff[lstar:]),'b-')
@@ -91,6 +92,7 @@ def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
             f_eff[j,-2] = (f_eff[j-1,lstar]+f0(times[j-1]))*dt_eff
             # the last component unchanged
         if verbose:
+            plt.plot(tau_eff[lstar:],f_eff[-1,lstar:-2]+f0(tau_eff[lstar:]),'r--')
             # plot the short rate
             lstar = 0
             tPlot = 1*t_eff
@@ -105,10 +107,16 @@ def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
             plt.grid(1)
 
         rv.append(1.0-f_eff[-1,-2])
+        if verbose:
+            print('The discount term equals %f'%(rv[-1]))
         tv = 0.0
         lstar = 0
         while tau_eff[lstar+1]<= t_max:
             lstar += 1
+        if verbose:
+            print('The underlying term equals %f'%(np.sum(f_eff[-1,lstar:-3])*(tau_eff[-1]-tau_eff[-2])))
+            print('dtau term %f'%((tau_eff[-1]-tau_eff[-2])))
+            print('average forward curve %f'%(np.mean(f_eff[-1,lstar:-3])))
         rv[-1] *= np.sum(f_eff[-1,lstar:-3])*(tau_eff[-1]-tau_eff[-2])
         if verbose:
             print('The quantity of interest is %f'%(rv[-1]))
