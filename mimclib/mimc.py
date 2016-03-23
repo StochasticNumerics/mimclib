@@ -56,6 +56,7 @@ class MIMCData(object):
         idx = self.M == 0
         val = self.calcEl(moment=2) - (self.calcEl())**2
         val[idx] = np.inf
+        assert (np.min(val)<0.0), "Negative variance encountered in calcVl!"
         return val
 
     def calcEl(self, moment=1):
