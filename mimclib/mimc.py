@@ -501,7 +501,6 @@ estimate optimal number of levels"
         return theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
-        assert (np.min(Vl)>=0), "Negative variance"
         M = (theta * TOL / self.params.Ca)**-2 *\
             np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
         M = np.maximum(M, minM)
