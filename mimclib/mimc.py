@@ -17,6 +17,16 @@ def public(sym):
 
 @public
 class MIMCData(object):
+
+    '''
+    MIMC Data is a class for describing necessary data
+    for a MIMC data, such as the dimension of the problem,
+    list of levels, times exerted, sample sizes, etc...
+
+    In a MIMC Run object, the data is stored in a MIMCData object
+
+    '''
+
     def __init__(self, dim, lvls=None,
                  psums=None, t=None, M=None):
         self.dim = dim
@@ -49,12 +59,31 @@ class MIMCData(object):
         return self.dim
 
     def calcVl(self):
+        """
+        Returns the variances of each level in the MIMC run,
+        levels with zero samples are infinite.
+        """
         idx = self.M == 0
         val = self.calcEl(moment=2) - (self.calcEl())**2
         val[idx] = np.inf
+        if np.min(val)<0.0:
+            """
+            There might be variances that are actually
+            zero but slightly negative, smaller in magnitude
+            than the machine precision. Fixing these manually.
+            """
+            idx = np.abs(val) < np.finfo(float).eps
+            val[idx] = np.abs(val[idx])
+        if np.min(val)<0.0:
+            raise ArithmeticError("Code gives significantly \
+negative variance! Possible problem in 2. moment computation.")
         return val
 
     def calcEl(self, moment=1):
+        '''
+        Returns the sample estimators for moments
+        for each level.
+        '''
         assert(moment > 0)
         idx = self.M != 0
         val = np.zeros_like(self.M, dtype=np.float)
@@ -71,7 +100,7 @@ class MIMCData(object):
         return np.sum(self.t)
 
     def addSamples(self, psums, M, t):
-        assert psums.shape[0] == len(M) and len(M) == len(t), \
+        assert psums.shape[0] == len(M) and len(M) == len(t) and np.min(M) >= 0, \
             "Inconsistent arguments "
 
         self.psums += psums
@@ -108,6 +137,15 @@ provided!".format(name))
 
 @public
 class MIMCRun(object):
+
+    '''
+    Object for a Multi-Index Monte Carlo run.
+
+    Data levels, moment estimators, sample sizes etc. are
+    stored in the *.data attribute that is of the MIMCData type
+
+    '''
+
     def __init__(self, **kwargs):
         self.params = MyDefaultDict(**kwargs)
         self.fnHierarchy = None
@@ -463,6 +501,7 @@ estimate optimal number of levels"
         return theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
+        assert (np.min(Vl)>=0), "Negative variance"
         M = (theta * TOL / self.params.Ca)**-2 *\
             np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
         M = np.maximum(M, minM)
@@ -522,6 +561,7 @@ estimate optimal number of levels"
                 todoM = self._calcTheoryM(TOL, self.Q.theta,
                                           self.Vl_estimate,
                                           self.Wl_estimate)
+
                 if verbose:
                     print("# theta", self.Q.theta)
                     print("# New M: ", todoM)

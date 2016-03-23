@@ -1,13 +1,19 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import warnings
 import os.path
 import numpy as np
 import mimclib.mimc as mimc
 import mimclib.db as mimcdb
 
+import HJM
+
 warnings.formatwarning = lambda msg, cat, filename, lineno, line: \
                          "{}:{}: ({}) {}\n".format(os.path.basename(filename),
                                                    lineno, cat.__name__, msg)
-warnings.filterwarnings('error')
+#warnings.filterwarnings('error')
 
 
 def addExtraArguments(parser):
@@ -24,35 +30,15 @@ def addExtraArguments(parser):
     parser.add_argument("-qoi_seed", type=int, default=-1,
                         action="store", help="Seed for random generator")
 
-
 def main():
     import argparse
-    from pdelib.SField import SField
-    SField.Init()
-
     parser = argparse.ArgumentParser(add_help=True)
     addExtraArguments(parser)
     mimc.MIMCRun.addOptionsToParser(parser)
-    sf = SField()
-
     mimcRun = mimc.MIMCRun(**vars(parser.parse_known_args()[0]))
-<<<<<<< HEAD
-<<<<<<< HEAD
     if mimcRun.params.qoi_seed >= 0:
         np.random.seed(mimcRun.params.qoi_seed)
 
-=======
-=======
->>>>>>> nohit
-
-    if mimcRun.params.qoi_seed >= 0:
-        np.random.seed(mimcRun.params.qoi_seed)
-
-
-<<<<<<< HEAD
->>>>>>> nohit
-=======
->>>>>>> nohit
     fnItrDone = None
     if mimcRun.params.db:
         if hasattr(mimcRun.params, "db_user"):
@@ -64,7 +50,7 @@ def main():
                               tag=mimcRun.params.db_tag)
         fnItrDone = lambda *a: db.writeRunData(run_id, mimcRun, *a)
 
-    mimcRun.setFunctions(fnSampleLvl=lambda *a: SamplePDE(sf, mimcRun, *a),
+    mimcRun.setFunctions(fnSampleQoI=lambda *a: mySampleQoI(mimcRun, *a),
                          fnItrDone=fnItrDone)
 
     try:
@@ -78,20 +64,10 @@ def main():
             db.markRunDone(run_id, flag=0)
         raise
 
-    SField.Final()
-
     return mimcRun.data.calcEg()
 
-
-def SamplePDE(sf, run, moments, mods, inds, M):
-    import time
-    timeStart = time.time()
-    psums = np.zeros(len(moments))
-    sf.BeginRuns(mods, 1./run.fnHierarchy(inds))
-    for m in range(0, M):
-        psums += sf.Sample()**moments
-    sf.EndRuns()
-    return M, psums, time.time() - timeStart
+def mySampleQoI(run, inds):
+    return HJM.hoLeeExample(inds)
 
 if __name__ == "__main__":
     main()
