@@ -59,20 +59,24 @@ class MIMCData(object):
         return self.dim
 
     def calcVl(self):
-        '''
+        """
         Returns the variances of each level in the MIMC run,
         levels with zero samples are infinite.
-        '''
+        """
         idx = self.M == 0
         val = self.calcEl(moment=2) - (self.calcEl())**2
         val[idx] = np.inf
         if np.min(val)<0.0:
-            idx = abs(val) < 1.0e-14
-            val[idx] *= 0
-            print(self.calcEl(moment=2))
-            print((self.calcEl())**2)
-            print(val)
-        assert (np.min(val)>=0.0), "Negative variance encountered in calcVl!"
+            """
+            There might be variances that are actually
+            zero but slightly negative, smaller in magnitude
+            than the machine precision. Fixing these manually.
+            """
+            idx = np.abs(val) < np.finfo(float).eps
+            val[idx] = np.abs(val[idx])
+        if np.min(val)<0.0:
+            raise ArithmeticError("Code gives significantly \
+negative variance! Possible problem in 2. moment computation.")
         return val
 
     def calcEl(self, moment=1):
