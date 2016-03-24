@@ -61,7 +61,6 @@ def main():
                          fnItrDone=fnItrDone)
 
     try:
-        raise ArithmeticError("Something something")
         mimcRun.doRun()
     except:
         if mimcRun.params.db:
