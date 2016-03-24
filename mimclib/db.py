@@ -141,18 +141,12 @@ VALUES(datetime(), ?, ?, ?, ?, -1)'''.format(runTable=self.runTable),
             WHERE run_id={run_id}'''.format(runTable=self.runTable,
                                             flag=flag, run_id=run_id))
 
-            
     def markRunSuccessful(self, run_id):
         self.markRunDone(run_id, flag=1)
 
-        
     def markRunFailed(self, run_id):
         self.markRunDone(run_id, flag=0)
 
-        
-    def markRunInterrupted(self, run_id):
-        self.markRunDone(run_id, flag=-2)
-        
     def writeRunData(self, run_id, mimc_run, iteration_idx, TOL,
                      totalTime, userdata=None):
         base = 0

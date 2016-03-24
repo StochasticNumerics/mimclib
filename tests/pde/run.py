@@ -57,8 +57,6 @@ def main():
         if mimcRun.params.db:
             db.markRunSuccessful(run_id)
     except KeyboardInterrupt:
-        if mimcRun.params.db:
-            db.markRunInterrupted(run_id)
         raise
     except:
         if mimcRun.params.db:

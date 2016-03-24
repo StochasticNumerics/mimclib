@@ -557,10 +557,6 @@ estimate optimal number of levels"
                 todoM = self._calcTheoryM(TOL, self.Q.theta,
                                           self.Vl_estimate,
                                           self.Wl_estimate)
-                if todoM[0] > 2000:
-                    import IPython
-                    IPython.embed()
-
                 if verbose:
                     print("# theta", self.Q.theta)
                     print("# New M: ", todoM)
