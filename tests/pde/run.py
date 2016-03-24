@@ -54,9 +54,9 @@ def main():
 
     try:
         mimcRun.doRun()
-    except BaseException as e:
+    except:
         if mimcRun.params.db:
-            db.markRunFailed(run_id, exception=e)
+            db.markRunFailed(run_id)
         raise   # If you don't want to raise, make sure the following code is not executed
 
     SField.Final()

@@ -147,9 +147,12 @@ VALUES(datetime(), ?, ?, ?, ?, -1, ?)'''.format(runTable=self.runTable),
     def markRunSuccessful(self, run_id, comment=''):
         self.markRunDone(run_id, flag=1, comment=comment)
 
-    def markRunFailed(self, run_id, comment='', exception=None):
-        if exception is not None:
-            comment += "{}: {}".format(type(exception).__name__, exception)
+    def markRunFailed(self, run_id, comment='', add_exception=True):
+        if add_exception:
+            import sys
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            if exc_obj is not None:
+                comment += "{}: {}".format(exc_type.__name__, exc_obj)
         self.markRunDone(run_id, flag=0, comment=comment)
 
     def writeRunData(self, run_id, mimc_run, iteration_idx, TOL,
