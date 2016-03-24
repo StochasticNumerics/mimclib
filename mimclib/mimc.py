@@ -18,14 +18,14 @@ def public(sym):
 @public
 class MIMCData(object):
 
-    '''
+    """
     MIMC Data is a class for describing necessary data
     for a MIMC data, such as the dimension of the problem,
     list of levels, times exerted, sample sizes, etc...
 
     In a MIMC Run object, the data is stored in a MIMCData object
 
-    '''
+    """
 
     def __init__(self, dim, lvls=None,
                  psums=None, t=None, M=None):
@@ -44,6 +44,11 @@ class MIMCData(object):
             self.M = np.empty(0, dtype=np.int)
 
     def calcEg(self):
+        """
+        Return the sum of the sample estimators for
+        all the levels
+        """
+        
         return np.sum(self.calcEl())
 
     def __len__(self):
@@ -138,13 +143,13 @@ provided!".format(name))
 @public
 class MIMCRun(object):
 
-    '''
+    """
     Object for a Multi-Index Monte Carlo run.
 
     Data levels, moment estimators, sample sizes etc. are
     stored in the *.data attribute that is of the MIMCData type
 
-    '''
+    """
 
     def __init__(self, **kwargs):
         self.params = MyDefaultDict(**kwargs)
@@ -651,6 +656,20 @@ def is_boundary(d, lvls):
 
 
 def lvl_to_inds_general(lvl):
+    
+    """
+    This routine takes a multi-index level and produces
+    a list of levels and weights that are needed to evaluate
+    the multi-dimensional difference estimator.
+
+    For example, in the MLMC setting the function
+    x,y = lvl_to_inds_general([N]) 
+    
+    sets y to an array of [N] and [N-1]
+    and x to an array of 1 and -1.
+
+    """
+
     lvl = np.array(lvl, dtype=np.int)
     seeds = list()
     for i in range(0, lvl.shape[0]):
