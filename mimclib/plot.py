@@ -203,19 +203,18 @@ run_data[i].run.data is an instance of mimc.MIMCData
     xy = np.array([[r.finalTOL, np.abs(exact - r.run.data.calcEg()),
                     r.run.totalErrorEst()]
                    for r in runs_data])
+    relative_error = kwargs.pop('relative', True)
+    if relative_error:
+        xy[:, 1:] = xy[:, 1:]/exact
+
     TOLs, error_est = __get_stats(xy, staton=2)
 
     plotObj = []
-    relative_error = kwargs.pop('relative', True)
 
     ax.set_xlabel('TOL')
     ax.set_ylabel('Errors')
     ax.set_yscale('log')
     ax.set_xscale('log')
-
-    if relative_error:
-        error_est = error_est/exact
-        xy[:, 1:] = xy[:, 1:]/exact
 
     ErrEst_kwargs = kwargs.pop('ErrEst_kwargs')
     TOLRef_kwargs = kwargs.pop('TOLRef_kwargs')
@@ -227,15 +226,10 @@ run_data[i].run.data is an instance of mimc.MIMCData
         plotObj.append(ax.scatter(xy[sel, 0], xy[sel, 1], *args, **kwargs))
 
     if ErrEst_kwargs is not None:
-        sel = np.logical_and(np.isfinite(xy[:, 2]), xy[:, 2] >=
-                             np.finfo(float).eps)
-        if np.sum(sel) == 0:
-            plotObj.append(None)
-        else:
-            plotObj.append(ax.errorbar(TOLs, error_est[:, 1],
-                                       yerr=[error_est[:, 1]-error_est[:, 0],
-                                             error_est[:, 2]-error_est[:, 1]],
-                                       **ErrEst_kwargs))
+        plotObj.append(ax.errorbar(TOLs, error_est[:, 1],
+                                   yerr=[error_est[:, 1]-error_est[:, 0],
+                                         error_est[:, 2]-error_est[:, 1]],
+                                   **ErrEst_kwargs))
     if TOLRef_kwargs is not None:
         plotObj.append(ax.add_line(FunctionLine2D.ExpLine(1, const=1./exact
                                                           if relative_error
@@ -276,6 +270,10 @@ def __calc_moments(runs_data, seed=None, direction=None):
     Tl /= M
     return El, Vl, Tl, M
 
+def __normalize_fmt(args, kwargs):
+    if "fmt" in kwargs:        # Normalize behavior of errorbar() and plot()
+        args = (kwargs.pop('fmt'), ) + args
+    return args, kwargs
 
 @public
 def plotExpectVsLvls(ax, runs_data, *args, **kwargs):
@@ -301,8 +299,7 @@ def plotVarVsLvls(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    if "fmt" in kwargs:        # Normalize behavior of errorbar() and plot()
-        args = (kwargs.pop('fmt'), ) + args
+    args, kwargs = __normalize_fmt(args, kwargs)
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
@@ -320,8 +317,7 @@ def plotTimeVsLvls(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    if "fmt" in kwargs:        # Normalize behavior of errorbar() and plot()
-        args = (kwargs.pop('fmt'), ) + args
+    args, kwargs = __normalize_fmt(args, kwargs)
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel('Time (s)')
     ax.set_yscale('log')
@@ -403,8 +399,7 @@ def plotThetaVsTOL(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    summary = np.array([[r.TOL, r.run.Q.theta]
-                        for r in runs_data])
+    summary = np.array([[r.TOL, r.run.Q.theta] for r in runs_data])
 
     ax.set_xscale('log')
     ax.set_xlabel('TOL')
@@ -415,12 +410,49 @@ ax is in instance of matplotlib.axes
 
 
 @public
+def plotThetaRefVsTOL(ax, runs_data, eta, chi, *args, **kwargs):
+    """Plots theta vs TOL of @runs_data, as
+returned by MIMCDatabase.readRunData()
+ax is in instance of matplotlib.axes
+"""
+    El = np.abs(__calc_moments(runs_data)[0])
+    L = lambda r: np.max([np.sum(l) for l in r.run.data.lvls])
+    if chi == 1:
+        summary = np.array([[r.TOL,
+                             (1. + (1./(2.*eta))*1./(L(r)+1.))**-1,
+                             1-El[L(r)]/r.TOL]
+                            for r in runs_data])
+    else:
+        summary = np.array([[r.TOL,
+                             (1. + (1./(2.*eta))*(1.-chi)/(1.-chi**(L(r)+1.)))**-1,
+                             1-El[L(r)]/r.TOL]
+                            for r in runs_data])
+    TOL, thetaRef = __get_stats(summary, staton=1)
+
+    #plotObj.append(ax.add_line(FunctionLine2D(lambda x: 1, *args, **kwargs)))
+    ax.set_xscale('log')
+    ax.set_xlabel('TOL')
+    ax.set_ylabel(r'$\theta$')
+    ax.set_ylim([0, 1.])
+    line = ax.errorbar(TOL, thetaRef[:, 1],
+                       yerr=[thetaRef[:, 1]-thetaRef[:, 0],
+                             thetaRef[:, 2]-thetaRef[:, 1]],
+                       *args, **kwargs)
+    return summary, [line]
+
+@public
 def plotErrorsQQ(ax, runs_data, *args, **kwargs): #(runs, tol, marker='o', color="b", fig=None, label=None):
     """Plots Normal vs Empirical CDF of @runs_data, as
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    tol = kwargs.pop("tol", np.min([r.TOL for r in runs_data]))
+    if "tol" not in kwargs:
+        TOLs = [r.TOL for r in runs_data]
+        unTOLs = np.unique([r.TOL for r in runs_data])
+        unTOLs.sort()
+        tol = unTOLs[np.argmax(np.bincount(np.digitize(TOLs, unTOLs)))-1]
+    else:
+        tol = kwargs.pop("tol")
     from scipy.stats import norm
     x = [r.run.data.calcEg() for r in runs_data if r.TOL == tol]
     x = np.array(x)
@@ -430,11 +462,12 @@ ax is in instance of matplotlib.axes
     ax.set_ylabel("Normal CDF")
 
     plotObj = []
-    plotObj.append(ax.scatter(norm.cdf(x), ec(x), *args, **kwargs))
     ax.set_xlim([0, 1.])
     ax.set_ylim([0, 1.])
-    if not kwargs.pop('no_ref', False):
-        plotObj.append(ax.add_line(FunctionLine2D.ExpLine(1, linestyle='--', c='k')))
+    Ref_kwargs = kwargs.pop('Ref_kwargs', None)
+    plotObj.append(ax.scatter(norm.cdf(x), ec(x), *args, **kwargs))
+    if Ref_kwargs is not None:
+        plotObj.append(ax.add_line(FunctionLine2D.ExpLine(1, **Ref_kwargs)))
     return plotObj[0].get_offsets(), plotObj
 
 
@@ -497,11 +530,12 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
 
     ax = add_fig()
     plotErrorsVsTOL(ax, runs_data, exact=exact,
+                    relative=True,
                     ErrEst_kwargs={'label': 'Error Estimate'},
                     TOLRef_kwargs={'linestyle': '--', 'c': 'k', 'label': 'TOL'})
 
     ax = add_fig()
-    plotErrorsQQ(ax, runs_data)
+    plotErrorsQQ(ax, runs_data, Ref_kwargs={'linestyle': '--', 'c': 'k'})
 
     ax = add_fig()
     data_mimc, _ = plotTimeVsTOL(ax, runs_data, label="MIMC",
@@ -569,10 +603,10 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     ax = add_fig()
     line_data, _ = plotLvlsNumVsTOL(ax, runs_data)
     if has_beta and has_w_rate and has_gamma_rate:
-        eta = np.array(params.w)
         if has_beta:
-            eta = eta * np.log(params.beta)
-        rate = 1./np.min(eta)
+            rate = 1./np.min(np.array(params.w) * np.log(params.beta))
+        else:
+            rate = 1./np.min(np.array(params.w))
         label = r'${}\log\left(\textrm{{TOL}}^{{-1}}\right)$'.format(formatPower(rate))
         ax.add_line(FunctionLine2D(lambda x, r=rate: -rate*np.log(x),
                                    data=line_data,
@@ -581,6 +615,10 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
 
     ax = add_fig()
     plotThetaVsTOL(ax, runs_data)
+    if dim == 1 and has_s_rate and has_w_rate and has_gamma_rate:
+        chi = params.s[0]/params.gamma[0]
+        eta = params.w[0]/params.gamma[0]
+        plotThetaRefVsTOL(ax, runs_data, eta=eta, chi=chi, fmt='--k')
 
     if fileName is not None:
         from matplotlib.backends.backend_pdf import PdfPages

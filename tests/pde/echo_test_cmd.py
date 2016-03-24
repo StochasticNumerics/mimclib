@@ -37,5 +37,5 @@ else:
     for TOL in TOLs:
         for i in range(0, realizations):
             print cmd_multi.format(bayesian=False, dim=args.mimc_dim,
-                                   tag="PDE_{}".format(dim), TOL=TOL,
+                                   tag="PDE_dim{}".format(dim), TOL=TOL,
                                    seed=np.random.randint(2**32-1))
