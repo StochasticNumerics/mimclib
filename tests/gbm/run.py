@@ -62,6 +62,7 @@ def main():
 
     try:
         mimcRun.doRun()
+<<<<<<< HEAD
     except KeyboardInterrupt:
         raise
     except Exception as e:
@@ -71,7 +72,15 @@ def main():
         raise
     if mimcRun.params.db:
         db.markRunSuccessful(run_id)
+=======
+    except:
+        if mimcRun.params.db:
+            db.markRunFailed(run_id)
+        raise   # If you don't want to raise, make sure the following code is not executed
+>>>>>>> 1b4d5bb1d25f110c07c82f885bae1350be1b44ba
 
+    if mimcRun.params.db:
+            db.markRunSuccessful(run_id)
     return mimcRun.data.calcEg()
 
 try:

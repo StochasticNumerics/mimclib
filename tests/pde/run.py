@@ -54,17 +54,14 @@ def main():
 
     try:
         mimcRun.doRun()
-        if mimcRun.params.db:
-            db.markRunSuccessful(run_id)
-    except KeyboardInterrupt:
-        raise
     except:
         if mimcRun.params.db:
             db.markRunFailed(run_id)
-        raise
+        raise   # If you don't want to raise, make sure the following code is not executed
 
     SField.Final()
-
+    if mimcRun.params.db:
+            db.markRunSuccessful(run_id)
     return mimcRun.data.calcEg()
 
 

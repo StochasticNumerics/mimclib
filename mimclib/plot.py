@@ -346,7 +346,7 @@ ax is in instance of matplotlib.axes
                r.run.data.calcVl()[0] * r.TOL**-2.]
               for r in runs_data]
     else:
-        xy = [[r.TOL, np.sum(r.run.data.t), r.run.data.t[-1] *
+        xy = [[r.TOL, np.sum(r.run.data.t), r.run.data.calcTl()[-1] *
                r.run.params.Ca * r.run.data.calcVl()[0] * r.TOL**-2.]
               for r in runs_data]
     ax.set_xscale('log')
