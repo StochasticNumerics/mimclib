@@ -445,7 +445,7 @@ estimate optimal number of levels"
         LsRange = range(len(self.data.lvls), len(self.data.lvls)+1+self.params.incL)
         for L in LsRange:
             bias_est = self._estimateBayesianBias(L)
-            if bias_est > TOL and L < LsRange[-1]:
+            if bias_est >= TOL and L < LsRange[-1]:
                 continue
             Wl = self.fnWorkModel(np.arange(0, L+1).reshape((-1, 1)))
             M = self._calcTheoryM(TOL,
@@ -494,7 +494,7 @@ estimate optimal number of levels"
 
     def _calcTheta(self, TOL, bias_est):
         if not self.params.const_theta:
-            return np.maximum(1 - bias_est/TOL, self.params.theta)
+            return 1 - bias_est/TOL
         return self.params.theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
@@ -541,7 +541,8 @@ estimate optimal number of levels"
                                                   L+1).reshape((-1, 1)))
                         self._estimateAll()
 
-                self.Q.theta = self._calcTheta(TOL, self.bias)
+                self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
+                                          self.params.theta)
                 if len(self.data.lvls) == 0 or \
                    (not self.params.bayesian and self.bias > (1 - self.Q.theta) * TOL):
                     # Bias is not satisfied (or this is the first iteration)
@@ -552,7 +553,8 @@ estimate optimal number of levels"
                     self._genSamples(np.concatenate((self.data.M[:prev],
                                                      newTodoM)), verbose)
                     self._estimateAll()
-                    self.Q.theta = self._calcTheta(TOL, self.bias)
+                    self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
+                                              self.params.theta)
 
                 todoM = self._calcTheoryM(TOL, self.Q.theta,
                                           self.Vl_estimate,
