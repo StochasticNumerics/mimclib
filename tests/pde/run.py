@@ -36,23 +36,8 @@ def main():
     sf = SField()
 
     mimcRun = mimc.MIMCRun(**vars(parser.parse_known_args()[0]))
-<<<<<<< HEAD
-<<<<<<< HEAD
     if mimcRun.params.qoi_seed >= 0:
         np.random.seed(mimcRun.params.qoi_seed)
-
-=======
-=======
->>>>>>> nohit
-
-    if mimcRun.params.qoi_seed >= 0:
-        np.random.seed(mimcRun.params.qoi_seed)
-
-
-<<<<<<< HEAD
->>>>>>> nohit
-=======
->>>>>>> nohit
     fnItrDone = None
     if mimcRun.params.db:
         if hasattr(mimcRun.params, "db_user"):
@@ -70,12 +55,12 @@ def main():
     try:
         mimcRun.doRun()
         if mimcRun.params.db:
-            # The run succeeded, mark it as done in the database
-            db.markRunDone(run_id)
+            db.markRunSuccessful(run_id)
+    except KeyboardInterrupt:
+        raise
     except:
-        # The run failed, mark it as failed in the database
         if mimcRun.params.db:
-            db.markRunDone(run_id, flag=0)
+            db.markRunFailed(run_id)
         raise
 
     SField.Final()

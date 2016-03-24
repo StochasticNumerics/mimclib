@@ -135,11 +135,17 @@ VALUES(datetime(), ?, ?, ?, ?, -1)'''.format(runTable=self.runTable),
                         [TOL, tag, dim, _pickle(params)])
             return cur.getLastRowID()
 
-    def markRunDone(self, run_id, flag=1):
+    def markRunDone(self, run_id, flag):
         with DBConn(**self.connArgs) as cur:
             cur.execute(''' UPDATE {runTable} SET done_flag={flag}
             WHERE run_id={run_id}'''.format(runTable=self.runTable,
                                             flag=flag, run_id=run_id))
+
+    def markRunSuccessful(self, run_id):
+        self.markRunDone(run_id, flag=1)
+
+    def markRunFailed(self, run_id):
+        self.markRunDone(run_id, flag=0)
 
     def writeRunData(self, run_id, mimc_run, iteration_idx, TOL,
                      totalTime, userdata=None):

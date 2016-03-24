@@ -63,12 +63,13 @@ def main():
     try:
         mimcRun.doRun()
         if mimcRun.params.db:
-            # The run succeeded, mark it as done in the database
-            db.markRunDone(run_id)
-    except:
-        # The run failed, mark it as failed in the database
+            db.markRunSuccessful(run_id)
+    except KeyboardInterrupt:
+        raise
+    except Exception as e:
         if mimcRun.params.db:
-            db.markRunDone(run_id, flag=0)
+            print("Run failed", run_id, e)
+            db.markRunFailed(run_id)
         raise
 
     return mimcRun.data.calcEg()
