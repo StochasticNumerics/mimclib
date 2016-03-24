@@ -135,7 +135,7 @@ VALUES(datetime(), ?, ?, ?, ?, -1)'''.format(runTable=self.runTable),
                         [TOL, tag, dim, _pickle(params)])
             return cur.getLastRowID()
 
-    def markRunDone(self, run_id):
+    def markRunDone(self, run_id, flag):
         with DBConn(**self.connArgs) as cur:
             cur.execute(''' UPDATE {runTable} SET done_flag={flag}
             WHERE run_id={run_id}'''.format(runTable=self.runTable,
