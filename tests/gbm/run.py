@@ -68,8 +68,9 @@ def main():
         if mimcRun.params.db:
             db.markRunInterrupted(run_id)
         raise
-    except:
+    except Exception as e:
         if mimcRun.params.db:
+            print("Run failed", run_id, e)
             db.markRunFailed(run_id)
         raise
 
