@@ -274,8 +274,6 @@ estimating bias (sometimes that's too conservative).")
         add_store('Ca', type=float, default=3,
                   help="Parameter to control confidence level")
         add_store('theta', type=float, default=0.5,
-                  help="Default theta or error splitting parameter.")
-        add_store('min_theta', type=float, default=0.2,
                   help="Minimum theta or error splitting parameter.")
         add_store('incL', type=int, default=2,
                   help="Maximum increment of number of levels \
@@ -495,12 +493,9 @@ estimate optimal number of levels"
         self._estimateAll()
 
     def _calcTheta(self, TOL, bias_est):
-        theta = self.params.theta
         if not self.params.const_theta:
-            theta = 1 - bias_est/TOL
-        if theta <= self.params.min_theta:
-            theta = self.params.min_theta   # Bias too large or const_theta
-        return theta
+            return np.maximum(1 - bias_est/TOL, self.params.theta)
+        return self.params.theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
         M = (theta * TOL / self.params.Ca)**-2 *\
