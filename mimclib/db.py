@@ -81,9 +81,10 @@ CREATE TABLE IF NOT EXISTS {runTable} (
     done_flag            INTEGER NOT NULL,
     dim                   INTEGER,
     tag                   VARCHAR(128),
-    params                mediumblob
+    params                mediumblob,
+    comment               TEXT
 );
-CREATE VIEW vw_runs AS SELECT run_id, creation_date, TOL, done_flag, dim, tag FROM {runTable};
+CREATE VIEW vw_runs AS SELECT run_id, creation_date, TOL, done_flag, dim, tag, comment FROM {runTable};
 
 CREATE TABLE IF NOT EXISTS {dataTable} (
     data_id                 INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
@@ -124,28 +125,32 @@ El, Vl, Wl, Tl, Ml FROM {lvlTable};
         return script
 
     def createRun(self, tag, TOL=None, dim=None, params=None,
-                  mimc_run=None):
+                  mimc_run=None, comment=""):
         TOL = TOL or mimc_run.params.TOL
         params = params or mimc_run.params
         dim = dim or mimc_run.data.dim
         with DBConn(**self.connArgs) as cur:
             cur.execute('''
-INSERT INTO {runTable}(creation_date, TOL, tag, dim, params, done_flag)
-VALUES(datetime(), ?, ?, ?, ?, -1)'''.format(runTable=self.runTable),
-                        [TOL, tag, dim, _pickle(params)])
+INSERT INTO {runTable}(creation_date, TOL, tag, dim, params, done_flag, comment)
+VALUES(datetime(), ?, ?, ?, ?, -1, ?)'''.format(runTable=self.runTable),
+                        [TOL, tag, dim, _pickle(params), comment])
             return cur.getLastRowID()
 
-    def markRunDone(self, run_id, flag):
+    def markRunDone(self, run_id, flag, comment=''):
         with DBConn(**self.connArgs) as cur:
-            cur.execute(''' UPDATE {runTable} SET done_flag={flag}
-            WHERE run_id={run_id}'''.format(runTable=self.runTable,
-                                            flag=flag, run_id=run_id))
+            cur.execute(''' UPDATE {runTable} SET done_flag=?,
+            comment = CONCAT(comment,  ?)
+            WHERE run_id=?'''.format(runTable=self.runTable,
+                                     flag=flag, run_id=run_id,
+                                     comment=comment), [flag, comment, run_id])
 
-    def markRunSuccessful(self, run_id):
-        self.markRunDone(run_id, flag=1)
+    def markRunSuccessful(self, run_id, comment=''):
+        self.markRunDone(run_id, flag=1, comment=comment)
 
-    def markRunFailed(self, run_id):
-        self.markRunDone(run_id, flag=0)
+    def markRunFailed(self, run_id, comment='', exception=None):
+        if exception is not None:
+            comment += "{}: {}".format(type(exception).__name__, exception)
+        self.markRunDone(run_id, flag=0, comment=comment)
 
     def writeRunData(self, run_id, mimc_run, iteration_idx, TOL,
                      totalTime, userdata=None):
@@ -170,9 +175,9 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?)'''.format(dataTable=self.dataTable),
                                 enumerate(mimc_run.data.lvls[k]) if j > base])
                 cur.execute('''
 INSERT INTO {lvlTable}(lvl, lvl_hash, El, Vl, Wl, Tl, Ml, psums, data_id)
-VALUES(?, md5('{lvl}'), ?, ?, ?, ?, ?, ?, ?)
+VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?)
 '''.format(lvlTable=self.lvlTable, lvl=lvl),
-                            [lvl, El[k], Vl[k], Wl[k], Tl[k], Ml[k],
+                            [lvl, lvl, El[k], Vl[k], Wl[k], Tl[k], Ml[k],
                              _pickle(mimc_run.data.psums[k, :]), data_id])
 
     def readRunData(self, data_ids):
