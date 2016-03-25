@@ -52,6 +52,9 @@ class DBConn(object):
     def getLastRowID(self):
         return self.cur.lastrowid
 
+    def getRowCount(self):
+        return self.cur.rowcount
+
     def Commit(self):
         self.conn.commit()
 
@@ -183,45 +186,53 @@ VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?)
                             [lvl, lvl, El[k], Vl[k], Wl[k], Tl[k], Ml[k],
                              _pickle(mimc_run.data.psums[k, :]), data_id])
 
-    def readRunData(self, data_ids):
+    def readRuns(self, run_ids):
         from . import mimc
         import re
         lstvalues = []
+        data_ids = self.getRunDataIDs(run_ids)
         dictParams = dict()
         with DBConn(**self.connArgs) as cur:
             for data_id in data_ids:
                 val = dict()
                 dataAll = cur.execute('''
-SELECT dr.run_id, dr.TOL, dr.creation_date, dr.totalTime, dr.bias,
-dr.stat_error, dr.Qparams, dr.userdata, dr.iteration_idx
-FROM {dataTable} dr WHERE data_id=?'''.format(dataTable=self.dataTable), [data_id]).fetchall()
+    SELECT dr.run_id, dr.TOL, dr.creation_date, dr.totalTime, dr.bias,
+    dr.stat_error, dr.Qparams, dr.userdata, dr.iteration_idx
+    FROM {dataTable} dr WHERE data_id=?'''.format(dataTable=self.dataTable), [data_id]).fetchall()
+
                 run_id = dataAll[0][0]
                 if run_id not in dictParams:
                     dataTmp = dictParams[run_id] = cur.execute(
-                        '''SELECT params, TOL FROM {runTable} WHERE run_id=?'''.
-                        format(runTable=self.runTable), [run_id]).fetchall()
-                    dataTmp2 = cur.execute(
-                        '''SELECT count(*) FROM {dataTable} WHERE run_id=?'''.
-                        format(dataTable=self.dataTable), [run_id]).fetchall()
+                        '''SELECT r.params, r.TOL, r.comment, count(*)
+                        FROM {runTable} r INNER JOIN {dataTable} dr ON
+                        r.run_id = dr.run_id WHERE r.run_id=? GROUP BY
+                        r.params, r.TOL, r.comment'''.
+                        format(runTable=self.runTable,
+                               dataTable=self.dataTable), [run_id]).fetchall()
                     dictParams[run_id] = [_unpickle(dataTmp[0][0]),
-                                          dataTmp[0][1], dataTmp2[0][0]]
+                                          dataTmp[0][1],
+                                          dataTmp[0][2],
+                                          dataTmp[0][3]]
+
+                run_params = dictParams[run_id]
                 val["data_id"] = data_id
-                val["finalTOL"] = dictParams[run_id][1]
-                val["total_iterations"] = dictParams[run_id][2]
+                val["finalTOL"] = run_params[1]
+                val["comment"] = run_params[2]
+                val["total_iterations"] = run_params[3]
                 val["TOL"] = dataAll[0][1]
                 val["creation_date"] = dataAll[0][2]
                 val["totalTime"] = dataAll[0][3]
-                run = mimc.MIMCRun(**dictParams[run_id][0].getDict())
+                run = mimc.MIMCRun(**run_params[0].getDict())
                 run.bias = dataAll[0][4]
                 run.stat_error = dataAll[0][5]
                 run.Q = _unpickle(dataAll[0][6])
                 val["run"] = run
-                val["userData"] = _unpickle(dataAll[0][7])
+                val["user_data"] = _unpickle(dataAll[0][7])
                 val["iteration_index"] = dataAll[0][8]
 
                 dataAll = cur.execute('''
-SELECT lvl, psums, Ml, Tl, Wl, Vl
-FROM {lvlTable} WHERE data_id=?'''.format(lvlTable=self.lvlTable), [data_id]).fetchall()
+    SELECT lvl, psums, Ml, Tl, Wl, Vl
+    FROM {lvlTable} WHERE data_id=?'''.format(lvlTable=self.lvlTable), [data_id]).fetchall()
                 psums, lvls, Ml, Tl, Wl, Vl = [], [], [], [], [], []
                 for r in dataAll:
                     t = np.array(map(int, [p for p in re.split(",|\|", r[0]) if p]),
@@ -247,70 +258,59 @@ FROM {lvlTable} WHERE data_id=?'''.format(lvlTable=self.lvlTable), [data_id]).fe
                 lstvalues.append(mimc.MyDefaultDict(**val))
         return lstvalues
 
-    def _fetchArray(self, query):
+    def _fetchArray(self, query, params=None):
         with DBConn(**self.connArgs) as cur:
-            dataAll = cur.execute(query)
+            dataAll = cur.execute(query, params if params else [])
             return np.array(dataAll.fetchall())
 
-    def getRunsIDs(self, minTOL=None, maxTOL=None, dim=None, tag=None):
+    def getRunsIDs(self, minTOL=None, maxTOL=None, dim=None, tag=None,
+                   TOL=None, from_date=None, to_date=None,
+                   done_flag=None):
         qs = []
+        params = []
         if dim is not None:
-            qs.append('dim in ({})'.
-                      format(','.join(map(str, np.array(dim).
-                                          astype(np.int).reshape(-1)))))
-        if tag is not None:
-            qs.append('''tag LIKE '{}' '''.format(tag))
-        if minTOL is not None:
-            qs.append('TOL>=({})'.format(minTOL))
-        if maxTOL is not None:
-            qs.append('TOL<=({})'.format(maxTOL))
-
-        wherestr = ("WHERE " + " AND ".join(qs)) if len(qs) > 0 else ''
-        ids = self._fetchArray("SELECT DISTINCT run_id FROM {runTable}\
-{wherestr} ORDER BY tag, dim, TOL".format(runTable=self.runTable,
-                                          wherestr=wherestr))
-        if ids.size > 0:
-            return ids[:, 0]
-        return ids
-
-    def getRunDataIDs(self, run_id=None, minTOL=None, maxTOL=None,
-                      dim=None, tag=None, done_flag=None):
-        if (run_id is not None) and (dim is not None or tag is not None):
-            raise Exception("Cannot specify dimensions and \
-tag after specifying run_id")
-
-        qs = []
-        if dim is not None:
-            qs.append('r.dim in ({})'.
-                      format(','.join(map(str, np.array(dim).
-                                          astype(np.int).reshape(-1)))))
-        if tag is not None:
-            qs.append('''r.tag LIKE '{}' '''.format(tag))
-
-        if run_id is not None:
-            qs.append('r.run_id in ({})'.
-                      format(','.join(map(str, np.array(run_id).
-                                          astype(np.int).reshape(-1)))))
-
+            qs.append('dim in ?')
+            params.append(np.array(dim).astype(np.int).reshape(-1).tolist())
         if done_flag is not None:
-            qs.append('r.done_flag in ({})'.
-                      format(','.join(map(str, np.array(done_flag).
-                                          astype(np.int).reshape(-1)))))
-
+            qs.append('done_flag in ?')
+            params.append(np.array(done_flag).astype(np.int).reshape(-1).tolist())
+        if tag is not None:
+            qs.append('tag LIKE ? ')
+            params.append(tag)
         if minTOL is not None:
-            qs.append('rd.TOL>=({})'.format(minTOL))
+            qs.append('TOL >= ?')
+            params.append(minTOL)
         if maxTOL is not None:
-            qs.append('rd.TOL<=({})'.format(maxTOL))
-
+            qs.append('TOL <= ?')
+            params.append(maxTOL)
+        if TOL is not None:
+            qs.append('TOL in ?')
+            params.append(np.array(TOL).reshape(-1).tolist())
+        if from_date is not None:
+            qs.append('creation_date >= ?')
+            params.append(from_date)
+        if to_date is not None:
+            qs.append('creation_date <= ?')
+            params.append(to_date)
         wherestr = ("WHERE " + " AND ".join(qs)) if len(qs) > 0 else ''
-        joinstr = '' if dim is None and tag is None else\
-                  ("INNER JOIN {runTable} r ON r.run_id = rd.run_id".
-                   format(runTable=self.runTable))
+        query = '''SELECT DISTINCT run_id FROM {runTable} {wherestr} ORDER BY tag, dim,
+        TOL'''.format(runTable=self.runTable, wherestr=wherestr)
 
-        ids = self._fetchArray("SELECT DISTINCT data_id FROM {dataTable} rd \
-{joinstr} {wherestr}".format(dataTable=self.dataTable,
-                             joinstr=joinstr,
-                             wherestr=wherestr))
+        ids = self._fetchArray(query, params)
         if ids.size > 0:
             return ids[:, 0]
         return ids
+
+    def getRunDataIDs(self, run_ids):
+        query = '''SELECT DISTINCT data_id FROM {dataTable} rd WHERE rd.run_id in ? '''.format(dataTable=self.dataTable)
+        ids = self._fetchArray(query,
+                               params=[np.array(run_ids).astype(np.int).reshape(-1).tolist()])
+        if ids.size > 0:
+            return ids[:, 0]
+        return ids
+
+    def deleteRuns(self, run_ids):
+        with DBConn(**self.connArgs) as cur:
+            cur.execute("DELETE from {runTable} where run_id in ?".format(runTable=self.runTable),
+                        [np.array(run_ids).astype(np.int).reshape(-1).tolist()])
+            return cur.getRowCount()
