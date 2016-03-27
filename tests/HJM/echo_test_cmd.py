@@ -62,5 +62,5 @@ else:
     TOLs = np.logspace(np.log10(TOL_max),np.log10(TOL_min),TOL_N)
     for TOL in TOLs:
         for i in range(0, realizations):
-            print cmd_multi.format(bayesian=False, tag="HJM_Example_2_newnewrate", TOL=TOL,
+            print cmd_multi.format(bayesian=False, tag="HJM_Example_2_c_rate", TOL=TOL,
                                    seed=np.random.randint(2**32-1))

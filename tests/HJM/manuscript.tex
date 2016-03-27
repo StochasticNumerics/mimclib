@@ -121,11 +121,34 @@ Multi-Index Monte Carlo formulation with the following effective parameters
 On the other hand, one may set $\ell_1=\ell_2=\ell_3=\ell$
 and arrive at a one-dimensional MLMC formulation with a weak rate of $2$, strong rate of $1$, and computational cost per realisation of $W_\ell=2^{2\ell}$. In the sequel, we will present the results of these two variations for comparison.
 
-\section{Multi-Index Monte Carlo}
+\section{Numerical results}
+
+In this section, we present some plots of the Multi-Index and Multi-Level Monte Carlo simulation using the Example 5.2.1 of \cite{bjork2013monte}, ie. the Ho-Lee model
+\begin{align}
+d f \parent{t,\tau} & = \sigma^2 \parent{\tau-t} dt 
++ \sigma dW_t, ~~~~ 0 \leq t \leq tau, 
+\nonumber
+\\
+f \parent{0, \tau} = f_0 \parent{ \tau}
+\end{align}
+with the initial data
+$f_0 \parent{\tau } = r_0- \frac{\sigma^2}{2}\tau^2 + 
+\int_0^\tau \theta \parent s ds$, with $r_0=0.05$,
+$\sigma=0.01$ and $\theta \parent \tau = \frac{e^{-\tau}}{10}$.
+
+Setting $t_{max}=1$ and $\tau_{max}=2$, we are interested in the
+expectation
+\begin{align}
+\expp{\mathcal F \parent f}
+=
+\expp{ \parent{1 - \int_0^{t_{max}} f \parent{s,s} ds } \parent{\int_{t_{max}}^{\tau_{max}} f 
+\parent{t_{max},\tau} d \tau}}.
+\end{align}
 
 
+\subsection{Multi-Level Monte Carlo}
 
-\section{Multi-Level Monte Carlo}
+\subsection{Multi-Index Monte Carlo}
 
 
 \bibliographystyle{agsm}
