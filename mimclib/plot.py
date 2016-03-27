@@ -207,8 +207,6 @@ run_data[i].run.data is an instance of mimc.MIMCData
     relative_error = kwargs.pop('relative', True)
     if relative_error:
         xy[:, 1:] = xy[:, 1:]/exact
-    import IPython
-    IPython.embed()a
     TOLs, error_est = __get_stats(xy, staton=2)
 
     plotObj = []
