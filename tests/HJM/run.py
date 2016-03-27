@@ -77,7 +77,7 @@ def main():
     return mimcRun.data.calcEg()
 
 def mySampleQoI(run, inds):
-    return HJM.hoLeeExample3(inds)
+    return HJM.hoLeeExample2(inds)
 
 
 if __name__ == "__main__":

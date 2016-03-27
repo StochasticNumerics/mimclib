@@ -46,14 +46,14 @@ args = parser.parse_known_args()[0]
 # Note that 0.6931 is np.log(2)
 base = "run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  \
 -qoi_seed {seed} \
--mimc_dim 1 -mimc_w 1 -mimc_s 1 -mimc_gamma 2 -mimc_beta 2 \
+-mimc_dim 2 -mimc_w 2 2 -mimc_s 0.5 1 -mimc_gamma 1 1 -mimc_beta 2 2 \
 -mimc_bayesian {bayesian} "
 
 cmd_multi = "python " + base + "-mimc_verbose False -db True -db_tag {tag} " + " -db_host {} ".format(args.db_host)
 cmd_single = "python " + base + " -mimc_verbose True -db False "
 
 if not args.multi:
-    print(cmd_single.format(seed=0, bayesian=False, TOL=0.0001))
+    print(cmd_single.format(seed=0, bayesian=False, TOL=args.TOL_min))
 else:
     realizations = args.N_iter # number of runs for each tolerance
     TOL_max = args.TOL_max
@@ -62,5 +62,5 @@ else:
     TOLs = np.logspace(np.log10(TOL_max),np.log10(TOL_min),TOL_N)
     for TOL in TOLs:
         for i in range(0, realizations):
-            print cmd_multi.format(bayesian=False, tag="HJM_Example_2_newrate", TOL=TOL,
+            print cmd_multi.format(bayesian=False, tag="HJM_Example_2_newnewrate", TOL=TOL,
                                    seed=np.random.randint(2**32-1))
