@@ -42,7 +42,7 @@ def main():
         db_args["host"] = args.db_host
     db = mimcdb.MIMCDatabase(**db_args)
 
-    run_data = db.readRunData(db.getRunDataIDs(tag=args.db_tag, done_flag=[1]))
+    run_data = db.readRuns(db.getRunsIDs(tag=args.db_tag, done_flag=1))
     run_data = [d for d in run_data if d.iteration_index+1 ==
                 d.total_iterations]
     if len(run_data) == 0:
