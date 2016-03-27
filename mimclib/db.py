@@ -302,9 +302,12 @@ VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?)
         return ids
 
     def getRunDataIDs(self, run_ids):
+        run_ids = np.array(run_ids).astype(np.int).reshape(-1).tolist()
+        if len(run_ids) == 0:
+            raise ValueError("Must have at least one run")
+
         query = '''SELECT DISTINCT data_id FROM {dataTable} rd WHERE rd.run_id in ? '''.format(dataTable=self.dataTable)
-        ids = self._fetchArray(query,
-                               params=[np.array(run_ids).astype(np.int).reshape(-1).tolist()])
+        ids = self._fetchArray(query, params=[run_ids])
         if ids.size > 0:
             return ids[:, 0]
         return ids

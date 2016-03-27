@@ -193,6 +193,7 @@ run_data[i].totalTime
 run_data[i].run is an instance of mimc.MIMCRun
 run_data[i].run.data is an instance of mimc.MIMCData
 """
+
     exact = kwargs.pop('exact', None)
     if exact is None:
         # Calculate mean based on data
@@ -206,7 +207,8 @@ run_data[i].run.data is an instance of mimc.MIMCData
     relative_error = kwargs.pop('relative', True)
     if relative_error:
         xy[:, 1:] = xy[:, 1:]/exact
-
+    import IPython
+    IPython.embed()a
     TOLs, error_est = __get_stats(xy, staton=2)
 
     plotObj = []
@@ -342,12 +344,15 @@ ax is in instance of matplotlib.axes
         xy = [[r.TOL, r.totalTime] for r in runs_data]
     elif work_estimate:
         xy = [[r.TOL, np.sum(r.run.data.M*r.run.Wl_estimate),
-               r.run.Wl_estimate[-1] * r.run.params.Ca *
-               r.run.data.calcVl()[0] * r.TOL**-2.]
+               r.run.Wl_estimate[-1] *
+               np.maximum(r.run.params.M0, r.run.params.Ca *
+                          r.run.all_data.calcVl()[0] * r.TOL**-2.)]
               for r in runs_data]
     else:
-        xy = [[r.TOL, np.sum(r.run.data.t), r.run.data.calcTl()[-1] *
-               r.run.params.Ca * r.run.data.calcVl()[0] * r.TOL**-2.]
+        xy = [[r.TOL, np.sum(r.run.data.t),
+               r.run.all_data.calcTl()[-1] *
+               np.maximum(r.run.params.M0, r.run.params.Ca *
+                          r.run.all_data.calcVl()[0] * r.TOL**-2.)]
               for r in runs_data]
     ax.set_xscale('log')
     ax.set_yscale('log')
