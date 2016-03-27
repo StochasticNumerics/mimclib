@@ -3,6 +3,103 @@
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
+import scipy.integrate as spint
+
+
+def rateTest2D(Nref=6,M=100,r0=0.05,sig=0.01):
+    
+    """
+    Test the convergence rates in two different dimensions.
+    """
+
+    # First check convergence along first difference
+
+    plotX = range(1,Nref+1)
+    plotYStrong = []
+    plotYWeak = []
+    plotYStrongE = []
+    plotYWeakE = []
+
+    plotRate = lambda ells,rate: 2**(np.array(ells)*(-1.0*rate))
+    
+    for ell in plotX:
+        sample = [hoLeeExample2([[ell,Nref],[ell-1,Nref]]) for foo in range(M)]
+        sample = [abs(foo[1]-foo[0]) for foo in sample]
+        plotYWeak.append(np.mean(sample))
+        plotYWeakE.append(np.sqrt(np.var(sample)/M))
+        sample = [foo**2 for foo in sample]
+        plotYStrong.append(np.mean(sample))
+        plotYStrongE.append(np.sqrt(np.var(sample)/M))
+
+    plotYStrong = np.array(plotYStrong)
+    plotYStrongE = np.array(plotYStrongE)
+    plotYWeak = np.array(plotYWeak)
+    plotYWeakE = np.array(plotYWeakE)
+
+    plt.figure()
+    plt.semilogy(plotX,plotYWeak,'b-')
+    plt.semilogy(plotX,plotYWeak-plotYWeakE,'b--')
+    plt.semilogy(plotX,plotYWeak+plotYWeakE,'b--')
+    plt.semilogy(plotX,0.1*plotRate(plotX,1.0),'r-')
+    plt.grid(1)
+    plt.title('Weak error, $\Delta t$ direction')
+    plt.xlabel('$\ell$')
+    plt.ylabel('$E_w$')
+    plt.savefig('dim_1_weak.pdf')
+
+    plt.figure()
+    plt.semilogy(plotX,plotYStrong,'b-')
+    plt.semilogy(plotX,plotYStrong+plotYStrongE,'b--')
+    plt.semilogy(plotX,plotYStrong-plotYStrongE,'b--')
+    plt.semilogy(plotX,1.0e-3*(plotRate(plotX,1.0))**2,'r-')
+    plt.grid(1)
+    plt.title('Strong error, $\Delta t$ dimension')
+    plt.xlabel('$\ell$')
+    plt.ylabel('$E_s$')
+    plt.savefig('dim_1_strong.pdf')
+
+    plotYStrong = []
+    plotYWeak =[]
+    plotYStrongE = []
+    plotYWeakE = []
+
+    for ell in plotX:
+        sample = [hoLeeExample2([[Nref,ell],[Nref,ell-1]]) for foo in range(M)]
+        sample = [abs(foo[1]-foo[0]) for foo in sample]
+        plotYWeak.append(np.mean(sample))
+        plotYWeakE.append(np.sqrt(np.var(sample)/M))
+        sample = [foo**2 for foo in sample]
+        plotYStrong.append(np.mean(sample))
+        plotYStrongE.append(np.sqrt(np.var(sample)/M))
+
+    plotYStrong = np.array(plotYStrong)
+    plotYStrongE = np.array(plotYStrongE)
+    plotYWeak =np.array(plotYWeak)
+    plotYWeakE = np.array(plotYWeakE)
+
+    plt.figure()
+    plt.semilogy(plotX,plotYWeak,'b-')
+    plt.semilogy(plotX,plotYWeak-plotYWeakE,'b--')
+    plt.semilogy(plotX,plotYWeak+plotYWeakE,'b--')
+    plt.semilogy(plotX,1*(plotRate(plotX,4.0)),'r-')
+    plt.grid(1)
+    plt.title('Weak error, $\Delta \\tau$ dimension')
+    plt.xlabel('$\ell$')
+    plt.ylabel('$E_w$')
+    plt.savefig('dim_2_weak.pdf')
+
+    plt.figure()
+    plt.semilogy(plotX,plotYStrong,'b-')
+    plt.semilogy(plotX,plotYStrong+plotYStrongE,'b--')
+    plt.semilogy(plotX,plotYStrong-plotYStrongE,'b--')
+    plt.semilogy(plotX,1*(plotRate(plotX,4.0))**2,'r-')
+    plt.grid(1)
+    plt.title('Strong error, $\Delta \\tau$ dimension')
+    plt.xlabel('$\ell$')
+    plt.ylabel('$E_s$')
+    plt.savefig('dim_2_strong.pdf')
+
+
 
 def hoLeeExample3(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
     return hoLeeExample([[foo[0]]*3 for foo in inds],t_max=t_max,tau_max=tau_max,r0=r0,sig=sig,verbose=verbose)
@@ -100,7 +197,7 @@ def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
             tPlot = 1*t_eff
             fttPlot = 0*t_eff
             for j in range(0,len(f_eff)):
-                fttPlot[j] = f_eff[j,lstar]
+                fttPlot[j] = f_eff[j,lstar]+f0(0.0)
                 while tau_eff[lstar+1]<= t_eff[j]:
                     lstar += 1
             plt.plot(tPlot,fttPlot+f0(tPlot),'r-')
@@ -115,11 +212,12 @@ def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
         lstar = 0
         while tau_eff[lstar+1]<= t_max:
             lstar += 1
+        underlying = spint.simps(f_eff[-1,lstar:-2]+f0(tau_eff[lstar:]),tau_eff[lstar:])
         if verbose:
-            print('The underlying term equals %f'%(np.sum(f_eff[-1,lstar:-3])*(tau_eff[-1]-tau_eff[-2])))
+            print('The underlying term equals %f'%(underlying,))
             #print('dtau term %f'%((tau_eff[-1]-tau_eff[-2])))
             #print('average forward curve %f'%(np.mean(f_eff[-1,lstar:-3])))
-        rv[-1] *= np.sum(f_eff[-1,lstar:-3])*(tau_eff[-1]-tau_eff[-2])
+        rv[-1] *= underlying
         if verbose:
             print('The quantity of interest is %f'%(rv[-1]))
     
