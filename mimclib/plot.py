@@ -342,13 +342,13 @@ ax is in instance of matplotlib.axes
         xy = [[r.TOL, r.totalTime] for r in runs_data]
     elif work_estimate:
         xy = [[r.TOL, np.sum(r.run.data.M*r.run.Wl_estimate),
-               r.run.Wl_estimate[-1] *
+               np.max(r.run.Wl_estimate) *
                np.maximum(r.run.params.M0, r.run.params.Ca *
                           r.run.all_data.calcVl()[0] * r.TOL**-2.)]
               for r in runs_data]
     else:
         xy = [[r.TOL, np.sum(r.run.data.t),
-               r.run.all_data.calcTl()[-1] *
+               np.max(r.run.all_data.calcTl()) *
                np.maximum(r.run.params.M0, r.run.params.Ca *
                           r.run.all_data.calcVl()[0] * r.TOL**-2.)]
               for r in runs_data]
@@ -475,17 +475,18 @@ ax is in instance of matplotlib.axes
 
 
 def __add_legend(ax, handles=None, labels=None, alpha=0.5,
-                 outside=False, loc='best', *args, **kwargs):
+                 outside=None, loc='best', *args, **kwargs):
     if not handles:
         handles, labels = ax.get_legend_handles_labels()
         if not handles:
             return
-    if outside:
+    if outside is not None and len(handles) >= outside:
         # Shrink current axis by 20%
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(handles, labels, loc='center left', fancybox=True,
-                  shadow=True, bbox_to_anchor=(1, 0.5)).draggable(True)
+        ax.legend(handles, labels, loc='center left', fancybox=False,
+                  frameon=False, shadow=False,
+                  bbox_to_anchor=(1, 0.5)).draggable(True)
     else:
         ax.legend(handles, labels, loc=loc, fancybox=True,
                   shadow=True).draggable(True)
@@ -516,6 +517,8 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
         params = next(r.run.params for r in runs_data if r.TOL == maxTOL)
 
     dim = params.dim
+    legend_outside = kwargs.pop("legend_outside", 5)
+
     has_gamma_rate = hasattr(params, 'gamma')
     has_w_rate = hasattr(params, 'w')
     has_s_rate = hasattr(params, 's')
@@ -573,9 +576,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
             return ""
         return rate
 
-    def getLevelRate(rates):
-        assert(len(rates) == 1)
-        rate = np.sum(rates)
+    def getLevelRate(rate):
         if has_beta:
             func = lambda x, r=rate, b=params.beta[0]: b ** (r*x)
             label = r'${:.2g}^{{ {}\ell }}$'.format(params.beta[0],
@@ -589,19 +590,33 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                  [plotVarVsLvls, -np.array(params.s) if has_s_rate else None],
                  [plotTimeVsLvls, np.array(params.gamma) if has_gamma_rate else None]]
 
+    directions = np.eye(dim, dtype=np.int).tolist()
+    cur = np.array(directions[0])
+    for i in range(1, dim):
+        cur += np.array(directions[i])
+        directions.append(cur.tolist())
+
     for plotFunc, rate in lvl_funcs:
-        if dim != 1:
-            continue
         ax = add_fig()
-        line_data, _ = plotFunc(ax, runs_data, fmt='-o')
-        if rate is None:
-            continue
-        assert(dim == 1)
-        func, label = getLevelRate(np.array(np.array(rate)))
-        ax.add_line(FunctionLine2D(func,
-                                   data=line_data,
-                                   linestyle='--', c='k',
-                                   label=label))
+        add_rates = dict()
+        markers = ['o', 'v', '^', '<', '>', '8', 's', 'p', '*', 'h', 'H', 'D', 'd']
+        linestyles = ['--', '-.', '-', ':', '-']
+        for j, direction in enumerate(directions):
+            line_data, _ = plotFunc(ax, runs_data,
+                                    fmt='-'+markers[j % len(markers)],
+                                    label=None if len(directions)==1 else
+                                    "$\ell={}$".format(direction),
+                                    direction=direction)
+            if rate is None:
+                continue
+            add_rates[np.sum(rate[np.array(direction) != 0])] = line_data
+
+        for j, r in enumerate(sorted(add_rates.keys(), key=lambda x:
+                                     np.abs(x))):
+            func, label = getLevelRate(r)
+            ax.add_line(FunctionLine2D(func, data=add_rates[r],
+                                       linestyle=linestyles[j % len(linestyles)],
+                                       c='k', label=label))
 
     ax = add_fig()
     line_data, _ = plotLvlsNumVsTOL(ax, runs_data)
@@ -627,7 +642,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
         from matplotlib.backends.backend_pdf import PdfPages
         with PdfPages(fileName) as pdf:
             for fig in figures:
-                __add_legend(fig.gca())
+                __add_legend(fig.gca(), outside=legend_outside)
                 pdf.savefig(fig)
 
     return figures
