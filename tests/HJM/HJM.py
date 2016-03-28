@@ -6,100 +6,6 @@ import matplotlib.pyplot as plt
 import scipy.integrate as spint
 import time
 
-def rateTest2D(Nref=6,M=100,r0=0.05,sig=0.01):
-    
-    """
-    Test the convergence rates in two different dimensions.
-    """
-
-    # First check convergence along first difference
-
-    plotX = range(1,Nref+1)
-    plotYStrong = []
-    plotYWeak = []
-    plotYStrongE = []
-    plotYWeakE = []
-
-    plotRate = lambda ells,rate: 2**(np.array(ells)*(-1.0*rate))
-    
-    for ell in plotX:
-        sample = [hoLeeExample2([[ell,Nref],[ell-1,Nref]]) for foo in range(M)]
-        sample = [abs(foo[1]-foo[0]) for foo in sample]
-        plotYWeak.append(np.mean(sample))
-        plotYWeakE.append(np.sqrt(np.var(sample)/M))
-        sample = [foo**2 for foo in sample]
-        plotYStrong.append(np.mean(sample))
-        plotYStrongE.append(np.sqrt(np.var(sample)/M))
-
-    plotYStrong = np.array(plotYStrong)
-    plotYStrongE = np.array(plotYStrongE)
-    plotYWeak = np.array(plotYWeak)
-    plotYWeakE = np.array(plotYWeakE)
-
-    plt.figure()
-    plt.semilogy(plotX,plotYWeak,'b-')
-    plt.semilogy(plotX,plotYWeak-plotYWeakE,'b--')
-    plt.semilogy(plotX,plotYWeak+plotYWeakE,'b--')
-    plt.semilogy(plotX,0.1*plotRate(plotX,1.0),'r-')
-    plt.grid(1)
-    plt.title('Weak error, $\Delta t$ direction')
-    plt.xlabel('$\ell$')
-    plt.ylabel('$E_w$')
-    plt.savefig('dim_1_weak.pdf')
-
-    plt.figure()
-    plt.semilogy(plotX,plotYStrong,'b-')
-    plt.semilogy(plotX,plotYStrong+plotYStrongE,'b--')
-    plt.semilogy(plotX,plotYStrong-plotYStrongE,'b--')
-    plt.semilogy(plotX,1.0e-3*(plotRate(plotX,1.0))**2,'r-')
-    plt.grid(1)
-    plt.title('Strong error, $\Delta t$ dimension')
-    plt.xlabel('$\ell$')
-    plt.ylabel('$E_s$')
-    plt.savefig('dim_1_strong.pdf')
-
-    plotYStrong = []
-    plotYWeak =[]
-    plotYStrongE = []
-    plotYWeakE = []
-
-    for ell in plotX:
-        sample = [hoLeeExample2([[Nref,ell],[Nref,ell-1]]) for foo in range(M)]
-        sample = [abs(foo[1]-foo[0]) for foo in sample]
-        plotYWeak.append(np.mean(sample))
-        plotYWeakE.append(np.sqrt(np.var(sample)/M))
-        sample = [foo**2 for foo in sample]
-        plotYStrong.append(np.mean(sample))
-        plotYStrongE.append(np.sqrt(np.var(sample)/M))
-
-    plotYStrong = np.array(plotYStrong)
-    plotYStrongE = np.array(plotYStrongE)
-    plotYWeak =np.array(plotYWeak)
-    plotYWeakE = np.array(plotYWeakE)
-
-    plt.figure()
-    plt.semilogy(plotX,plotYWeak,'b-')
-    plt.semilogy(plotX,plotYWeak-plotYWeakE,'b--')
-    plt.semilogy(plotX,plotYWeak+plotYWeakE,'b--')
-    plt.semilogy(plotX,1*(plotRate(plotX,4.0)),'r-')
-    plt.grid(1)
-    plt.title('Weak error, $\Delta \\tau$ dimension')
-    plt.xlabel('$\ell$')
-    plt.ylabel('$E_w$')
-    plt.savefig('dim_2_weak.pdf')
-
-    plt.figure()
-    plt.semilogy(plotX,plotYStrong,'b-')
-    plt.semilogy(plotX,plotYStrong+plotYStrongE,'b--')
-    plt.semilogy(plotX,plotYStrong-plotYStrongE,'b--')
-    plt.semilogy(plotX,1*(plotRate(plotX,4.0))**2,'r-')
-    plt.grid(1)
-    plt.title('Strong error, $\Delta \\tau$ dimension')
-    plt.xlabel('$\ell$')
-    plt.ylabel('$E_s$')
-    plt.savefig('dim_2_strong.pdf')
-
-
 
 def hoLeeExample3(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
     return hoLeeExample([[foo[0]]*3 for foo in inds],t_max=t_max,tau_max=tau_max,r0=r0,sig=sig,verbose=verbose)
@@ -300,4 +206,100 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
         print('Total time for all inds: %d seconds'%(ts[-1]-ts[0]))
 
     return rv
+
+def rateTest2D(Nref=7,M=100,r0=0.05,sig=0.01):
+    
+    """
+    Test the convergence rates in two different dimensions.
+    """
+
+    # First check convergence along first difference
+
+    plotX = range(1,Nref+1)
+    plotYStrong = []
+    plotYWeak = []
+    plotYStrongE = []
+    plotYWeakE = []
+
+    plotRate = lambda ells,rate: 2**(np.array(ells)*(-1.0*rate))
+    
+    for ell in plotX:
+        sample = [hoLeeExample2([[ell,Nref],[ell-1,Nref]]) for foo in range(M)]
+        sample = [abs(foo[1]-foo[0]) for foo in sample]
+        plotYWeak.append(np.mean(sample))
+        plotYWeakE.append(np.sqrt(np.var(sample)/M))
+        sample = [foo**2 for foo in sample]
+        plotYStrong.append(np.mean(sample))
+        plotYStrongE.append(np.sqrt(np.var(sample)/M))
+
+    plotYStrong = np.array(plotYStrong)
+    plotYStrongE = np.array(plotYStrongE)
+    plotYWeak = np.array(plotYWeak)
+    plotYWeakE = np.array(plotYWeakE)
+
+    plt.figure()
+    plt.semilogy(plotX,plotYWeak,'b-')
+    plt.semilogy(plotX,plotYWeak-plotYWeakE,'b--')
+    plt.semilogy(plotX,plotYWeak+plotYWeakE,'b--')
+    plt.semilogy(plotX,0.1*plotRate(plotX,1.0),'r-')
+    plt.grid(1)
+    plt.title('Weak error, $\Delta t$ direction')
+    plt.xlabel('$\ell$')
+    plt.ylabel('$E_w$')
+    plt.savefig('dim_1_weak.pdf')
+
+    plt.figure()
+    plt.semilogy(plotX,plotYStrong,'b-')
+    plt.semilogy(plotX,plotYStrong+plotYStrongE,'b--')
+    plt.semilogy(plotX,plotYStrong-plotYStrongE,'b--')
+    plt.semilogy(plotX,1.0e-3*(plotRate(plotX,1.0))**2,'r-')
+    plt.grid(1)
+    plt.title('Strong error, $\Delta t$ dimension')
+    plt.xlabel('$\ell$')
+    plt.ylabel('$E_s$')
+    plt.savefig('dim_1_strong.pdf')
+
+    plotYStrong = []
+    plotYWeak =[]
+    plotYStrongE = []
+    plotYWeakE = []
+
+    for ell in plotX:
+        sample = [hoLeeExample2([[Nref,ell],[Nref,ell-1]]) for foo in range(M)]
+        sample = [abs(foo[1]-foo[0]) for foo in sample]
+        plotYWeak.append(np.mean(sample))
+        plotYWeakE.append(np.sqrt(np.var(sample)/M))
+        sample = [foo**2 for foo in sample]
+        plotYStrong.append(np.mean(sample))
+        plotYStrongE.append(np.sqrt(np.var(sample)/M))
+
+    plotYStrong = np.array(plotYStrong)
+    plotYStrongE = np.array(plotYStrongE)
+    plotYWeak =np.array(plotYWeak)
+    plotYWeakE = np.array(plotYWeakE)
+
+    plt.figure()
+    plt.semilogy(plotX,plotYWeak,'b-')
+    plt.semilogy(plotX,plotYWeak-plotYWeakE,'b--')
+    plt.semilogy(plotX,plotYWeak+plotYWeakE,'b--')
+    plt.semilogy(plotX,1*(plotRate(plotX,1.5)),'r-')
+    plt.grid(1)
+    plt.title('Weak error, $\Delta \\tau$ dimension')
+    plt.xlabel('$\ell$')
+    plt.ylabel('$E_w$')
+    plt.savefig('dim_2_weak.pdf')
+
+    plt.figure()
+    plt.semilogy(plotX,plotYStrong,'b-')
+    plt.semilogy(plotX,plotYStrong+plotYStrongE,'b--')
+    plt.semilogy(plotX,plotYStrong-plotYStrongE,'b--')
+    plt.semilogy(plotX,1*(plotRate(plotX,1.5))**2,'r-')
+    plt.grid(1)
+    plt.title('Strong error, $\Delta \\tau$ dimension')
+    plt.xlabel('$\ell$')
+    plt.ylabel('$E_s$')
+    plt.savefig('dim_2_strong.pdf')
+
+
+
 
