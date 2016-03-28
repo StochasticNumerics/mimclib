@@ -4,7 +4,7 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 import scipy.integrate as spint
-
+import time
 
 def rateTest2D(Nref=6,M=100,r0=0.05,sig=0.01):
     
@@ -165,11 +165,13 @@ def twoFactorGaussianExample(inds,t_max=1.0,tau_max=3.0,b0=0.0759,b1=-0.0439,k=0
 
     return multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=t_max,tau_max=tau_max,identifierString=identifierString,verbose=verbose)    
 
-def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identifierString='HJM Model',verbose=False):
+def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identifierString='HJM Model',verbose=False,maxLev=30):
     
     '''
     Template to solve HJM type problems
     '''
+
+    ts = [time.time(),]
 
     if verbose:
         print('Evaluating the Two Factor Gaussian example.')
@@ -181,6 +183,10 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
     N_t = max([foo[0] for foo in inds])
     N_tau_1 = max([foo[1] for foo in inds])
     N_tau_2 = max([foo[2] for foo in inds])
+
+    if N_t+max(N_tau_1,N_tau_2) > maxLev:
+        raise MemoryError('Asking for exceptionally refined solution!')
+    
 
     N_t = 2**(N_t)+1
     N_tau_1 = 2**(N_tau_1)+1
@@ -214,6 +220,11 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
 
     rv = []
 
+    ts.append(time.time())
+
+    if verbose:
+        print('Mesh generations and initialisations done in %d seconds'%(ts[-1]-ts[-2]))
+    
     for ind in inds:
         if verbose:
             print('Evaluating the following index:')
@@ -280,8 +291,13 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
             print('The absurd additive term equals %f'%(weirdTerm,))
         rv[-1] *= underlying
         rv[-1] += weirdTerm
+        ts.append(time.time())
         if verbose:
             print('The quantity of interest is %f'%(rv[-1]))
+            print('Time spent on the level: %d seconds'%(ts[-1]-ts[-2]))
+
+    if verbose:
+        print('Total time for all inds: %d seconds'%(ts[-1]-ts[0]))
 
     return rv
 
