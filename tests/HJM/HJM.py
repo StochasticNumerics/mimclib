@@ -207,7 +207,7 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
 
     return rv
 
-def rateTest2D(Nref=7,M=100,r0=0.05,sig=0.01):
+def rateTest2D(fun=hoLeeExample2,Nref=7,M=100,r0=0.05,sig=0.01,weaks=[1,2],strongs=[1,2]):
     
     """
     Test the convergence rates in two different dimensions.
@@ -224,7 +224,7 @@ def rateTest2D(Nref=7,M=100,r0=0.05,sig=0.01):
     plotRate = lambda ells,rate: 2**(np.array(ells)*(-1.0*rate))
     
     for ell in plotX:
-        sample = [hoLeeExample2([[ell,Nref],[ell-1,Nref]]) for foo in range(M)]
+        sample = [fun([[ell,Nref],[ell-1,Nref]]) for foo in range(M)]
         sample = [abs(foo[1]-foo[0]) for foo in sample]
         plotYWeak.append(np.mean(sample))
         plotYWeakE.append(np.sqrt(np.var(sample)/M))
@@ -241,7 +241,7 @@ def rateTest2D(Nref=7,M=100,r0=0.05,sig=0.01):
     plt.semilogy(plotX,plotYWeak,'b-')
     plt.semilogy(plotX,plotYWeak-plotYWeakE,'b--')
     plt.semilogy(plotX,plotYWeak+plotYWeakE,'b--')
-    plt.semilogy(plotX,0.1*plotRate(plotX,1.0),'r-')
+    plt.semilogy(plotX,0.1*plotRate(plotX,weaks[0]*1.0),'r-')
     plt.grid(1)
     plt.title('Weak error, $\Delta t$ direction')
     plt.xlabel('$\ell$')
@@ -252,7 +252,7 @@ def rateTest2D(Nref=7,M=100,r0=0.05,sig=0.01):
     plt.semilogy(plotX,plotYStrong,'b-')
     plt.semilogy(plotX,plotYStrong+plotYStrongE,'b--')
     plt.semilogy(plotX,plotYStrong-plotYStrongE,'b--')
-    plt.semilogy(plotX,1.0e-3*(plotRate(plotX,1.0))**2,'r-')
+    plt.semilogy(plotX,1.0e-3*(plotRate(plotX,strongs[0]*1.0))**2,'r-')
     plt.grid(1)
     plt.title('Strong error, $\Delta t$ dimension')
     plt.xlabel('$\ell$')
@@ -265,7 +265,7 @@ def rateTest2D(Nref=7,M=100,r0=0.05,sig=0.01):
     plotYWeakE = []
 
     for ell in plotX:
-        sample = [hoLeeExample2([[Nref,ell],[Nref,ell-1]]) for foo in range(M)]
+        sample = [fun([[Nref,ell],[Nref,ell-1]]) for foo in range(M)]
         sample = [abs(foo[1]-foo[0]) for foo in sample]
         plotYWeak.append(np.mean(sample))
         plotYWeakE.append(np.sqrt(np.var(sample)/M))
@@ -282,7 +282,7 @@ def rateTest2D(Nref=7,M=100,r0=0.05,sig=0.01):
     plt.semilogy(plotX,plotYWeak,'b-')
     plt.semilogy(plotX,plotYWeak-plotYWeakE,'b--')
     plt.semilogy(plotX,plotYWeak+plotYWeakE,'b--')
-    plt.semilogy(plotX,1*(plotRate(plotX,1.5)),'r-')
+    plt.semilogy(plotX,1*(plotRate(plotX,weaks[1]*1.0)),'r-')
     plt.grid(1)
     plt.title('Weak error, $\Delta \\tau$ dimension')
     plt.xlabel('$\ell$')
@@ -293,7 +293,7 @@ def rateTest2D(Nref=7,M=100,r0=0.05,sig=0.01):
     plt.semilogy(plotX,plotYStrong,'b-')
     plt.semilogy(plotX,plotYStrong+plotYStrongE,'b--')
     plt.semilogy(plotX,plotYStrong-plotYStrongE,'b--')
-    plt.semilogy(plotX,1*(plotRate(plotX,1.5))**2,'r-')
+    plt.semilogy(plotX,1*(plotRate(plotX,strongs[1]*1.0))**2,'r-')
     plt.grid(1)
     plt.title('Strong error, $\Delta \\tau$ dimension')
     plt.xlabel('$\ell$')
