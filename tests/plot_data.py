@@ -1,9 +1,12 @@
 #!/usr/bin/python
 import mimclib.db as mimcdb
 import mimclib.plot as miplot
-
+import warnings
+import os
+warnings.formatwarning = lambda msg, cat, filename, lineno, line: \
+                             "{}:{}: ({}) {}\n".format(os.path.basename(filename),
+                                                       lineno, cat.__name__, msg)
 try:
-    import warnings
     from matplotlib.cbook import MatplotlibDeprecationWarning
     warnings.simplefilter('ignore', MatplotlibDeprecationWarning)
 except:
@@ -42,6 +45,8 @@ def main():
         db_args["host"] = args.db_host
     db = mimcdb.MIMCDatabase(**db_args)
 
+    if args.db_tag is None:
+        warnings.warn("You did not select a database tag!!")
     run_data = db.readRuns(db.getRunsIDs(tag=args.db_tag, done_flag=1))
     run_data = [d for d in run_data if d.iteration_index+1 ==
                 d.total_iterations]
