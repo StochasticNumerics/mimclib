@@ -35,7 +35,7 @@ class DBConn(object):
 
     def __enter__(self):
         import MySQLdb
-        self.conn = MySQLdb.connect(**self.connArgs)
+        self.conn = MySQLdb.connect(compress=True, **self.connArgs)
         self.cur = self.conn.cursor()
         return self
 
@@ -190,72 +190,86 @@ VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?)
         from . import mimc
         import re
         lstvalues = []
-        data_ids = self.getRunDataIDs(run_ids)
-        dictParams = dict()
+        run_ids = np.array(run_ids).astype(np.int).reshape(-1).tolist()
         with DBConn(**self.connArgs) as cur:
-            for data_id in data_ids:
-                val = dict()
-                dataAll = cur.execute('''
-    SELECT dr.run_id, dr.TOL, dr.creation_date, dr.totalTime, dr.bias,
-    dr.stat_error, dr.Qparams, dr.userdata, dr.iteration_idx
-    FROM {dataTable} dr WHERE data_id=?'''.format(dataTable=self.dataTable), [data_id]).fetchall()
-
-                run_id = dataAll[0][0]
-                if run_id not in dictParams:
-                    dataTmp = dictParams[run_id] = cur.execute(
-                        '''SELECT r.params, r.TOL, r.comment, count(*)
+            runAll = cur.execute(
+                        '''SELECT r.run_id, r.params, r.TOL, r.comment, count(*)
                         FROM {runTable} r INNER JOIN {dataTable} dr ON
-                        r.run_id = dr.run_id WHERE r.run_id=? GROUP BY
-                        r.params, r.TOL, r.comment'''.
+                        r.run_id = dr.run_id WHERE r.run_id in ? GROUP BY
+                        r.run_id, r.params, r.TOL, r.comment'''.
                         format(runTable=self.runTable,
-                               dataTable=self.dataTable), [run_id]).fetchall()
-                    dictParams[run_id] = [_unpickle(dataTmp[0][0]),
-                                          dataTmp[0][1],
-                                          dataTmp[0][2],
-                                          dataTmp[0][3]]
+                               dataTable=self.dataTable), [run_ids]).fetchall()
 
-                run_params = dictParams[run_id]
-                val["data_id"] = data_id
-                val["finalTOL"] = run_params[1]
-                val["comment"] = run_params[2]
-                val["total_iterations"] = run_params[3]
-                val["TOL"] = dataAll[0][1]
-                val["creation_date"] = dataAll[0][2]
-                val["totalTime"] = dataAll[0][3]
-                run = mimc.MIMCRun(**run_params[0].getDict())
-                run.bias = dataAll[0][4]
-                run.stat_error = dataAll[0][5]
-                run.Q = _unpickle(dataAll[0][6])
-                val["run"] = run
-                val["user_data"] = _unpickle(dataAll[0][7])
-                val["iteration_index"] = dataAll[0][8]
+            dataAll = cur.execute('''
+SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
+        dr.totalTime, dr.bias, dr.stat_error, dr.Qparams, dr.userdata,
+        dr.iteration_idx FROM {dataTable} dr WHERE dr.run_id in ?
+'''.format(dataTable=self.dataTable), [run_ids]).fetchall()
 
-                dataAll = cur.execute('''
-    SELECT lvl, psums, Ml, Tl, Wl, Vl
-    FROM {lvlTable} WHERE data_id=?'''.format(lvlTable=self.lvlTable), [data_id]).fetchall()
-                psums, lvls, Ml, Tl, Wl, Vl = [], [], [], [], [], []
-                for r in dataAll:
-                    t = np.array(map(int, [p for p in re.split(",|\|", r[0]) if p]),
-                                 dtype=np.uint32)
-                    ind = np.zeros(run.params.dim, dtype=np.uint)
-                    ind[t[::2]] = t[1::2]
-                    lvls.append(ind.tolist())
-                    psums.append(_unpickle(r[1]))
-                    Ml.append(r[2])
-                    Tl.append(r[3])
-                    Wl.append(r[4])
-                    Vl.append(r[5])
+            lvlsAll = cur.execute('''
+            SELECT dr.data_id, l.lvl, l.psums, l.Ml, l.Tl, l.Wl, l.Vl, r.dim FROM
+            {lvlTable} l INNER JOIN {dataTable} dr ON
+            dr.data_id=l.data_id INNER JOIN {runTable} r on r.run_id=dr.run_id
+            WHERE dr.run_id in ? ORDER BY dr.data_id'''.
+                                  format(lvlTable=self.lvlTable,
+                                         dataTable=self.dataTable,
+                                         runTable=self.runTable),
+                                  [run_ids]).fetchall()
 
-                lvls = np.array(lvls)
-                sort_rows = lambda a: np.argsort(a.view([('',a.dtype)]*a.shape[1]),0).T[0]
-                ind = sort_rows(lvls)
-                run.all_data.lvls = run.data.lvls = lvls[ind]
-                run.all_data.psums = run.data.psums = np.array(psums)[ind]
-                run.all_data.M = run.data.M = np.array(Ml)[ind]
-                run.all_data.t = run.data.t = run.data.M * np.array(Tl)[ind]
-                run.Vl_estimate = np.array(Vl)[ind]
-                run.Wl_estimate = np.array(Wl)[ind]
-                lstvalues.append(mimc.MyDefaultDict(**val))
+        dictRuns = dict()
+        for run in runAll:
+            dictRuns[run[0]] = [_unpickle(run[1]), run[2], run[3],
+                                run[4]]
+
+        dictLvls = dict()
+        import itertools
+        for run_id, itr in itertools.groupby(lvlsAll, key=lambda x:x[0]):
+            psums, lvls, Ml, Tl, Wl, Vl = [], [], [], [], [], []
+            for r in itr:
+                t = np.array(map(int, [p for p in re.split(",|\|", r[1]) if p]),
+                             dtype=np.uint32)
+                ind = np.zeros(r[-1], dtype=np.uint)
+                ind[t[::2]] = t[1::2]
+                lvls.append(ind.tolist())
+                psums.append(_unpickle(r[2]))
+                Ml.append(r[3])
+                Tl.append(r[4])
+                Wl.append(r[5])
+                Vl.append(r[6])
+            dictLvls[run_id] = [psums, lvls, Ml, Tl, Wl, Vl]
+
+        for data in dataAll:
+            val = dict()
+            run_id = data[1]
+            data_id = data[0]
+            run_params = dictRuns[run_id]
+            val["data_id"] = data_id
+            val["finalTOL"] = run_params[1]
+            val["comment"] = run_params[2]
+            val["total_iterations"] = run_params[3]
+            val["TOL"] = data[2]
+            val["creation_date"] = data[3]
+            val["totalTime"] = data[4]
+            run = mimc.MIMCRun(**run_params[0].getDict())
+            run.bias = data[5]
+            run.stat_error = data[6]
+            run.Q = _unpickle(data[7])
+            val["run"] = run
+            val["user_data"] = _unpickle(data[8])
+            val["iteration_index"] = data[9]
+
+            psums, lvls, Ml, Tl, Wl, Vl = dictLvls[data_id]
+
+            lvls = np.array(lvls)
+            sort_rows = lambda a: np.argsort(a.view([('',a.dtype)]*a.shape[1]),0).T[0]
+            ind = sort_rows(lvls)
+            run.all_data.lvls = run.data.lvls = lvls[ind]
+            run.all_data.psums = run.data.psums = np.array(psums)[ind]
+            run.all_data.M = run.data.M = np.array(Ml)[ind]
+            run.all_data.t = run.data.t = run.data.M * np.array(Tl)[ind]
+            run.Vl_estimate = np.array(Vl)[ind]
+            run.Wl_estimate = np.array(Wl)[ind]
+            lstvalues.append(mimc.MyDefaultDict(**val))
         return lstvalues
 
     def _fetchArray(self, query, params=None):
