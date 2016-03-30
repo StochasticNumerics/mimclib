@@ -35,7 +35,8 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(add_help=True)
     addExtraArguments(parser)
-    args = parser.parse_known_args()[0]
+    import mimclib.test
+    args = mimclib.test.parse_known_args(parser)
     db_args = dict()
     if args.db_name is not None:
         db_args["db"] = args.db_name
