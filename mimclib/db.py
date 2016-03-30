@@ -191,6 +191,9 @@ VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?)
         import re
         lstvalues = []
         run_ids = np.array(run_ids).astype(np.int).reshape(-1).tolist()
+        if len(run_ids) == 0:
+            return lstvalues
+
         with DBConn(**self.connArgs) as cur:
             runAll = cur.execute(
                         '''SELECT r.run_id, r.params, r.TOL, r.comment, count(*)
