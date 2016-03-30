@@ -2,10 +2,30 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 #warnings.filterwarnings('error')
-
 import numpy as np
+import warnings
+
+class ArgumentWarning(Warning):
+    def __init__(self, message):
+        self.message = message
+    def __str__(self):
+        return self.message
+
+
+def parse_known_args(parser, warn=True, return_unknown=False):
+    knowns, unknowns = parser.parse_known_args()
+    for a in unknowns:
+        if a.startswith('-'):
+            warnings.warn(ArgumentWarning("Argument {} was not used!".format(a)))
+    if return_unknown:
+        return knowns, unknowns
+    return knowns
+
+
 def RunStandardTest(fnSampleQoI=None, fnSampleLvl=None,
-                    fnAddExtraArgs=None, fnSeed=np.random.seed):
+                    fnAddExtraArgs=None,
+                    fnInit=None,
+                    fnSeed=np.random.seed):
     import warnings
     import os.path
     import mimclib.mimc as mimc
@@ -31,7 +51,11 @@ def RunStandardTest(fnSampleQoI=None, fnSampleLvl=None,
     if fnAddExtraArgs is not None:
         fnAddExtraArgs(parser)
     mimc.MIMCRun.addOptionsToParser(parser)
-    mimcRun = mimc.MIMCRun(**vars(parser.parse_known_args()[0]))
+    mimcRun = mimc.MIMCRun(**vars(parse_known_args(parser)))
+
+    if fnInit is not None:
+        fnInit(mimcRun)
+
     if mimcRun.params.qoi_seed >= 0 and fnSeed is not None:
         fnSeed(mimcRun.params.qoi_seed)
 
