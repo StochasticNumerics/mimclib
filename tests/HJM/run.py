@@ -27,8 +27,17 @@ def addExtraArguments(parser):
                         action="store", help="Database Tag")
     parser.add_argument("-db", type='bool', default=False,
                         action="store", help="Save in Database")
+    parser.add_argument("-qoi_sigma", type=float, default=1.,
+                        action="store", help="Volatility in GBM")
+    parser.add_argument("-qoi_mu", type=float, default=1.,
+                        action="store", help="Drift in GBM")
+    parser.add_argument("-qoi_T", type=float, default=1.,
+                        action="store", help="Final time in GBM")
+    parser.add_argument("-qoi_S0", type=float, default=1.,
+                        action="store", help="Initial condition in GBM")
     parser.add_argument("-qoi_seed", type=int, default=-1,
                         action="store", help="Seed for random generator")
+
 
 def main():
     import argparse
@@ -55,19 +64,21 @@ def main():
 
     try:
         mimcRun.doRun()
-        if mimcRun.params.db:
-            # The run succeeded, mark it as done in the database
-            db.markRunDone(run_id)
-    except:
-        # The run failed, mark it as failed in the database
-        if mimcRun.params.db:
-            db.markRunDone(run_id, flag=0)
+    except KeyboardInterrupt:
         raise
+    except Exception as e:
+        if mimcRun.params.db:
+            print("Run failed", run_id, e)
+            db.markRunFailed(run_id)
+        raise
+    if mimcRun.params.db:
+        db.markRunSuccessful(run_id)
 
     return mimcRun.data.calcEg()
 
 def mySampleQoI(run, inds):
     return HJM.hoLeeExample2(inds)
+
 
 if __name__ == "__main__":
     main()

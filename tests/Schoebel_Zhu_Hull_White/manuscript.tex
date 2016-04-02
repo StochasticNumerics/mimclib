@@ -1,0 +1,187 @@
+\documentclass[11pt]{amsart}
+\usepackage{geometry}                % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}                   % ... or a4paper or a5paper or ... 
+%\geometry{landscape}                % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}    % Activate to begin paragraphs with an empty line rather than an indent
+\usepackage{graphicx}
+\usepackage{amssymb, amsmath, amsthm}
+\usepackage{natbib}
+\usepackage{epstopdf}
+\usepackage{enumerate}
+\usepackage{textcomp}
+\usepackage{mathrsfs }
+\usepackage[section]{algorithm}
+\usepackage{algorithmic}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepgfplotslibrary{patchplots}
+\usepackage{subfigure}
+\usepackage{hyperref}
+\usepackage{comment}
+\usepackage{multirow}
+
+%line suggested by my compiler (Fabian)
+\pgfplotsset{compat=1.9}
+
+% put figures at the end of the document, while I am writing is very annoying to have the figures in the middle of the text! 
+% \usepackage[nomarkers,figuresonly]{endfloat}
+
+
+\DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
+
+\input{macros.tex}
+
+\title[MLMC for timer options]{Multi-Level Monte Carlo evaluation of timer options.}
+\author{Juho H\"app\"ol\"a}
+\address{\kaustaddress}
+\email{juho.happola@iki.fi}
+
+
+\date{\today}    
+                                    % Activate to display a given date or no date
+\begin{document}
+
+
+\begin{abstract}
+Abstract here!!!
+\end{abstract}
+
+\maketitle
+%\tableofcontents
+
+
+\section{Introduction}
+
+Timer options are an interesting class of derivative assets that have gained some popularity recently. The central feature of timer options is their stochastic exercise time.
+
+Let the asset price be modelled by the following SDE
+\begin{align}
+dX_t &= r_t X dt + \beta \parent{t,X_t, \sigma_t} dW_t
+\nonumber \\
+X_0 &= x_0
+\end{align}
+with the volatility $\sigma_t$, and interest rate $r_t$
+given by adapted processes.
+
+Unlike in plain vanilla options, we are interested in evaluating
+the expected value of a payoff functional $g$
+\begin{align}
+\expp{e^{-\int_0^\tau r_s ds} g \parent{X_\tau}}
+\end{align}
+with the hitting time $\tau$ being defined as
+\begin{align}
+\label{eq:hittingTimeDefinition}
+\tau \equiv \mathop{\mathrm{inf.}}_{\iota}
+\sset{\iota: \int_0^\iota \sigma_s^2 ds \geq V}.
+\end{align}
+
+We note, that for processes that have almost surely $\sigma_s=\sigma$,
+the option prices reduce to those of a fixed-maturity plain-vanilla option.
+
+The case of stochastic volatility has been studied earlier
+in the Forward-Euler Monte Carlo setting by \cite{bernard2011pricing}. For a selected class of stochastic
+volatility models, \cite{zeng2015fast} presented a fast Hilbert transform based solution.
+
+\section{Model}
+
+For a rather general study framework of studying the pricing of timer options, we choose the Sch\"obel-Zhu-Hull-White model introduced in \cite{grzelak2012extension}, with stochastic interest rates and volatility:
+\begin{align}
+d S_t &=& r_t S_t dt &+& \sigma_t^p S_t dW_t^x 
+\nonumber
+\\
+d r_t &=& \lambda \parent{\theta_t -r_t} dt  &+& \eta dW_t^r
+\\
+d \sigma_t &=& \kappa \parent{\overline \sigma - \sigma_t} dt
+ &+& \gamma \sigma^{1-p} dW_t^\sigma
+\nonumber,
+\end{align}
+where the three Brownian motions $W^x$, $W^r$ and $W^\sigma$
+are correlated through the constant instantaneous correlation matrix
+$\Sigma$.
+
+
+\section{Numerical example}
+
+To set a reasonable test case in which to test the convergence of
+Multi-Level Monte Carlo, we may select the a reasonable asset volatility
+to twenty per cent:
+\begin{align*}
+\overline \sigma = \sigma_0 = 0.2.
+\end{align*}
+Setting $p=1$, the
+long-term variance of volatility is given by
+\begin{align*}
+\frac{\gamma^2 }{2 \kappa} = \frac{\bar \sigma}{4},
+\end{align*}
+we set
+\begin{align*}
+\kappa &= 2, \\
+\bar \sigma &= \gamma.
+\end{align*}
+Likewise, for the interest rate, we set 
+\begin{align*}
+\theta_t &= 0.01, \\
+\lambda &=1,
+\eta = 0.1.
+\end{align*}
+
+We may select the maturity time $T=\frac{1}{12}$ and which
+gives us
+\begin{align*}
+V = \frac{\bar \sigma^2}{12}.
+\end{align*}
+
+For the discretisation, we select the drift-implicit Euler method
+which guarantees stability for longer time steps when using longer
+time steps for the Ornstein-Uhlenbeck process.
+\begin{align}
+\sigma_{n+1} &= \frac{\kappa \overline \sigma}{1+\Delta t}
++ \gamma \sigma_{n}^{1-p} \Delta W_n^{\sigma}
+\\
+r_{n+1} &= \frac{\lambda \overline \theta_n}{1+ \Delta t}
++ \eta \Delta W_n^r
+\\
+\log X_{n+1} &=
+ \parent{r - \frac{\sigma^{2p}_{n+1}}{2}} \Delta t
++ \sigma_n^{p} \Delta W_n^x .
+\end{align}
+To evaluate the accumulated variance, we discretise the integral in eq. \eqref{eq:hittingTimeDefinition} as
+\begin{align}
+\nu_{n+1} = \nu_n + \sigma_n^2 \Delta t,
+\end{align}
+and similarly for the discounting process
+\begin{align}
+d_{n+1} = d_n + r_n \Delta t.
+\end{align}
+
+For the correlation matrix, we initially set $\Sigma = \mathbf 1_3$.
+
+Given a multi-level index $\ell \geq 0$, we set
+\begin{align*}
+\Delta t^{\ell} = 2^{-\ell-5} T,
+\end{align*}
+i.e. We start with a setting that for $\gamma=0$ case
+has $2^5$ time steps and increase the number of time steps geometrically.
+
+We simulate realisations $\overline X^\ell$, $\overline X^{\ell-1}$ for
+$1<\ell<L$ in pairs using the same brownian paths and run the discretised Euler integration until $n^*,k^*$ $\nu_{n^*}^\ell \geq V$ and $\nu_{k^*}^{\ell+1} \geq V$. Finally, we form the estimator for the option price as
+\begin{align}
+\mathcal A \parent{g} = \ssum{m=0}{M_0} \frac{e^{d_{n^*}^{\parent{0}}} g \parent{X_{k^*}} }{M_0}
++
+\ssum{\ell=1}{L} \ssum{m=0}{M_\ell}
+\frac{e^{d_{n^*}^{\parent{0}}} g \parent{X_{n^*}} - e^{d_{k^*}^{\parent{0}}} g \parent{X_{k^*}} }{M_0}
+\end{align}
+
+\section{Convergence results (???)}
+
+\bibliographystyle{agsm}
+\bibliography{references}
+
+\appendix
+
+
+
+
+\end{document}
+
+
