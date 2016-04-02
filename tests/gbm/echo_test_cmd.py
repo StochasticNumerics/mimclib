@@ -28,6 +28,6 @@ else:
     TOLs = 0.1*np.sqrt(2.)**-np.arange(0., 10.)
     for TOL in TOLs:
         for i in range(0, realizations):
-            print cmd_multi.format(bayesian=False, tag="GBM_test_kurtosis", TOL=TOL,
+            print cmd_multi.format(bayesian=True, tag="GBM_test_kurtosis", TOL=TOL,
                                    seed=np.random.randint(2**32-1), theta="0.2")
 
