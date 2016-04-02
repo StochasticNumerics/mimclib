@@ -265,10 +265,13 @@ def __calc_moments(runs_data, seed=None, direction=None):
         M[:L] += curRun.run.data.M[inds]
         Tl[:L] += curRun.run.data.t[inds]
 
-    El = psums[:, 0]/M
-    Vl = psums[:, 1]/M - El**2
+    central_moments = np.empty_like(psums)
+    for m in range(1, psums.shape[1]+1):
+        central_moments[:, m-1] = mimc.compute_central_moment(psums,
+                                                              M, m,
+                                                              empty_value=np.inf)
     Tl /= M
-    return El, Vl, Tl, M
+    return central_moments, Tl, M
 
 def __normalize_fmt(args, kwargs):
     if "fmt" in kwargs:        # Normalize behavior of errorbar() and plot()
@@ -285,9 +288,14 @@ ax is in instance of matplotlib.axes
     ax.set_ylabel(r'$E_\ell$')
     ax.set_yscale('log')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    El, Vl, _, M = __calc_moments(runs_data,
-                                  seed=kwargs.pop('seed', None),
-                                  direction=kwargs.pop('direction', None))
+    if "__calc_moments" in kwargs:
+        central_moments, _, M = kwargs.pop("__calc_moments")
+    else:
+        central_moments, _, M = __calc_moments(runs_data,
+                                               seed=kwargs.pop('seed', None),
+                                               direction=kwargs.pop('direction', None))
+    El = central_moments[:, 0]
+    Vl = central_moments[:, 1]
     errorBar = ax.errorbar(np.arange(0, len(El)), np.abs(El), *args,
                            yerr=3*np.sqrt(np.abs(Vl/M)), **kwargs)
     return errorBar[0].get_xydata(), [errorBar]
@@ -303,12 +311,66 @@ ax is in instance of matplotlib.axes
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
-    _, Vl, _, _ = __calc_moments(runs_data,
-                                 seed=kwargs.pop('seed', None),
-                                 direction=kwargs.pop('direction', None))
+    if "__calc_moments" in kwargs:
+        central_moments, _, _ = kwargs.pop("__calc_moments")
+    else:
+        central_moments, _, _ = __calc_moments(runs_data,
+                                               seed=kwargs.pop('seed', None),
+                                               direction=kwargs.pop('direction',
+                                                                    None))
+    Vl = central_moments[:, 1]
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     line = ax.plot(np.arange(0, len(Vl)), Vl, *args, **kwargs)
     return line[0].get_xydata(), [line]
+
+
+@public
+def plotKurtosisVsLvls(ax, runs_data, *args, **kwargs):
+    """Plots El, Vl vs TOL of @runs_data, as
+returned by MIMCDatabase.readRunData()
+ax is in instance of matplotlib.axes
+"""
+    args, kwargs = __normalize_fmt(args, kwargs)
+    ax.set_xlabel(r'$\ell$')
+    ax.set_ylabel(r'$\textnormal{Kurt}_\ell$')
+    ax.set_yscale('log')
+    if "__calc_moments" in kwargs:
+        central_moments, _, _ = kwargs.pop("__calc_moments")
+    else:
+        central_moments, _, _ = __calc_moments(runs_data,
+                                               seed=kwargs.pop('seed', None),
+                                               direction=kwargs.pop('direction',
+                                                                    None))
+    Vl = central_moments[:, 1]
+    E4l = central_moments[:, 3]
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    line = ax.plot(np.arange(0, len(Vl)), E4l/Vl**2, *args, **kwargs)
+    return line[0].get_xydata(), [line]
+
+
+@public
+def plotSkewnessVsLvls(ax, runs_data, *args, **kwargs):
+    """Plots El, Vl vs TOL of @runs_data, as
+returned by MIMCDatabase.readRunData()
+ax is in instance of matplotlib.axes
+"""
+    args, kwargs = __normalize_fmt(args, kwargs)
+    ax.set_xlabel(r'$\ell$')
+    ax.set_ylabel(r'$\textnormal{Skew}_\ell$')
+    ax.set_yscale('log')
+    if "__calc_moments" in kwargs:
+        central_moments, _, _ = kwargs.pop("__calc_moments")
+    else:
+        central_moments, _, _ = __calc_moments(runs_data,
+                                               seed=kwargs.pop('seed', None),
+                                               direction=kwargs.pop('direction',
+                                                                    None))
+    Vl = central_moments[:, 1]
+    E3l = central_moments[:, 2]
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    line = ax.plot(np.arange(0, len(Vl)), E3l/Vl**1.5, *args, **kwargs)
+    return line[0].get_xydata(), [line]
+
 
 
 @public
@@ -321,9 +383,12 @@ ax is in instance of matplotlib.axes
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel('Time (s)')
     ax.set_yscale('log')
-    _, _, Tl, _ = __calc_moments(runs_data,
-                                 seed=kwargs.pop('seed', None),
-                                 direction=kwargs.pop('direction', None))
+    if "__calc_moments" in kwargs:
+        _, Tl, _ = kwargs.pop("__calc_moments")
+    else:
+        _, Tl, _ = __calc_moments(runs_data,
+                                  seed=kwargs.pop('seed', None),
+                                  direction=kwargs.pop('direction', None))
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     line = ax.plot(np.arange(0, len(Tl)), Tl, *args, **kwargs)
     return line[0].get_xydata(), [line]
@@ -418,7 +483,8 @@ def plotThetaRefVsTOL(ax, runs_data, eta, chi, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    El = np.abs(__calc_moments(runs_data)[0])
+    central_moments, _, _ = __calc_moments(runs_data)
+    El = np.abs(central_moments[:, 0])
     L = lambda r: np.max([np.sum(l) for l in r.run.data.lvls])
     if chi == 1:
         summary = np.array([[r.TOL,
@@ -506,6 +572,21 @@ def __formatMIMCRate(rate, log_rate, lbl_base=r"\textrm{TOL}", lbl_log_base=None
         "${}$".format(label)
 
 
+def __plot_failed(ax):
+    left, width = .25, .5
+    bottom, height = .25, .5
+    right = left + width
+    top = bottom + height
+    ax.text(0.5*(left+right), 0.5*(bottom+top), 'PLOTTING\nFAILED',
+            horizontalalignment='center', verticalalignment='center',
+            rotation=45, fontsize=60, color='red', alpha=0.5,
+            transform=ax.transAxes)
+
+    import traceback
+    print('-----------------------------------------------------')
+    traceback.print_exc(limit=None)
+    print('-----------------------------------------------------')
+
 @public
 def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     import matplotlib.pyplot as plt
@@ -535,38 +616,52 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
         return figures[-1].gca()
 
     ax = add_fig()
-    plotErrorsVsTOL(ax, runs_data, exact=exact,
-                    relative=True,
-                    ErrEst_kwargs={'label': 'Error Estimate'},
-                    TOLRef_kwargs={'linestyle': '--', 'c': 'k', 'label': 'TOL'})
+    try:
+        plotErrorsVsTOL(ax, runs_data, exact=exact,
+                        relative=True,
+                        ErrEst_kwargs={'label': 'Error Estimate'},
+                        TOLRef_kwargs={'linestyle': '--', 'c': 'k', 'label': 'TOL'})
+    except:
+        __plot_failed(ax)
 
     ax = add_fig()
-    plotErrorsQQ(ax, runs_data, Ref_kwargs={'linestyle': '--', 'c': 'k'})
+    try:
+        plotErrorsQQ(ax, runs_data, Ref_kwargs={'linestyle': '--', 'c': 'k'})
+    except:
+        __plot_failed(ax)
 
     ax = add_fig()
-    data_mimc, _ = plotTimeVsTOL(ax, runs_data, label="MIMC",
-                                 MC_kwargs={"label": "MC Estimate", "fmt": "--r"})
+    try:
+        data_mimc, _ = plotTimeVsTOL(ax, runs_data, label="MIMC",
+                                     MC_kwargs={"label": "MC Estimate", "fmt": "--r"})
+    except:
+        __plot_failed(ax)
+
     ax_est = add_fig()
-    data_mc, _ = plotTimeVsTOL(ax_est, runs_data, label="MIMC",
-                               work_estimate=True,
-                               MC_kwargs={"label": "MC Estimate", "fmt":
-                                          "--r"})
-    if has_s_rate and has_gamma_rate and has_w_rate:
-        s = np.array(params.s)
-        w = np.array(params.w)
-        gamma = np.array(params.gamma)
-        if has_beta:
-            s = s * np.log(params.beta)
-            w = w * np.log(params.beta)
-            gamma = gamma * np.log(params.beta)
-        func, label = __formatMIMCRate(*mimc.calcMIMCRate(w, s, gamma))
-        ax.add_line(FunctionLine2D(func, data=data_mimc,
-                                   linestyle='--', c='k',
-                                   label=label))
-        ax_est.add_line(FunctionLine2D(func,
-                                       data=data_mc,
+    try:
+        data_mc, _ = plotTimeVsTOL(ax_est, runs_data, label="MIMC",
+                                   work_estimate=True,
+                                   MC_kwargs={"label": "MC Estimate", "fmt":
+                                              "--r"})
+        if has_s_rate and has_gamma_rate and has_w_rate:
+            s = np.array(params.s)
+            w = np.array(params.w)
+            gamma = np.array(params.gamma)
+            if has_beta:
+                s = s * np.log(params.beta)
+                w = w * np.log(params.beta)
+                gamma = gamma * np.log(params.beta)
+            func, label = __formatMIMCRate(*mimc.calcMIMCRate(w, s, gamma))
+            ax.add_line(FunctionLine2D(func, data=data_mimc,
                                        linestyle='--', c='k',
                                        label=label))
+            ax_est.add_line(FunctionLine2D(func,
+                                           data=data_mc,
+                                           linestyle='--', c='k',
+                                           label=label))
+
+    except:
+        __plot_failed(ax)
 
     def formatPower(rate):
         rate = "{:.2g}".format(rate)
@@ -586,57 +681,73 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
             label = r'$\exp({}\ell)$'.format(formatPower(rate))
         return func, label
 
-    lvl_funcs = [[plotExpectVsLvls, -np.array(params.w) if has_w_rate else None],
-                 [plotVarVsLvls, -np.array(params.s) if has_s_rate else None],
-                 [plotTimeVsLvls, np.array(params.gamma) if has_gamma_rate else None]]
-
+    lvl_funcs = [[0, plotTimeVsLvls, np.array(params.gamma)
+                  if has_gamma_rate else None],
+                 [1, plotExpectVsLvls, -np.array(params.w)
+                  if has_w_rate else None],
+                 [2, plotVarVsLvls, -np.array(params.s)
+                  if has_s_rate else None],
+                 [3, plotSkewnessVsLvls, None],
+                 [4, plotKurtosisVsLvls, None]]
     directions = np.eye(dim, dtype=np.int).tolist()
     cur = np.array(directions[0])
     for i in range(1, dim):
         cur += np.array(directions[i])
         directions.append(cur.tolist())
 
-    for plotFunc, rate in lvl_funcs:
-        ax = add_fig()
-        add_rates = dict()
-        markers = ['o', 'v', '^', '<', '>', '8', 's', 'p', '*', 'h', 'H', 'D', 'd']
-        linestyles = ['--', '-.', '-', ':', '-']
-        for j, direction in enumerate(directions):
-            line_data, _ = plotFunc(ax, runs_data,
-                                    fmt='-'+markers[j % len(markers)],
-                                    label=None if len(directions)==1 else
-                                    "$\ell={}$".format(direction),
-                                    direction=direction)
-            if rate is None:
-                continue
-            add_rates[np.sum(rate[np.array(direction) != 0])] = line_data
+    max_moment = runs_data[0].run.data.psums.shape[1]
+    for min_moment, plotFunc, rate in lvl_funcs:
+        if min_moment > max_moment:
+            continue
+        try:
+            ax = add_fig()
+            add_rates = dict()
+            markers = ['o', 'v', '^', '<', '>', '8', 's', 'p', '*', 'h', 'H', 'D', 'd']
+            linestyles = ['--', '-.', '-', ':', '-']
+            for j, direction in enumerate(directions):
+                line_data, _ = plotFunc(ax, runs_data,
+                                        fmt='-'+markers[j % len(markers)],
+                                        label=None if len(directions)==1 else
+                                        "$\ell={}$".format(direction),
+                                        direction=direction)
+                if rate is None:
+                    continue
+                add_rates[np.sum(rate[np.array(direction) != 0])] = line_data
 
-        for j, r in enumerate(sorted(add_rates.keys(), key=lambda x:
-                                     np.abs(x))):
-            func, label = getLevelRate(r)
-            ax.add_line(FunctionLine2D(func, data=add_rates[r],
-                                       linestyle=linestyles[j % len(linestyles)],
-                                       c='k', label=label))
-
-    ax = add_fig()
-    line_data, _ = plotLvlsNumVsTOL(ax, runs_data)
-    if has_beta and has_w_rate and has_gamma_rate:
-        if has_beta:
-            rate = 1./np.min(np.array(params.w) * np.log(params.beta))
-        else:
-            rate = 1./np.min(np.array(params.w))
-        label = r'${}\log\left(\textrm{{TOL}}^{{-1}}\right)$'.format(formatPower(rate))
-        ax.add_line(FunctionLine2D(lambda x, r=rate: -rate*np.log(x),
-                                   data=line_data,
-                                   linestyle='--', c='k',
-                                   label=label))
+            for j, r in enumerate(sorted(add_rates.keys(), key=lambda x:
+                                         np.abs(x))):
+                func, label = getLevelRate(r)
+                ax.add_line(FunctionLine2D(func, data=add_rates[r],
+                                           linestyle=linestyles[j % len(linestyles)],
+                                           c='k', label=label))
+        except:
+            __plot_failed(ax)
 
     ax = add_fig()
-    plotThetaVsTOL(ax, runs_data)
-    if dim == 1 and has_s_rate and has_w_rate and has_gamma_rate:
-        chi = params.s[0]/params.gamma[0]
-        eta = params.w[0]/params.gamma[0]
-        plotThetaRefVsTOL(ax, runs_data, eta=eta, chi=chi, fmt='--k')
+    try:
+        line_data, _ = plotLvlsNumVsTOL(ax, runs_data)
+        if has_beta and has_w_rate and has_gamma_rate:
+            if has_beta:
+                rate = 1./np.min(np.array(params.w) * np.log(params.beta))
+            else:
+                rate = 1./np.min(np.array(params.w))
+            label = r'${}\log\left(\textrm{{TOL}}^{{-1}}\right)$'.format(formatPower(rate))
+            ax.add_line(FunctionLine2D(lambda x, r=rate: -rate*np.log(x),
+                                       data=line_data,
+                                       linestyle='--', c='k',
+                                       label=label))
+    except:
+        __plot_failed(ax)
+
+    ax = add_fig()
+    try:
+        plotThetaVsTOL(ax, runs_data)
+        if dim == 1 and has_s_rate and has_w_rate and has_gamma_rate:
+            chi = params.s[0]/params.gamma[0]
+            eta = params.w[0]/params.gamma[0]
+            plotThetaRefVsTOL(ax, runs_data, eta=eta, chi=chi, fmt='--k')
+    except:
+        __plot_failed(ax)
 
     if fileName is not None:
         from matplotlib.backends.backend_pdf import PdfPages
@@ -644,5 +755,4 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
             for fig in figures:
                 __add_legend(fig.gca(), outside=legend_outside)
                 pdf.savefig(fig)
-
     return figures
