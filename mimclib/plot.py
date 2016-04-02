@@ -242,8 +242,8 @@ def __calc_moments(runs_data, seed=None, direction=None):
     dim = runs_data[0].run.data.dim
     seed = np.array(seed) if seed is not None else np.zeros(dim, dtype=np.uint32)
     direction = np.array(direction) if direction is not None else np.ones(dim, dtype=np.uint32)
-
-    psums = np.zeros((0, 2))
+    moments = runs_data[0].run.data.psums.shape[1]
+    psums = np.zeros((0, moments))
     Tl = np.zeros(0)
     M = np.zeros(0)
     for curRun in runs_data:
@@ -258,10 +258,10 @@ def __calc_moments(runs_data, seed=None, direction=None):
             cur = cur + direction
         L = len(inds)
         if L > len(M):
-            psums.resize((L, 2), refcheck=False)
+            psums.resize((L, moments), refcheck=False)
             M.resize(L, refcheck=False)
             Tl.resize(L, refcheck=False)
-        psums[:L, :] += curRun.run.data.psums[inds, :2]
+        psums[:L, :] += curRun.run.data.psums[inds, :]
         M[:L] += curRun.run.data.M[inds]
         Tl[:L] += curRun.run.data.t[inds]
 
