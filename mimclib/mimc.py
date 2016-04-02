@@ -521,7 +521,7 @@ estimate optimal number of levels"
         lvls = self.data.lvls
         s = len(lvls)
         M = np.zeros(s, dtype=np.int)
-        psums = np.zeros((s, 2))
+        psums = np.zeros_like(self.data.psums)
         p = np.arange(1, psums.shape[1]+1)
         t = np.zeros(s)
         for i in range(0, s):
