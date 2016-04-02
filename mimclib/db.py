@@ -253,11 +253,6 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
             val["TOL"] = data[2]
             val["creation_date"] = data[3]
             val["totalTime"] = data[4]
-            run = mimc.MIMCRun(**run_params[0].getDict())
-            run.bias = data[5]
-            run.stat_error = data[6]
-            run.Q = _unpickle(data[7])
-            val["run"] = run
             val["user_data"] = _unpickle(data[8])
             val["iteration_index"] = data[9]
 
@@ -266,10 +261,17 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
             lvls = np.array(lvls)
             sort_rows = lambda a: np.argsort(a.view([('',a.dtype)]*a.shape[1]),0).T[0]
             ind = sort_rows(lvls)
-            run.all_data.lvls = run.data.lvls = lvls[ind]
-            run.all_data.psums = run.data.psums = np.array(psums)[ind]
-            run.all_data.M = run.data.M = np.array(Ml)[ind]
-            run.all_data.t = run.data.t = run.data.M * np.array(Tl)[ind]
+
+            old_data = mimc.MIMCData(run_params[0].dim, lvls=lvls[ind],
+                                     psums=np.array(psums)[ind],
+                                     M=np.array(Ml)[ind],
+                                     t=np.array(Ml)[ind] * np.array(Tl)[ind])
+            run = mimc.MIMCRun(old_data=old_data,
+                               **run_params[0].getDict())
+            run.bias = data[5]
+            run.stat_error = data[6]
+            run.Q = _unpickle(data[7])
+            val["run"] = run
             run.Vl_estimate = np.array(Vl)[ind]
             run.Wl_estimate = np.array(Wl)[ind]
             lstvalues.append(mimc.MyDefaultDict(**val))

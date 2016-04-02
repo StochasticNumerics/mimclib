@@ -14,6 +14,46 @@ def public(sym):
     __all__.append(sym.__name__)
     return sym
 
+def compute_raw_moments(psums, M, empty_value=0):
+    '''
+    Returns the raw moments or empty_value when M=0.
+    '''
+    idx = M != 0
+    val = np.empty_like(psums, dtype=np.float)
+    val[idx, :] = psums[idx, :] / np.tile(M[idx].reshape((-1,1)),
+                                          (1, psums.shape[1]))
+    val[M == 0, :] = empty_value
+    return val
+
+def compute_central_moment(psums, M, moment, empty_value=0):
+    '''
+    Returns the centralized moments or empty_value when M=0.
+    '''
+    raw = compute_raw_moments(psums, M, empty_value=empty_value)
+    if moment == 1:
+        return raw[:, 0]
+    n = moment
+    val = (-1)**n * raw[:, 0]**n
+    # From http://mathworld.wolfram.com/CentralMoment.html
+    nfact = np.math.factorial(n)
+    for k in range(1, moment+1):
+        nchoosek = nfact / (np.math.factorial(k) * np.math.factorial(n-k))
+        val += nchoosek * (-1)**(n-k) * raw[:, k-1] * raw[:, 0]**(n-k)
+    if moment % 2 == 1:
+        return val
+    # The moment should be positive
+    if np.min(val)<0.0:
+        """
+        There might be kurtosis values that are actually
+        zero but slightly negative, smaller in magnitude
+        than the machine precision. Fixing these manually.
+        """
+        idx = np.abs(val) < np.finfo(float).eps
+        val[idx] = np.abs(val[idx])
+        if np.min(val)<0.0:
+            raise ArithmeticError("Significantly negative even moment! Possible problem in computing sums up to {}.".format(moment))
+    return val
+
 
 @public
 class MIMCData(object):
@@ -27,8 +67,8 @@ class MIMCData(object):
 
     """
 
-    def __init__(self, dim, lvls=None,
-                 psums=None, t=None, M=None):
+    def __init__(self, dim, lvls=None, psums=None, t=None, M=None,
+                 moments=2):
         self.dim = dim
         self.lvls = lvls          # MIMC lvls
         self.psums = psums        # sums of lvls
@@ -37,18 +77,20 @@ class MIMCData(object):
         if self.lvls is None:
             self.lvls = []
         if self.psums is None:
-            self.psums = np.empty((0, 2))
+            self.psums = np.empty((0, moments))
         if self.t is None:
             self.t = np.empty(0)
         if self.M is None:
             self.M = np.empty(0, dtype=np.int)
+        assert(len(self.lvls) == self.psums.shape[0])
+        assert(len(self.lvls) == self.M.shape[0])
+        assert(len(self.lvls) == self.t.shape[0])
 
     def calcEg(self):
         """
         Return the sum of the sample estimators for
         all the levels
         """
-        
         return np.sum(self.calcEl())
 
     def __len__(self):
@@ -63,37 +105,28 @@ class MIMCData(object):
     def Dim(self):
         return self.dim
 
+    def computedMoments(self):
+        return self.psums.shape[1]
+
     def calcVl(self):
-        """
-        Returns the variances of each level in the MIMC run,
-        levels with zero samples are infinite.
-        """
-        idx = self.M == 0
-        val = self.calcEl(moment=2) - (self.calcEl())**2
-        val[idx] = np.inf
-        if np.min(val)<0.0:
-            """
-            There might be variances that are actually
-            zero but slightly negative, smaller in magnitude
-            than the machine precision. Fixing these manually.
-            """
-            idx = np.abs(val) < np.finfo(float).eps
-            val[idx] = np.abs(val[idx])
-        if np.min(val)<0.0:
-            raise ArithmeticError("Code gives significantly \
-negative variance! Possible problem in 2. moment computation.")
-        return val
+        return self.calcCentralMoment(2, empty_value=np.inf)
 
     def calcEl(self, moment=1):
         '''
         Returns the sample estimators for moments
         for each level.
         '''
+        if moment > self.psums.shape[1]:
+            raise ValueError("The {}'th moment was not computed".format(moment))
         assert(moment > 0)
         idx = self.M != 0
         val = np.zeros_like(self.M, dtype=np.float)
         val[idx] = self.psums[idx, moment-1] / self.M[idx]
         return val
+
+    def calcCentralMoment(self, moment, empty_value=np.inf):
+        return compute_central_moment(self.psums, self.M, moment,
+                                      empty_value=empty_value)
 
     def calcTl(self):
         idx = self.M != 0
@@ -151,7 +184,7 @@ class MIMCRun(object):
 
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, old_data=None, **kwargs):
         self.params = MyDefaultDict(**kwargs)
         self.fnHierarchy = None
         self.fnWorkModel = None
@@ -163,8 +196,13 @@ class MIMCRun(object):
         self.Wl_estimate = None
         self.bias = np.inf           # Approximation of the discretization error
         self.stat_error = np.inf     # Sampling error (based on M)
-        self.data = MIMCData(dim=self.params.dim)
-        self.all_data = MIMCData(dim=self.params.dim)
+        if old_data is not None:
+            assert(old_data.dim == self.params.dim)
+            self.all_data = self.data = old_data
+        else:
+            self.all_data = self.data = MIMCData(dim=self.params.dim, moments=self.params.moments)
+            if not self.params.reuse_samples:
+                self.all_data = MIMCData(dim=self.params.dim, moments=self.params.moments)
 
         if (hasattr(self.params, "w") and len(self.params.w) != self.data.dim) or \
            (hasattr(self.params, "s") and len(self.params.s) != self.data.dim) or \
@@ -269,6 +307,7 @@ are the same as the argument ones")
                   help="Use Bayesian fitting to estimate bias, variance and optimize number \
 of levels in every iteration. This is based on CMLMC.")
         add_store('dim', type=int, help="Number of dimensions used in MIMC")
+        add_store('moments', type=int, default=2, help="Number of moments to compute")
         add_store('reuse_samples', type='bool', default=True,
                   help="Reuse samples between iterations")
         add_store('abs_bnd', type='bool', default=False,
@@ -475,7 +514,8 @@ estimate optimal number of levels"
 
     def _addLevels(self, lvls):
         self.data.addLevels(lvls)
-        self.all_data.addLevels(lvls)
+        if self.all_data != self.data:
+            self.all_data.addLevels(lvls)
 
     def _genSamples(self, totalM, verbose):
         lvls = self.data.lvls
@@ -494,7 +534,8 @@ estimate optimal number of levels"
                                                        totalM[i] -
                                                        self.data.M[i])
         self.data.addSamples(psums, M, t)
-        self.all_data.addSamples(psums, M, t)
+        if self.all_data != self.data:
+            self.all_data.addSamples(psums, M, t)
         self._estimateAll()
 
     def _calcTheta(self, TOL, bias_est):
@@ -658,15 +699,15 @@ def is_boundary(d, lvls):
 
 
 def lvl_to_inds_general(lvl):
-    
+
     """
     This routine takes a multi-index level and produces
     a list of levels and weights that are needed to evaluate
     the multi-dimensional difference estimator.
 
     For example, in the MLMC setting the function
-    x,y = lvl_to_inds_general([N]) 
-    
+    x,y = lvl_to_inds_general([N])
+
     sets y to an array of [N] and [N-1]
     and x to an array of 1 and -1.
 
