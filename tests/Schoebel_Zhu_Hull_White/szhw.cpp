@@ -5,6 +5,47 @@
 #include <random>
 #include <quadmath.h>
 
+#ifndef Pi
+#define Pi 3.141592653589793238462643
+#endif 
+
+double CND (double X);
+
+// From http://www.espenhaug.com/black_scholes.html
+
+// The Black and Scholes (1973) Stock option formula
+double BlackScholesCall(double S, double X, double T, double r, double v)
+{
+  double d1, d2;
+
+
+  d1=(log(S/X)+(r+v*v/2)*T)/(v*sqrt(T));
+  d2=d1-v*sqrt(T);
+
+  return S *CND(d1)-X * exp(-r*T)*CND(d2);
+
+}
+
+
+double CND( double X )
+{
+
+  double L, K, w ;
+
+  double const a1 = 0.31938153, a2 = -0.356563782, a3 = 1.781477937;
+  double const a4 = -1.821255978, a5 = 1.330274429;
+
+  L = fabs(X);
+  K = 1.0 / (1.0 + 0.2316419 * L);
+  w = 1.0 - 1.0 / sqrt(2 * Pi) * exp(-L *L / 2) * (a1 * K + a2 * K *K + a3 * pow(K,3) + a4 * pow(K,4) + a5 * pow(K,5));
+
+  if (X < 0 ){
+    w= 1.0 - w;
+  }
+  return w;
+} 
+
+
 using namespace std;
 
 mt19937 gen(time(0));
@@ -91,6 +132,13 @@ void schoebelZhuHullWhiteEllStep(double dt,szhw imod,double *x,double *y,double 
   //std :: cout << "Components " << x[0] << " " << x[1]  << " " << x[2]  << " " <<  xa[0]  << " " <<  xa[1]  << " " <<  xa[2] << "\n";
 }
 
+void schoebelZhuHullWhiteUpdateControlVar(double dt, double *sig, double * cVar, double* dW, double* W, double * targetVar){
+  cVar[0] += sig[0]*sig[0]*dt;
+  if(cVar[0] < targetVar[0]){
+    W[0] += dW[0];
+  }
+}
+
 void schoebelZhuHullWhiteUpdateCVar(double dt,double * x,double * cVar){
   cVar[0] += x[2]*x[2]*dt;
 }
@@ -110,8 +158,12 @@ void schoebelZhuHullWhiteUpdateEvaluate(double * x, double * disc, double *cVar,
 }
 
 double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K,bool diff){
-  
-  //std :: cout << "targetVar vittu " << targetVar << "\n";
+
+  /*
+
+    Compute the difference of 
+    
+   */
 
   unsigned int i;
 
@@ -119,6 +171,9 @@ double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K,boo
   
   double dW1[3];
   double dW2[3];
+  double W_final=0.0;
+  double controlCumu=0.0;
+  double controlVariate;
   double x1[3];
   double x2[3];
   double y1[3];
@@ -167,6 +222,7 @@ double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K,boo
     //dW1[1] = imod.corrStructure[3]*dW1[1]+imod.corrStructure[4]*dW1[2];
     //dW1[2] = imod.corrStructure[5]*dW1[2];
     // Store random increments for simulation of the coarse process
+    schoebelZhuHullWhiteUpdateControlVar(dt,&(imod.x0[2]),& controlCumu, dW1+2, &W_final, & targetVar);
     for(i=0;i<3;i++) dW2[i]=dW1[i];
     // Update cumulative variance and discount
     schoebelZhuHullWhiteUpdateCVar(dt,x1,cVar);
@@ -184,6 +240,7 @@ double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K,boo
     //dW1[1] = imod.corrStructure[3]*dW1[1]+imod.corrStructure[4]*dW1[2];
     //W1[2] = imod.corrStructure[5]*dW1[2];
     // Increment the random increments for the coarse process
+    schoebelZhuHullWhiteUpdateControlVar(dt,&(imod.x0[2]),& controlCumu, dW1+2, &W_final, & targetVar);
     for(i=0;i<3;i++) dW2[i]+=dW1[i];
     // Update compounded variance and discount factor
     for(i=0;i<4;i++) cVarp[i] = cVar[i];
@@ -209,6 +266,29 @@ double schoebelZhuHullWhiteEll(double dt,szhw imod,double targetVar,double K,boo
   if(diff){
     return  0.5*(g[0]+g[2]-g[1]-g[3]);
   }
+  while(controlCumu < targetVar){
+    for(i=0;i<3;i++) dW1[i] = sqrtDt*normalDouble();
+    //dW1[0] = imod.corrStructure[0]*dW1[0]+imod.corrStructure[1]*dW1[1]+imod.corrStructure[2]*dW1[2];
+    //dW1[1] = imod.corrStructure[3]*dW1[1]+imod.corrStructure[4]*dW1[2];
+    //W1[2] = imod.corrStructure[5]*dW1[2];
+    schoebelZhuHullWhiteUpdateControlVar(dt,&(imod.x0[2]),& controlCumu, dW1+2, &W_final, & targetVar);
+  }
+
+  double T;
+  T = targetVar/imod.x0[2]*imod.x0[2];
+  double mu;
+  mu = (imod.x0[1]-0.5*imod.x0[2]*imod.x0[2])*T;
+  double cvar1, cvar2;
+  cvar1 = imod.x0[0]*exp(mu+imod.x0[2]*W_final);
+  cvar2 = imod.x0[0]*exp(mu-imod.x0[2]*W_final);
+  cvar1 = (cvar1-K>0.0)?cvar1-K:0.0;
+  cvar2 = (cvar2-K>0.0)?cvar2-K:0.0;
+  cvar1 *= exp(-1.0*T*imod.x0[1]);
+  cvar2 *= exp(-1.0*T*imod.x0[1]);
+  double eVal;
+  eVal = BlackScholesCall(imod.x0[0], K, T, imod.x0[1], imod.x0[2]);
+  return 0.5*(g[0]+g[2]+cvar1+cvar2)-eVal;
+  
   return 0.5*(g[0]+g[2]);
 }
 
@@ -270,7 +350,7 @@ double szhwModelDt(double dt, double S,double sigma, double r, double T, double 
   testModel.corrStructure[0] = 1.0;
   testModel.corrStructure[1] = 0.0;
   testModel.corrStructure[2] = 0.0;
-q  testModel.corrStructure[3] = 1.0;
+  testModel.corrStructure[3] = 1.0;
   testModel.corrStructure[4] = 0.0;
   testModel.corrStructure[5] = 1.0;
   testModel.x0[0] = S;

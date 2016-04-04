@@ -14,7 +14,7 @@ parser.add_argument("-db_host", type=str, action="store",
 args = parser.parse_known_args()[0]
 
 base = "run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  \
--qoi_sigma 0.1 -qoi_mu 1 -qoi_seed {seed} \
+-qoi_sigma 0.1 -qoi_mu 1 -qoi_seed {seed} -mimc_moments 4 \
 -mimc_dim 1 -mimc_w 1 -mimc_s 1 -mimc_gamma 1 -mimc_beta 2 \
 -mimc_theta {theta} -mimc_bayesian {bayesian} "
 
@@ -25,13 +25,9 @@ if not args.multi:
     print(cmd_single.format(seed=0, bayesian=True, TOL=0.001, theta="0.2"))
 else:
     realizations = 35
-    TOLs = 0.1*np.sqrt(2.)**-np.arange(0., 20.)
+    TOLs = 0.1*np.sqrt(2.)**-np.arange(0., 10.)
     for TOL in TOLs:
         for i in range(0, realizations):
-            print cmd_multi.format(bayesian=True, tag="GBM_bayes", TOL=TOL,
+            print cmd_multi.format(bayesian=True, tag="GBM_test_kurtosis", TOL=TOL,
                                    seed=np.random.randint(2**32-1), theta="0.2")
-            print cmd_multi.format(bayesian=False, tag="GBM", TOL=TOL,
-                                   seed=np.random.randint(2**32-1), theta="0.2")
-            print cmd_multi.format(bayesian=False, tag="GBM_theta", TOL=TOL,
-                                   seed=np.random.randint(2**32-1),
-                                   theta="0.5 -mimc_const_theta True")
+
