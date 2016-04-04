@@ -10,6 +10,9 @@ def public(sym):
     __all__.append(sym.__name__)
     return sym
 
+# TODO:
+# Add confidence intervals to variance.
+# Wl*M*TOL^{-2} per level.
 
 @public
 class FunctionLine2D(plt.Line2D):
@@ -307,20 +310,27 @@ def plotVarVsLvls(ax, runs_data, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    args, kwargs = __normalize_fmt(args, kwargs)
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
     if "__calc_moments" in kwargs:
-        central_moments, _, _ = kwargs.pop("__calc_moments")
+        central_moments, _, M = kwargs.pop("__calc_moments")
     else:
-        central_moments, _, _ = __calc_moments(runs_data,
+        central_moments, _, M = __calc_moments(runs_data,
                                                seed=kwargs.pop('seed', None),
                                                direction=kwargs.pop('direction',
                                                                     None))
     Vl = central_moments[:, 1]
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    line = ax.plot(np.arange(0, len(Vl)), Vl, *args, **kwargs)
+    if central_moments.shape[1] >= 4:
+        El4 = central_moments[:, 3]
+        line = ax.errorbar(np.arange(0, len(Vl)), Vl,
+                           yerr=3*np.sqrt(np.abs(El4/M)),
+                           *args, **kwargs)
+    else:
+        args, kwargs = __normalize_fmt(args, kwargs)
+        line = ax.plot(np.arange(0, len(Vl)), Vl, *args, **kwargs)
+
     return line[0].get_xydata(), [line]
 
 
@@ -366,7 +376,7 @@ ax is in instance of matplotlib.axes
                                                direction=kwargs.pop('direction',
                                                                     None))
     Vl = central_moments[:, 1]
-    E3l = central_moments[:, 2]
+    E3l = np.abs(central_moments[:, 2])
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     line = ax.plot(np.arange(0, len(Vl)), E3l/Vl**1.5, *args, **kwargs)
     return line[0].get_xydata(), [line]
@@ -384,13 +394,14 @@ ax is in instance of matplotlib.axes
     ax.set_ylabel('Time (s)')
     ax.set_yscale('log')
     if "__calc_moments" in kwargs:
-        _, Tl, _ = kwargs.pop("__calc_moments")
+        _, Tl, M = kwargs.pop("__calc_moments")
     else:
-        _, Tl, _ = __calc_moments(runs_data,
+        _, Tl, M = __calc_moments(runs_data,
                                   seed=kwargs.pop('seed', None),
                                   direction=kwargs.pop('direction', None))
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     line = ax.plot(np.arange(0, len(Tl)), Tl, *args, **kwargs)
+    #line2 = ax.plot(np.arange(0, len(Tl)), M, *args, **kwargs)
     return line[0].get_xydata(), [line]
 
 
@@ -717,7 +728,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
             for j, r in enumerate(sorted(add_rates.keys(), key=lambda x:
                                          np.abs(x))):
                 func, label = getLevelRate(r)
-                ax.add_line(FunctionLine2D(func, data=add_rates[r],
+                ax.add_line(FunctionLine2D(func, data=add_rates[r][1:, :],
                                            linestyle=linestyles[j % len(linestyles)],
                                            c='k', label=label))
         except:
