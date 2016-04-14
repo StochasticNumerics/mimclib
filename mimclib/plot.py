@@ -11,8 +11,7 @@ def public(sym):
     return sym
 
 # TODO:
-# Add confidence intervals to variance.
-# Wl*M*TOL^{-2} per level.
+# Wl*M
 
 @public
 class FunctionLine2D(plt.Line2D):
@@ -280,6 +279,66 @@ def __normalize_fmt(args, kwargs):
     if "fmt" in kwargs:        # Normalize behavior of errorbar() and plot()
         args = (kwargs.pop('fmt'), ) + args
     return args, kwargs
+
+@public
+def plotTotalWorkVsLvls(ax, runs_data, *args, **kwargs):
+    """Plots Time vs TOL of @runs_data, as
+returned by MIMCDatabase.readRunData()
+ax is in instance of matplotlib.axes
+"""
+    ax.set_xlabel(r'$\ell$')
+    ax.set_ylabel('Total Work')
+    ax.set_yscale('log')
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    dim = runs_data[0].run.data.dim
+    seed=kwargs.pop('seed', None)
+    direction=kwargs.pop('direction', None)
+
+    seed = np.array(seed) if seed is not None else np.zeros(dim, dtype=np.uint32)
+    direction = np.array(direction) if direction is not None else np.ones(dim, dtype=np.uint32)
+
+    plotObj = []
+    runs_data = sorted(runs_data, key=lambda r: r.TOL)
+    import itertools
+    label_fmt = kwargs.pop('label_fmt', None)
+    TOLs = np.unique([r.TOL for r in runs_data])
+    TOLs = TOLs[:kwargs.pop("max_TOLs", len(TOLs))]
+    for TOL, itr in itertools.groupby(runs_data, key=lambda r: r.TOL):
+        if TOL not in TOLs:
+            continue
+
+        data_tw = []
+        for curRun in itr:
+            cur = seed
+            inds = []
+            while True:
+                ii = next((i for i, l in enumerate(curRun.run.data.lvls)
+                           if np.all(l == cur)), None)
+                if ii is None:
+                    break
+                inds.append(ii)
+                cur = cur + direction
+            for j, ind in enumerate(inds):
+                data_tw.append([j, curRun.run.data.M[j] * curRun.run.Wl_estimate[j]])
+        lvls, total_work = __get_stats(data_tw)
+        plotObj.append(ax.errorbar(lvls, total_work[:, 1],
+                                   yerr=[total_work[:, 1]-total_work[:, 0],
+                                         total_work[:, 2]-total_work[:, 1]],
+                                   label=label_fmt.format(TOL) if label_fmt is not None else None,
+                                   *args,
+                                   **kwargs))
+
+    if hasattr(curRun.run.params, "s") and hasattr(curRun.run.params, "gamma"):
+        rate = np.array(curRun.run.params.gamma) - np.array(curRun.run.params.s)
+        if hasattr(curRun.run.params, "beta"):
+            rate *= np.log(curRun.run.params.beta)
+        ax.add_line(FunctionLine2D(lambda x, tol=TOL, r=rate: tol**-2 * np.exp(r*x),
+                                   data=total_work[:, :2],
+                                   linestyle='--', c='k'))
+    return plotObj
+
+
 
 @public
 def plotExpectVsLvls(ax, runs_data, *args, **kwargs):
@@ -733,6 +792,15 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                                            c='k', label=label))
         except:
             __plot_failed(ax)
+
+    ax = add_fig()
+    try:
+        plotTotalWorkVsLvls(ax, runs_data,
+                            fmt='-o',
+                            label_fmt="${:.2g}$",
+                            max_TOLs=5)
+    except:
+        __plot_failed(ax)
 
     ax = add_fig()
     try:
