@@ -15,7 +15,9 @@
 \usepackage{tikz}
 \usepackage{pgfplots}
 \usepgfplotslibrary{patchplots}
-\usepackage{subfigure}
+%\usepackage{subfigure}
+\usepackage{subcaption}
+
 \usepackage{hyperref}
 \usepackage{comment}
 \usepackage{multirow}
@@ -43,17 +45,27 @@
 
 
 \begin{abstract}
-Abstract here!!!
+Notes of MIMC and MLMC evaluation of HJM models.
 \end{abstract}
 
 \maketitle
 %\tableofcontents
 
+\section{Intro}
 
-
-We are interested in analysing the Forward Euler Finite Element evaluation of forward curve models of HJM models. The main approach was represented with a convergence analysis in \cite{bjork2013monte}, whose notation we largely follow.
+We are interested in analysing the Forward Euler Finite Difference evaluation of forward curve models of HJM models. The main approach was represented with a convergence analysis in \cite{bjork2013monte}, whose notation we largely follow.
 
 We are focused on the evolution of the forward curve $f \parent{t , \tau}$ for $t \in [0,t_{max}]$, $\tau \in [0,\tau_{max}]$ with $\tau_{max}>t_{max}$. In order to define a mesh for the numerical solution of the problem, let us define $\bar \ell \in \mathbb{N}^3$.
+
+Let our quantity of interest be defined as the expectation of a functional $\mathcal F$
+of the forward curve:
+\begin{align*}
+\mathcal F \parent f =& F \parent{\int_0 ^{t_{max}} f \parent{s,s} ds}
+G \parent{ \int_{\tau_a}^{\tau_{max}} \Psi \parent{f \parent{t_{max},\tau}} d\tau }
+\\
+&+
+\int_{0}^{t_{max}} F \parent{\int_0^{s} f \parent{s',s'} ds'} U \parent{f\parent{s,s}} ds.
+\end{align*}
 
 Let us first discretise the time interval as
 \begin{align*}
@@ -121,34 +133,71 @@ Multi-Index Monte Carlo formulation with the following effective parameters
 On the other hand, one may set $\ell_1=\ell_2=\ell_3=\ell$
 and arrive at a one-dimensional MLMC formulation with a weak rate of $2$, strong rate of $1$, and computational cost per realisation of $W_\ell=2^{2\ell}$. In the sequel, we will present the results of these two variations for comparison.
 
-\section{Numerical results}
+\section{Numerical tests}
 
-In this section, we present some plots of the Multi-Index and Multi-Level Monte Carlo simulation using the Example 5.2.1 of \cite{bjork2013monte}, ie. the Ho-Lee model
+For the simplest possible example, let our model be Gaussian with
+the following exponential covariance structure
 \begin{align}
-d f \parent{t,\tau} & = \sigma^2 \parent{\tau-t} dt 
-+ \sigma dW_t, ~~~~ 0 \leq t \leq tau, 
-\nonumber
-\\
-f \parent{0, \tau} = f_0 \parent{ \tau}
-\end{align}
-with the initial data
-$f_0 \parent{\tau } = r_0- \frac{\sigma^2}{2}\tau^2 + 
-\int_0^\tau \theta \parent s ds$, with $r_0=0.05$,
-$\sigma=0.01$ and $\theta \parent \tau = \frac{e^{-\tau}}{10}$.
-
-Setting $t_{max}=1$ and $\tau_{max}=2$, we are interested in the
-expectation
-\begin{align}
-\expp{\mathcal F \parent f}
+\expp{df \parent{t,\tau} df \parent{t, \tau'}}
 =
-\expp{ \parent{1 - \int_0^{t_{max}} f \parent{s,s} ds } \parent{\int_{t_{max}}^{\tau_{max}} f 
-\parent{t_{max},\tau} d \tau}}.
+\sigma^2 \expf{- \kappa \absval{\tau-\tau'}} dt.
 \end{align}
 
+Let our first test case be arguably simplest infinite dimensional one possible,
+\begin{align*}
+F \parent{x} &= 1-x,\\
+U \parent{x} &= 0, \\
+G \parent{x} &= x, \\
+\Psi \parent{x} &= x, \\
+f \parent{0,\tau} &= 0, \\
+\kappa &= 2.
+\end{align*}
 
-\subsection{Multi-Level Monte Carlo}
+In \ref{fig:empInfDimRates} we get see that we have rate one for both 
+the weak and the strong rate along both dimensions for this text example.
 
-\subsection{Multi-Index Monte Carlo}
+\begin{figure}
+\includegraphics[scale=0.7]{figure_1.pdf}
+\caption{Sample realisation of a forward curve with the discretisation level 
+$\overline \ell = [5,5,5]^T$.}
+\end{figure}
+
+It remains to deduce the cost of simulating the cost of a realisation. In order to
+simulate Gaussian random variables one needs the Cholesky decomposition of the covariance matrix. The cost to generate this $N_\tau \times N_\tau$-matrix is $N_\tau^3$, with $N_\tau = 2^{\ell_3} 2^{\ell_2}$. Using the Cholesky decomposition, the cost to take a a time step becomes $N_\tau^2$. Putting all together, the cost to generate $M$ Monte Carlo realisations with $N_t$ time steps and $N_\tau$ discretisation steps along the maturity direction becomes
+\begin{align*}
+C \parent{\Delta t, \Delta \tau, M} = N_\tau^3 + M N_\tau^2 N_t.
+\end{align*}
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.4\textwidth}
+        \includegraphics[width=\textwidth]{dim_1_strong.pdf}
+        %\caption{A gull}
+        \label{fig:gull}
+    \end{subfigure}
+    ~ %add desired spacing between images, e. g. ~, \quad, \qquad, \hfill etc. 
+      %(or a blank line to force the subfigure onto a new line)
+    \begin{subfigure}[b]{0.4\textwidth}
+        \includegraphics[width=\textwidth]{dim_1_weak.pdf}
+        %\caption{A tiger}
+        \label{fig:tiger}
+    \end{subfigure}
+    \\
+    ~ %add desired spacing between images, e. g. ~, \quad, \qquad, \hfill etc. 
+    %(or a blank line to force the subfigure onto a new line)
+    \begin{subfigure}[b]{0.4\textwidth}
+        \includegraphics[width=\textwidth]{dim_2_strong.pdf}
+        %\caption{A mouse}
+        \label{fig:mouse}
+    \end{subfigure}
+        \begin{subfigure}[b]{0.4\textwidth}
+        \includegraphics[width=\textwidth]{dim_2_weak.pdf}
+        %\caption{A mouse}
+        \label{fig:mouse}
+    \end{subfigure}
+    \caption{\label{fig:empInfDimRates}Empirical strong and weak convergence rate for the $\Delta t$ and $\Delta \tau$ discretisation errors.}
+\end{figure}
+
 
 
 \bibliographystyle{agsm}

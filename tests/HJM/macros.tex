@@ -1,0 +1,199 @@
+% \theoremstyle{theorem}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{point}[theorem]{}
+\newtheorem{assumption}[theorem]{Assumption}
+
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{notation}[theorem]{Notation}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{condition}{Condition}
+
+\newcommand{\F}{\operatorname{\mathcal{F}}}
+\newcommand{\iF}{\operatorname{\mathcal{F}^{-1}}}
+
+\newcommand{\Loperator}{\mathcal{L}}
+%\newcommand{\R}{\mathbf{R}}
+\newcommand{\Z}{\mathbf{Z}}
+
+\newcommand{\dd}{\, \textrm{d}}
+\newcommand{\e}{\textrm{exp}}
+\newcommand{\fFrequency}{ f_{\omega_0}}
+\newcommand{\fQuadrature}{ f_{\Delta}}
+
+\newcommand{\I}{\mathbf{I}}
+
+\newcommand{\ErrorFrequency}{\mathcal{E_F}}
+\newcommand{\ErrorQuadrature}{\mathcal{E_Q}}
+\newcommand{\Error}{\mathcal{E}}
+\newcommand{\EF}{\ErrorFrequency}
+\newcommand{\EQ}{\ErrorQuadrature}
+\newcommand{\E}{\Error}
+\newcommand{\est}{\overline {\mathcal{E}}}
+\newcommand{\estFrequency}{\est_F}
+\newcommand{\estQuadrature}{\est_Q}
+
+
+\newcommand{\lx}{\mathcal{L}^{X}}
+\newcommand{\ls}{\mathcal{L}^{S}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\prob}[2]{\pi_{{#1,#2}}}
+\newcommand{\lam}[1]{\lambda_#1}
+\newcommand{\trials}[2]{\theta_{#1,#2}}
+\newcommand{\damp}{\alpha}
+
+\newcommand{\cgmyY}{Y}
+\newcommand{\cgmyM}{\eta_+}
+\newcommand{\cgmyG}{\eta_-}
+\newcommand{\cgmyC}{K}
+
+\newcommand{\cgmyexp}{\cgmyY}
+
+\newcommand{\fa}{f_{\damp}}
+\newcommand{\fadisc}[1]{f_{\damp, #1}}
+\newcommand{\fdisc}[1]{f_{#1}}
+\newcommand{\ga}{g_{\damp}}
+\newcommand{\ha}{h_{\damp}}
+\newcommand{\ft}[1]{\hat{#1}}
+\newcommand{\kft}[1]{\tilde{#1}}
+\newcommand{\ift}[1]{\iF\left[#1\right]}
+\newcommand{\Lnorm}{\textrm{L}}
+\newcommand{\real}[1]{\mathrm{Re}\left[#1\right]}
+\newcommand{\im}[1]{\mathrm{Im}\left[#1\right]}
+\newcommand{\step}{\Delta\omega}
+\newcommand{\strip}[1]{A_{#1}}
+\newcommand{\pureJumpProcessConstant}{C(\nu)}
+
+\newcommand{\charExp}[1]{\Psi \parent{{#1}}}
+\newcommand{\charFun}[2]{\varphi_{#1} \parent{{#2}}}
+
+\newcommand{\cutoff}{\omega_{\mathrm{\max}}}
+\newcommand{\strike}{k}
+
+\newcommand{\pprob}[1]{}
+
+\newcommand{\fnka}{f_{\damp}^{N,\cutoff}}
+\newcommand{\ftnka}{\tilde f_{\damp}^{N,\cutoff}}
+
+\newcommand{\pnka}{\Pi_{\damp}^{N,\cutoff}}
+
+\newcommand{\fft}[2]{\mathrm{FFT}_{{#1}} \parent{{#2} }}
+\newcommand{\tol}{\epsilon_{\mathrm T}}
+
+\newcommand{\cutoffFrequency}{\omega_{\textrm{max}}}
+
+\newcommand{\uremark}[2]{\underbrace{{#1}}_{{#2}}}
+
+% Juho macros
+\newcommand{\partder}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\der}[1]{\partial_{ #1}}
+\newcommand{\ket}[1]{\left | {#1} \right \rangle }
+\newcommand{\refstate}[0]{\textbf{0}}
+\newcommand{\vacket}[0]{\ket{\refstate}}
+\newcommand{\vacbra}[0]{\bra{\refstate}}
+\newcommand{\bra}[1]{\left \langle {#1} \right | }
+\newcommand{\ketbra}[1]{\ket{#1} \bra{#1}}
+\newcommand{\innerprod}[2]{\left \langle {{#1} | {#2}} \right \rangle}
+\newcommand{\uket}[0]{\ket{\uparrow}}
+\newcommand{\dket}[0]{\ket{\downarrow}}
+\newcommand{\ubra}[0]{\bra{\uparrow}}
+\newcommand{\dbra}[0]{\bra{\downarrow}}
+\newcommand{\hadj}[1]{{#1}^{\dagger}}
+\newcommand{\conj}[1]{{#1}^{\ast}}
+\newcommand{\cosine}[1]{\mathrm{cos}\left ( {#1}\right )}
+\newcommand{\sine}[1]{\mathrm{sin}\left ( {#1}\right )}
+\newcommand{\cosinep}[2]{\mathrm{cos}^{#2}\left ( {#1}\right )}
+\newcommand{\sinep}[2]{\mathrm{sin}^{#2}\left ( {#1}\right )}
+\newcommand{\expf}[1]{\mathrm{exp}\left ( {#1}\right )}
+\newcommand{\expfs}[1]{e^{#1}}
+\newcommand{\determinant}[1]{\mathrm{det}\left ( {#1}\right )}
+\newcommand{\trace}[1]{\mathrm{Tr}\left ( {#1}\right )}
+\newcommand{\parent}[1]{\left( {#1} \right)}
+\newcommand{\aver}[1]{ \left\langle  {#1}  \right\rangle }
+\newcommand{\absval}[1]{\left| {#1} \right|}
+\newcommand{\sset}[1]{\left\lbrace {#1} \right\rbrace }
+\newcommand{\iden}[1]{\mathbf{1}_{#1}}
+\newcommand{\ssum}[2]{\displaystyle\sum\limits_{#1}^{#2}}
+\newcommand{\pprod}[2]{\displaystyle\prod\limits_{#1}^{#2}}
+\newcommand{\commut}[2]{\left[ {#1} , {#2} \right]}
+\newcommand{\acommut}[2]{\left\lbrace  {#1} , {#2} \right\rbrace }
+\newcommand{\spann}[1]{\mathrm{span} \parent{{#1}}}
+\newcommand{\ttrace}[2]{\mathrm{Tr}_{#1} \parent{#2}}
+\newcommand{\logt}[1]{\mathrm{log_2} \parent{{#1}}}
+\newcommand{\hilbert}[1]{\mathcal{H}_{{#1}}}
+\newcommand{\genus}{g}
+\newcommand{\gsfun}[0]{\eta_{GS}}
+\newcommand{\vvec}[1]{\textbf{{#1}}}
+\newcommand{\kk}[0]{\vvec{k}}
+\newcommand{\tsection}[1]{\newpage \section{{#1}}}
+\newcommand{\grad}[0]{\nabla}
+\newcommand{\divv}[0]{\nabla \dot}
+\newcommand{\curl}[0]{\nabla \times}
+\newcommand{\vvar}[1]{\mathrm{var} \parent{{#1}}}
+\newcommand{\bigo}[1]{\mathcal O \parent{{#1}}}
+\newcommand{\smallo}[1]{ o \parent{{#1}}}
+\def\d{\textrm{d}}
+
+\newcommand{\cost}[1]{C_{\mathrm{#1}}}
+
+\newcommand{\qt}[0]{\tilde q}
+%\newcommand{\e}[1]{\times 10^{#1}}
+\newcommand{\supremum}[1]{\mathop{\mathrm{sup}}_{{#1}}}
+\newcommand{\nnorm}[2]{\absval{\absval{{#1}}}_{#2}}
+\newcommand{\problem}[1]{\newpage \section*{{#1}}}
+\newcommand{\hittime}[0]{\sigma_{\bar{\mathcal E}}}
+\newcommand{\probb}[1]{\mathrm{P} \parent{{#1}}}
+\newcommand{\expp}[1]{\mathrm{E} \parent{{#1}}}
+
+\newcommand{\kaustaddress}[0]{King Abdullah University of Science and Technology, Thuwal, Kingdom of Saudi Arabia}
+\newcommand{\indicatorfun}[3]{\mathbf{1}_{[{#1},{#2}]} \parent{{#3}}}
+\newcommand{\indicator}{\mathbf{1}}
+\newcommand{\binaryg}[1]{g_{\mathrm{bin}} \parent{#1}}
+\newcommand{\binaryf}[1]{f_{\mathrm{bin}} \parent{#1}}
+\newcommand{\fbinaryf}[1]{\hat{f}_{\mathrm{bin}} \parent{#1}}
+
+\newcommand{\callg}[1]{g_{\mathrm{call}} \parent{#1}}
+\newcommand{\fcallg}[1]{\hat{g}_{\mathrm{call}} \parent{#1}}
+\newcommand{\fcallga}[1]{\hat{g}_{\mathrm{call}, \damp} \parent{#1}}
+\newcommand{\fputga}[1]{\hat{g}_{\mathrm{put}, \damp} \parent{#1}}
+\newcommand{\fcallf}[1]{\hat{f}_{\mathrm{call}} \parent{#1}}
+\newcommand{\fcallfa}[1]{\hat{f}_{\mathrm{call}, \damp} \parent{#1}}
+
+
+\newcommand{\evaldiff}[3]{{\left [ {#1} \right ]}_{#2}^{#3}} 
+
+\newcommand{\vga}{a}
+\newcommand{\vgb}{b}
+
+\newcommand{\vgpoly}[1]{w  \parent{#1}}
+\newcommand{\vgaux}{q}
+
+\newcommand{\imo}{y}
+\newcommand{\reo}{x}
+\newcommand{\abex}{\rho}
+
+%%% for the merton case
+\newcommand{\sj}{\sigma_{\mathrm{jump}}}
+\newcommand{\rj}{r_{\mathrm{jump}}}
+
+
+%% I always forget the correct spelling
+\newcommand{\levy}{L\'evy }
+\newcommand{\levynospace}{L\'evy}
+%%
+
+\newcommand{\rz}{\R \setminus \sset{0}}
+
+\newcommand{\linf}[1]{L^\infty_{#1}}
+\newcommand{\norminf}[2]{\left\|#1\right\|_{\linf{#2}}}
+\newcommand{\cl}{C \parent{\lambda}}
+
+\pgfmathdeclarefunction{lg10}{1}{%
+    \pgfmathparse{ln(#1)/ln(10)}%
+}

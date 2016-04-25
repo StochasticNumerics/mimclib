@@ -4,8 +4,26 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 import scipy.integrate as spint
+import scipy.linalg as spal
 import time
+import matplotlib as mpl
+from mpl_toolkits.mplot3d import Axes3D
 
+def hash(x):
+    return '%f_%f_%f_%f'%(x[0],x[-1],x[1]-x[0],x[-1]-x[-2])
+
+def expCovar(xs,kappa,chol=False):
+    '''
+    Given a spatial mesh x, return an exponential
+    covariance matrix with inverse correlation length
+    kappa.
+    '''
+
+    x,y = np.meshgrid(xs,xs)
+    rv = np.exp(-1.0*kappa*abs(x-y))
+    if chol:
+        return spal.cholesky(rv)
+    return rv
 
 def hoLeeExample3(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
     return hoLeeExample([[foo[0]]*3 for foo in inds],t_max=t_max,tau_max=tau_max,r0=r0,sig=sig,verbose=verbose)
@@ -71,6 +89,158 @@ def twoFactorGaussianExample(inds,t_max=1.0,tau_max=3.0,b0=0.0759,b1=-0.0439,k=0
 
     return multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=t_max,tau_max=tau_max,identifierString=identifierString,verbose=verbose)    
 
+def infDimHjmModel(inds,F,G,U,Psi,f0,kappa,t_max=1.0,tau_max=2.0,identifierString='Infinite HJM Model',verbose=False,maxLev=30):
+
+    '''
+    Solve an infinite-dimensional HJM model, crude example
+    '''
+
+    ts = [time.time(),]
+
+    if verbose:
+        print('Evaluating the Two Factor Gaussian example.')
+        print(identifierString)
+        for ind in inds:
+            print(ind)
+
+    # largest values of the discretisation numbers                                                                           
+    N_t = max([foo[0] for foo in inds])
+    N_tau_1 = max([foo[1] for foo in inds])
+    N_tau_2 = max([foo[2] for foo in inds])
+
+    if N_t+max(N_tau_1,N_tau_2) > maxLev:
+        raise MemoryError('Asking for exceptionally refined solution!')
+
+
+    N_t = 2**(N_t)+1
+    N_tau_1 = 2**(N_tau_1)+1
+    N_tau_2 = 2**(N_tau_2)+1
+
+    if verbose:
+        print('Meshes constructed.')
+        print('The number of mesh points in time: %d'%(N_t))
+        print('Mesh points in maturity: %d before t_max, %d after'%(N_tau_2,N_tau_1))
+
+    times = np.linspace(0,t_max,N_t)
+    taus_1 = np.linspace(0,t_max,N_tau_2)
+    taus_2 = np.linspace(t_max,tau_max,N_tau_1)
+    
+    taus = np.concatenate((taus_1[:-1],taus_2))
+    tauhash = hash(taus)
+
+    covMat = 1
+
+    try:
+        covMat = infDimHjmModel.chols[tauhash]
+        if verbose:
+            print('Cholesky factorisation already initialised.')
+    except AttributeError:
+        if verbose:
+            print('Generating the cholesky factorisation.')
+        infDimHjmModel.chols = {}
+        covMat = expCovar(taus,kappa,chol=1)
+        infDimHjmModel.chols[tauhash] = covMat
+    except KeyError:
+        if verbose:
+            print('Generating the cholesky factorisation')
+        covMat = expCovar(taus,kappa,chol=1)
+        infDimHjmModel.chols[tauhash] = 1.0*covMat
+        
+
+    covMat = expCovar(taus,kappa,chol=1)
+
+    dt = times[1]-times[0]
+    Ws = np.zeros((len(times),len(taus)))
+    for jj in range(1,len(Ws)):
+        Ws[jj,:] = Ws[jj-1,:] + np.sqrt(dt)*np.dot(covMat,sp.randn(len(taus)))
+
+    ts.append(time.time())
+
+    if verbose:
+        print('Mesh generations and initialisations done in %d seconds'%(ts[-1]-ts[-2]))
+
+    rv = []
+
+    for ind in inds:
+        if verbose:
+            print('Evaluating the following index:')
+            print(ind)
+        t_jump = 2**(max([foo[0] for foo in inds])-ind[0])
+        tau_jump_1 = 2**(max([foo[1] for foo in inds])-ind[1])
+        tau_jump_2 = 2**(max([foo[2] for foo in inds])-ind[2])
+        if verbose:
+            print('Jumps in each of the categories: %d , %d , %d'%(t_jump,tau_jump_1,tau_jump_2))
+        tau_eff = np.concatenate((taus_1[0:-1:tau_jump_2],taus_2[0::tau_jump_1]))
+        cov_chol = expCovar(tau_eff,kappa,chol=1)
+        t_eff = times[::t_jump]
+        f_eff = np.zeros((len(t_eff),len(tau_eff)+2))
+        Ws_eff = np.concatenate((Ws[0::t_jump,0:len(taus_1):tau_jump_1],Ws[0::t_jump,len(taus_1)::tau_jump_2]),axis=1)
+        dt_eff = t_eff[1]-t_eff[0]
+        if verbose:
+            fig=plt.figure()
+            ax=fig.gca(projection='3d')
+            ax.plot(0*tau_eff,tau_eff,f_eff[0,:-2]+f0(tau_eff),'g-')
+            ax.set_xlabel('$t$')
+            ax.set_ylabel('$\\tau$')
+            ax.set_zlabel('$f (\\tau, t)$')
+        # Time stepping 
+        lstar = 0
+        for j in range(1,len(f_eff)):
+            if verbose:
+                print('Time step No %d, t=%.4f. tau_n=%.4f'%(j,t_eff[j],tau_eff[lstar]))
+            f_eff[j,lstar:] = f_eff[j-1,lstar:]
+            #f_eff[j,lstar:-2] += drift(tau_eff[lstar:]-t_eff[j-1])*dt_eff
+            f_eff[j,lstar:-2] += Ws_eff[j,lstar:]-Ws_eff[j-1,lstar:]
+            while tau_eff[lstar+1]<= t_eff[j]:
+                lstar += 1
+            f_eff[j,-2] = f_eff[j-1,-2]+(f_eff[j-1,lstar]+f0(tau_eff[lstar]))*dt_eff
+            f_eff[j,-1] = f_eff[j-1,-1]+(F(f_eff[j-1,-2])*U(f_eff[j-1,lstar]+f0(tau_eff[lstar])))*dt_eff
+            while tau_eff[lstar+1]<= t_eff[j]:
+                lstar += 1
+            f_eff[j,-2] = f_eff[j-1,-2]+(f_eff[j-1,lstar]+f0(tau_eff[lstar]))*dt_eff
+            f_eff[j,-1] = f_eff[j-1,-1]+(F(f_eff[j-1,-2])*U(f_eff[j-1,lstar]+f0(tau_eff[lstar])))*dt_eff
+            if verbose:
+                ax.plot(t_eff[j]*np.ones(len(tau_eff[lstar:])),tau_eff[lstar:],f_eff[j,lstar:-2]+f0(tau_eff[lstar:]),'b-')
+        if verbose:
+            #ax.plot(tau_eff[lstar:],t_eff[j]*np.ones(np.shape(tau_eff[lstar:])),f_eff[-1,lstar:-2]+f0(tau_eff[lstar:]),'r--')
+            lstar = 0
+            tPlot = 1*t_eff
+            fttPlot = 0*t_eff
+            for j in range(0,len(f_eff)):
+                while tau_eff[lstar+1]<= t_eff[j]:
+                    lstar += 1
+                print('For t=%f, \\tau^*=%f'%(t_eff[j],tau_eff[lstar]))
+                fttPlot[j] = f_eff[j,lstar]+f0(tau_eff[lstar])
+                ax.plot([t_eff[j],],[t_eff[j],],f_eff[j,lstar]+f0(tau_eff[lstar]),'gx')
+            ax.plot(tPlot,tPlot,fttPlot,'r-')
+            #plt.xlabel('$\\tau$')
+            #plt.ylabel('$f(t,\\tau)$')
+            plt.grid(1)
+
+        rv.append(F(f_eff[-1,-2]))
+        if verbose:
+            print('The discount term equals %f'%(rv[-1]))
+        tv = 0.0
+        lstar = 0
+        while tau_eff[lstar+1]<= t_max:
+            lstar += 1
+        underlying = spint.simps(Psi(f_eff[-1,lstar:-2]+f0(tau_eff[lstar:])),tau_eff[lstar:])
+        weirdTerm = f_eff[-1,-1]
+        if verbose:
+            print('The underlying term equals %f'%(underlying,))
+            print('The absurd additive term equals %f'%(weirdTerm,))
+        rv[-1] *= underlying
+        rv[-1] += weirdTerm
+        ts.append(time.time())
+        if verbose:
+            print('The quantity of interest is %f'%(rv[-1]))
+            print('Time spent on the level: %d seconds'%(ts[-1]-ts[-2]))
+
+    if verbose:
+        print('Total time for all inds: %d seconds'%(ts[-1]-ts[0]))
+
+    return rv
+
 def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identifierString='HJM Model',verbose=False,maxLev=30):
     
     '''
@@ -85,7 +255,7 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
         for ind in inds:
             print(ind)
 
-    # largest values of the discretisation numbers                                                                                                                                                                   
+    # largest values of the discretisation numbers
     N_t = max([foo[0] for foo in inds])
     N_tau_1 = max([foo[1] for foo in inds])
     N_tau_2 = max([foo[2] for foo in inds])
@@ -148,7 +318,7 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
         if verbose:
             plt.figure()
             plt.plot(tau_eff,f_eff[0,:-2]+f0(tau_eff),'g-')
-        # Time stepping                                                                                                                                                                                              
+        # Time stepping
         lstar = 0
         for j in range(1,len(f_eff)):
             if verbose:
@@ -166,9 +336,9 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
             f_eff[j,-2] = f_eff[j-1,-2]+(f_eff[j-1,lstar]+f0(tau_eff[lstar]))*dt_eff
             f_eff[j,-1] = f_eff[j-1,-1]+(F(f_eff[j-1,-2])*U(f_eff[j-1,lstar]+f0(tau_eff[lstar])))*dt_eff
             if verbose:
-                plt.plot(tau_eff[lstar:],f_eff[j,lstar:-2]+f0(tau_eff[lstar:]),'b-')
+                ax.plot(t_eff[j]*np.ones(len(tau_eff[lstar:])),tau_eff[lstar:],f_eff[j,lstar:-2]+f0(tau_eff[lstar:]),'b-')
         if verbose:
-            plt.plot(tau_eff[lstar:],f_eff[-1,lstar:-2]+f0(tau_eff[lstar:]),'r--')
+            #ax.plot(tau_eff[lstar:],f_eff[-1,lstar:-2]+f0(tau_eff[lstar:]),'r--')
             lstar = 0
             tPlot = 1*t_eff
             fttPlot = 0*t_eff
@@ -177,10 +347,13 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
                     lstar += 1
                 print('For t=%f, \\tau^*=%f'%(t_eff[j],tau_eff[lstar]))
                 fttPlot[j] = f_eff[j,lstar]+f0(tau_eff[lstar])
-                plt.plot([t_eff[j],],f_eff[j,lstar]+f0(tau_eff[lstar]),'gx')
-            plt.plot(tPlot,fttPlot,'r-')
-            plt.xlabel('$\\tau$')
-            plt.ylabel('$f(t,\\tau)$')
+                #ax.plot([t_eff[j],],f_eff[j,lstar]+f0(tau_eff[lstar]),'gx')
+            #plt.plot(tPlot,fttPlot,'r-')
+            #plt.xlabel('$\\tau$')
+            #plt.ylabel('$f(t,\\tau)$')
+            ax.set_xlabel('$t$')
+            ax.set_ylabel('$\\tau$')
+            ax.set_zlabel('$f (\tau,t)$')
             plt.grid(1)
 
         rv.append(F(f_eff[-1,-2]))
@@ -324,7 +497,11 @@ def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
     
     return rv
 
-def rateTest2D(fun=hoLeeExample2,Nref=7,M=100,r0=0.05,sig=0.01,weaks=[1,2],strongs=[1,2]):
+def infExample2(inds):
+    inp = [[foo[0],foo[1],foo[1]] for foo in inds]
+    return infDimTest(inp)
+
+def rateTest2D(fun=infExample2,Nref=7,M=100,r0=0.05,sig=0.01,weaks=[1,1],strongs=[1,1]):
     
     """
     Test the convergence rates in two different dimensions.
@@ -417,6 +594,14 @@ def rateTest2D(fun=hoLeeExample2,Nref=7,M=100,r0=0.05,sig=0.01,weaks=[1,2],stron
     plt.ylabel('$E_s$')
     plt.savefig('dim_2_strong.pdf')
 
-
+def infDimTest(inds,verbose=False,maxLev=20):
+    F =lambda x: 1.0-x
+    G =lambda x: 1.0*x
+    U =lambda x: 0.0*x
+    Psi = lambda x: 1.0*x
+    f0 = lambda x: 0.0*x
+    kappa = 2.0
+    identifierString = 'infDim example, kappa=%f'%(kappa,)
+    return infDimHjmModel(inds,F,G,U,Psi,f0,kappa,maxLev=maxLev,verbose=verbose)
 
 
