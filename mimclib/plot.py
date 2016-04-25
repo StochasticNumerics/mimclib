@@ -15,17 +15,19 @@ def public(sym):
 
 @public
 class FunctionLine2D(plt.Line2D):
-    def __init__(self, fn, data=None, **kwargs):
+    def __init__(self, fn, log_data=True, data=None, **kwargs):
         self.flip = kwargs.pop('flip', False)
         self.fn = fn
         if data is not None:
             x = np.array([d[0] for d in data])
             y = np.array([d[1] for d in data])
             if len(x) > 0 and len(y) > 0:
-                const = [np.mean(y/fn(x)), 0]
-                # const = np.polyfit(fn(x), y, 1)
-                # print(const, np.mean(y/fn(x)))
-                self.fn = lambda x, cc=const, ff=fn: cc[0] * ff(x) + cc[1]
+                if log_data:
+                    const = [np.mean(y/fn(x)), 0]
+                    self.fn = lambda x, cc=const, ff=fn: cc[0] * ff(x) + cc[1]
+                else:
+                    const = [np.mean(y-fn(x)), 0]
+                    self.fn = lambda x, cc=const, ff=fn: ff(x) + cc[0]
 
         super(FunctionLine2D, self).__init__([], [], **kwargs)
 
@@ -813,6 +815,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
             label = r'${}\log\left(\textrm{{TOL}}^{{-1}}\right)$'.format(formatPower(rate))
             ax.add_line(FunctionLine2D(lambda x, r=rate: -rate*np.log(x),
                                        data=line_data,
+                                       log_data=False,
                                        linestyle='--', c='k',
                                        label=label))
     except:
