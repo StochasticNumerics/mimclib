@@ -51,134 +51,182 @@ Notes of MIMC and MLMC evaluation of HJM models.
 \maketitle
 %\tableofcontents
 
-\section{Intro}
 
-We are interested in analysing the Forward Euler Finite Difference evaluation of forward curve models of HJM models. The main approach was represented with a convergence analysis in \cite{bjork2013monte}, whose notation we largely follow.
+\section{HJM model in Fourier space}
 
-We are focused on the evolution of the forward curve $f \parent{t , \tau}$ for $t \in [0,t_{max}]$, $\tau \in [0,\tau_{max}]$ with $\tau_{max}>t_{max}$. In order to define a mesh for the numerical solution of the problem, let us define $\bar \ell \in \mathbb{N}^3$.
+Let us focus on the following HJM type SDE:
+\begin{align}
+d f \parent{t,\tau} &= \alpha \parent{t,\tau} dt + \beta \parent{t,\tau} d \overline W \parent t \\
+f \parent{0,\tau} &= f_0 \parent \tau ,
+\end{align}
+with the diffusion term given as the infinite-dimensional expansion of
+eq. (1.1) in \cite{bjork2013monte}:
+\begin{align}
+\beta \parent{t, \tau} d \overline W \parent t = \ssum{n=0}{\infty} c_n \parent{\sin \parent{\frac{n \pi \tau}{L}} + \cos \parent{\frac{n \pi \tau}{L}}} dW_n \parent t , 
+\end{align}
+with $W_n$ independent Brownian motions and $L>>1$. This gives the following Fourier decomposition for the covariance
+of interests:
+\begin{align}
+&\expp{ \beta \parent{t, \tau_1} d \overline W \parent t \beta \parent{t, \tau_2} d \overline W \parent t}
+\\
+= & \ssum{n=0}{\infty} c_n^2 \parent{ \cos \parent{\frac{n \pi \parent{\tau_1-\tau_2 }}{L}}}
+\end{align}
 
-Let our quantity of interest be defined as the expectation of a functional $\mathcal F$
-of the forward curve:
+To keep the exponential HJM model risk neutral, we fix the drift of the equation as
 \begin{align*}
-\mathcal F \parent f =& F \parent{\int_0 ^{t_{max}} f \parent{s,s} ds}
-G \parent{ \int_{\tau_a}^{\tau_{max}} \Psi \parent{f \parent{t_{max},\tau}} d\tau }
+\alpha \parent{t, \tau} 
+=&
+c_0^2 \parent{\tau-t}
 \\
 &+
-\int_{0}^{t_{max}} F \parent{\int_0^{s} f \parent{s',s'} ds'} U \parent{f\parent{s,s}} ds.
-\end{align*}
-
-Let us first discretise the time interval as
-\begin{align*}
-\Delta t_{\bar \ell} &= 2^{-\ell_1} t_{max},
+\ssum{n=1}{\infty }
+\frac{c_n^2}{n}
+\sin \parent{\frac{n \pi \tau}{L}} \parent{\cos \parent{\frac{n \pi t}{L}} -  \sin \parent{\frac{n \pi t}{L}}}
 \\
-t_{\bar \ell, n} &= n \Delta t_{\bar \ell}, ~~~ n \in [0,1,2,\cdots, 2^{\ell_1}].
-\end{align*}
-Since there is an additional requirement that $t_{max}$ be in
-the mesh of maturities, one point in the mesh in $\tau \in [0,\tau_{max}]$. We let $\ell_1$ and $\ell_2$ define the number of discretisation points to the right and to the left of the fixed
-point, respectively.
-\begin{align*}
-\Delta \tau_{\bar \ell,1} &= 2^{-\ell_3} t_{max},  \\
-\Delta \tau_{\bar \ell,2} &= 2^{-\ell_2} \parent{\tau_{max}-t_{max}}, \\
-\tau_{\bar \ell, n} &= n \Delta \tau t_{\bar \ell,1}, ~~~ n \in [0,1,2,\cdots, 2^{\ell_3}] \\
-\tau_{\bar \ell, n} &= n \Delta \tau t_{\bar \ell,1}, ~~~ n \in [2^{\ell_3},2^{\ell_3}+1,\cdots, 2^{\ell_3}+2^{\ell 2}].
-\end{align*}
-
-Using this notation, we have the following rates of convergence, following the Multi-Index notation:
-\begin{align}
-\bar \beta &= [2,2,2]^T \\
-\bar \gamma &= [1,1,1]^T .
-\end{align} 
-Choosing the Simpson method for integration, we have the order of quadrature $p_Q=3$, which brings the quadrature error to 
-\begin{align}
-\expp{\absval{\mathcal G\parent{\bar{\bar g}} - \mathcal G \parent{g}}^{2 \kappa}} \leq C \parent{\Delta \tau_{\bar \ell}}^{2 \kappa p_Q} = 
-\tilde C 2^{-6 \kappa \mathrm{min} \parent{\ell_3,\ell_2}}.
-\end{align}
-On the other hand, the error of the simpson method is the sum of errors for $\tau < t_{max}$ and $\tau \leq t_{max}$. The error for these two domains are $\bigo{2^{-2 \ell_2}}$ and $\bigo {2^{-2 \ell_3}}$, respectively. Combining together, we get the weak and the strong rate
-for the Simpson quadrature:
-\begin{align}
-\expp{\absval{\mathcal G\parent{\bar{\bar g}} - \mathcal G \parent{g}}^{2}} \leq&  \tilde C_Q 2^{-6 \mathrm{min} \parent{\ell_3,\ell_2}}
+&+
+\ssum{n=1}{\infty }
+\frac{c_n^2}{n}
+\cos \parent{\frac{n \pi \tau}{L}} \parent{\cos \parent{\frac{n \pi t}{L}} -  \sin \parent{\frac{n \pi t}{L}}}
 \\
-\expp{\absval{\mathcal G\parent{\bar{\bar g}} - \mathcal G \parent{g}}} \leq& C_Q 2^{-2 \mathrm{min} \parent{\ell_2,\ell_3}}.
-\end{align}
-
-\begin{align}
-\expp{\absval{\mathcal G\parent{\bar{\bar g}} - \mathcal G \parent{g}}^{2 \kappa}}
-\end{align}
-using Theorem 3.3 of \cite{bjork2013monte}.
-
-On the other hand, theorem 3.2 and equation (3.54) states that
-\begin{align}
-\expp{ \absval{ \mathcal G \parent{g} - \mathcal G \parent{\bar{\bar g}} }^{2 \kappa}  } ^{\frac{1}{2 \kappa}} \leq C_{5}^{CV} \parent{ \parent{\Delta t}^{\frac{1}{2}} + \Delta \tau }.
-\end{align}
-
-The weak rate for the discretisation error can be bounded by eq. (4.6):
-\begin{align}
-\expp{ \absval{ \mathcal G \parent{g} - \mathcal G \parent{\bar{\bar g}} }^{}  }
-= 
- \bigo{\parent{\Delta t}^2 + \parent{\Delta \tau}^2}
- = \bigo{2^{-2 \ell_1} + 2^{-2 \mathrm {min} \parent{\ell_2,\ell_3} }}
-\end{align}
-
-Due to the fact that the discretisation errors relating to $\tau$
-depend on the minimum of $\ell_2$ and $\ell_3$, it seems natural
-to assume $\ell_3=\ell_2$. This gives us a two-dimensional
-Multi-Index Monte Carlo formulation with the following effective parameters
-\begin{align}
-\bar \beta &= [2,2]^T ,\\
-\bar \gamma &= [1,1]^T , \\
-\bar s &= [1,2], \\
-\bar w & = [1,2].
-\end{align}
-
-On the other hand, one may set $\ell_1=\ell_2=\ell_3=\ell$
-and arrive at a one-dimensional MLMC formulation with a weak rate of $2$, strong rate of $1$, and computational cost per realisation of $W_\ell=2^{2\ell}$. In the sequel, we will present the results of these two variations for comparison.
-
-\section{Numerical tests}
-
-For the simplest possible example, let our model be Gaussian with
-the following exponential covariance structure
-\begin{align}
-\expp{df \parent{t,\tau} df \parent{t, \tau'}}
-=
-\sigma^2 \expf{- \kappa \absval{\tau-\tau'}} dt.
-\end{align}
-
-Let our first test case be arguably simplest infinite dimensional one possible,
-\begin{align*}
-F \parent{x} &= 1-x,\\
-U \parent{x} &= 0, \\
-G \parent{x} &= x, \\
-\Psi \parent{x} &= x, \\
-f \parent{0,\tau} &= 0, \\
-\kappa &= 2.
+&+
+\ssum{n=1}{\infty }
+\frac{c_n^2}{n}
+\cos \parent{\frac{2n \pi \tau}{L}}.
 \end{align*}
 
-In \ref{fig:empInfDimRates} we get see that we have rate one for both 
-the weak and the strong rate along both dimensions for this text example.
-
-\begin{figure}
-\includegraphics[scale=0.7]{figure_1.pdf}
-\caption{Sample realisation of a forward curve with the discretisation level 
-$\overline \ell = [5,5,5]^T$.}
-\end{figure}
-
-It remains to deduce the cost of simulating the cost of a realisation. In order to
-simulate Gaussian random variables one needs the Cholesky decomposition of the covariance matrix. The cost to generate this $N_\tau \times N_\tau$-matrix is $N_\tau^3$, with $N_\tau = 2^{\ell_3} 2^{\ell_2}$. Using the Cholesky decomposition, the cost to take a a time step becomes $N_\tau^2$. Putting all together, the cost to generate $M$ Monte Carlo realisations with $N_t$ time steps and $N_\tau$ discretisation steps along the maturity direction becomes
+The solution to the SDE can be written as
 \begin{align*}
-C \parent{\Delta t, \Delta \tau, M} = N_\tau^3 + M N_\tau^2 N_t.
+f \parent{t,\tau} - f_0 \parent \tau
+= \tilde f \parent{t,\tau}
++ \ssum{n=1}{N} b_n \parent t \cos \parent{\frac{n \pi \tau}{L}} + a_n \parent t \sin \parent{\frac{n \pi \tau}{L}},
 \end{align*}
+with
+\begin{align}
+\tilde f \parent{t,\tau} =& c_0^2 t \parent{\tau-\frac{t}{2}},
+\\
+a_n \parent{t} =& \frac{c_n^2 L^2}{\pi^2 n^2} \parent{\cos \parent{\frac{n \pi t}{L}} + \sin \parent{\frac{n \pi t}{L}}-1 } + c_n W_n \parent{t}
+\\
+b_n \parent{t} =& a_n \parent{t} -  \frac{\mathbf{1}_{\frac{n}{2} \in \mathbb Z_+}  c_n^2 L t}{\pi n}.
+\end{align}
+
+The solution above lends itself to approximate solutions to the quantity of interest.
+First, the discount factor can be approximated as:
+\begin{align*}
+&\int_0^{t_{max}} f \parent{s,s} ds
+\\
+\approx& \Delta t \ssum{n=1}{N_t} \parent{ f_0 \parent{t_n} + \tilde f \parent{t_n, t_n} +
+\ssum{k=1}{N_f}
+b_k \parent {t_n} \cos \parent{\frac{k \pi t_n}{L}} + a_k \parent {t_n} \sin \parent{\frac{k \pi t_n}{L}}
+}
+\\
+=& F_{N_t,N_f}
+,
+\end{align*}
+with $t_n = \frac{nT}{N_t}$.
+This approximation gives the follwoing approximation error
+in $N_f$:
+\begin{align*}
+&\int_0^{T} f \parent{s,s} ds -\lim_{N_t \rightarrow \infty} F_{N_t,N_f}
+\\
+=& \int_0^T \ssum{k=1}{N_f}
+\frac{c_k^2 L^2}{k^2 \pi^2}
+\parent{1+ \sin \parent{\frac{2 k \pi s}{L}}} ds
+\\
+&+
+ \int_0^T \ssum{k=1}{N_f} c_k W_k \parent s
+\parent{\sin \parent{\frac{ k \pi s}{L}} + \cos \parent{\frac{ k \pi s}{L}}}
+ds
+\\
+&-
+\int_0^T \ssum{k=1}{N_f}
+\frac{c_k^2 L}{\pi k} \cos \parent{\frac{ k \pi s}{L}},
+ds,
+\end{align*}
+
+
+Similarly, one may the underlying part of the 
+payoff functional
+\begin{align*}
+&\int_{\tau_1}^{\tau_2}
+f \parent{T,\tau} d\tau 
+\\
+\approx & \int_{\tau_1}^{\tau_2}
+f_0 \parent \tau + \tilde f \parent{t_n, t_n} +
+\ssum{k=1}{N_f}
+b_k \parent {T} \cos \parent{\frac{k \pi \tau}{L}} + a_k \parent {T} \sin \parent{\frac{k \pi \tau}{L}}
+d \tau.
+\\
+= &+ \int_{\tau_1}^{\tau_2}
+f_0 \parent \tau d \tau + \frac{c_0 T}{2} \parent{\tau_2^2 - \tau_2 +\tau_1 - \tau_1^2} 
+\\
+&+
+\ssum{k=1}{N_f} 
+\frac{b_k \parent T L}{k \pi} 
+\parent{\sin \parent{\frac{k \pi \tau_2}{L}}  - \sin \parent{\frac{k \pi \tau_1}{L}} }
+\\
+&-
+\ssum{k=1}{N_f} 
+\frac{a_k \parent T L}{k \pi} 
+\parent{\cos \parent{\frac{k \pi \tau_2}{L}}  - \cos \parent{\frac{k \pi \tau_1}{L}} }
+\\
+=& \Psi_{N_f} .
+\end{align*}
+The corresponding empirical rates for the approximations of the quantity of interest
+\begin{align*}
+\mathcal G \parent f =
+\expp{\expf{-\int_0^{t_{T}} f \parent{s,s} ds}\expf{-\int_{\tau_1}^{\tau_2} f \parent{T,\tau} d\tau}}
+\approx
+\expp{
+F_{N_t,N_f}
+\Psi_{N_f} }
+\end{align*}
+are presented in fig. \ref{fig:empInfDimRates}
+
+
+Setting $\ell = \parent{\ell_1 , \ell_2}$, we may define a Monte
+Carlo estimator using $m$ independent realisations of $\Psi_{N_f}$ and $F_{N_t,N_f}$:
+\begin{align}
+\mathcal A_{\ell_1, \ell_2} 
+\equiv
+\ssum{m=1}{M}
+\frac{F_{C_1 2^{\ell_1}+1,C_2 2^{\ell_2}} \Psi_{C_2 2^{\ell_2} }\parent m}{M}.
+\end{align}
+
+Similarly, we may extend the above to a MLMC estimator as
+\begin{align*}
+\mathcal{A}_{ML} =& \ssum{m=0}{M_0} \frac{F_{2 C_1 ,C_2 } \Psi_{C_2 }\parent m}{M_0}
+\\
+&+
+\ssum{\ell_1=1}{L}
+\ssum{m=0}{M_{\ell_1}} \frac{\parent{ F_{C_1 2^{\ell_1}+1,C_2 2^{\ell_1}} \Psi_{C_2 2^{\ell_1} } - F_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_1-1}} \Psi_{C_2 2^{\ell_1} }} \parent m }{M_{\ell_1}},
+\\
+\equiv& \ssum{\ell_1=0}{L} \ssum{m=0}{M_{\ell_1}} \frac{\Delta_{\ell_1} \parent m}{M_{\ell_1}}
+\end{align*}
+and, into a MIMC estimator through defining the appropriate two-dimensional difference operators $\Delta_{\ell_1,\ell_2}$ and a downward-closed index-set $L_K=\sset{\parent{\ell_1,\ell_2}\in \mathbb Z_+^2: I \parent{\ell_1,\ell_2}<K}$:
+\begin{align*}
+\mathcal A_{MI} =& \ssum{\ell \in L_K}{} \ssum{m=1}{M_{\ell}} \frac{\Delta_{\ell_1,\ell_2} \parent m}{M_\ell}
+\\
+\Delta_{\ell_1,\ell_2}
+\equiv&
+F_{C_1 2^{\ell_1}+1,C_2 2^{\ell_2}} \Psi_{C_2 2^{\ell_2} } - \mathbf{1}_{\ell_1>1} F_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_2-1}} \Psi_{C_2 2^{\ell_2-1} }
+\\
+& -\mathbf{1}_{\ell_2>1} F_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_2}} \Psi_{C_2 2^{\ell_2} }
++ \mathbf{1}_{\ell_1,\ell_2>1} F_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_2-1}} \Psi_{C_2 2^{\ell_2-1} }.
+\end{align*}
+
+
 
 \begin{figure}
     \centering
     \begin{subfigure}[b]{0.4\textwidth}
-        \includegraphics[width=\textwidth]{dim_1_strong.pdf}
+        \includegraphics[width=\textwidth]{nfstrong.pdf}
         %\caption{A gull}
         \label{fig:gull}
     \end{subfigure}
     ~ %add desired spacing between images, e. g. ~, \quad, \qquad, \hfill etc. 
       %(or a blank line to force the subfigure onto a new line)
     \begin{subfigure}[b]{0.4\textwidth}
-        \includegraphics[width=\textwidth]{dim_1_weak.pdf}
+        \includegraphics[width=\textwidth]{nfweak.pdf}
         %\caption{A tiger}
         \label{fig:tiger}
     \end{subfigure}
@@ -186,19 +234,18 @@ C \parent{\Delta t, \Delta \tau, M} = N_\tau^3 + M N_\tau^2 N_t.
     ~ %add desired spacing between images, e. g. ~, \quad, \qquad, \hfill etc. 
     %(or a blank line to force the subfigure onto a new line)
     \begin{subfigure}[b]{0.4\textwidth}
-        \includegraphics[width=\textwidth]{dim_2_strong.pdf}
+        \includegraphics[width=\textwidth]{ntstrong.pdf}
         %\caption{A mouse}
         \label{fig:mouse}
     \end{subfigure}
         \begin{subfigure}[b]{0.4\textwidth}
-        \includegraphics[width=\textwidth]{dim_2_weak.pdf}
+        \includegraphics[width=\textwidth]{ntweak.pdf}
         %\caption{A mouse}
         \label{fig:mouse}
     \end{subfigure}
-    \caption{\label{fig:empInfDimRates}Empirical strong and weak convergence rate for the $\Delta t$ and $\Delta \tau$ discretisation errors.}
+    \caption{\label{fig:empInfDimRates}Empirical strong and weak convergence rate for
+    the $N_t$ and $N_f$.}
 \end{figure}
-
-
 
 \bibliographystyle{agsm}
 \bibliography{references}

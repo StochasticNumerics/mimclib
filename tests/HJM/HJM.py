@@ -8,6 +8,7 @@ import scipy.linalg as spal
 import time
 import matplotlib as mpl
 from mpl_toolkits.mplot3d import Axes3D
+import itertools
 
 def hash(x):
     return '%f_%f_%f_%f'%(x[0],x[-1],x[1]-x[0],x[-1]-x[-2])
@@ -88,6 +89,123 @@ def twoFactorGaussianExample(inds,t_max=1.0,tau_max=3.0,b0=0.0759,b1=-0.0439,k=0
     identifierString += 'k: %f, a2: %f, K: %f, b1: %f'%(k,a2,K,b1)
 
     return multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=t_max,tau_max=tau_max,identifierString=identifierString,verbose=verbose)    
+
+def cCovExp(L,K,n):
+    return 2*K*((1-np.exp(-abs(K*L))*((-1)**n))/(K*K+n*n*np.pi*np.pi/L/L))/L
+
+def fourierExample(inds,cfun,L=50.0,tau1=1.0,tau2=2.0,t_max=1.0,verbose=False):
+
+    ts = [time.time(),]
+
+    w = lambda k: np.pi*k/L
+    plotN = 200
+
+    # largest values of the discretisation numbers                                                                           
+    N_t = max([foo[0] for foo in inds])
+    N_f = max([foo[1] for foo in inds])
+
+    N_t = 2**(N_t)+1
+    N_f = 2**(N_f)
+
+    times = np.linspace(0,t_max,N_t)
+    dt = times[1]-times[0]
+
+    Wt = sp.randn(N_t,N_f)*np.sqrt(dt)
+    Wt[0,:] *= 0
+    Wt = np.cumsum(Wt,axis=0)
+
+    if verbose:
+        print('W mean and variance: %f, %f'%(np.mean(Wt[-1,:]),np.var(Wt[-1,:])))
+    
+    consts = np.zeros(N_t)
+    ans = np.zeros((N_t,N_f-1))
+    bns = np.zeros((N_t,N_f-1))
+
+    for row in range(0,N_t):
+        consts[row] = Wt[row,0]
+        for col in range(0,N_f-1):
+            k = col+1
+            t = times[row]
+            #ans[row,col] = ((cfun(k)/w(k))**2)*(np.cos(t*w(k))+np.sin(t*w(k))-1.0)
+            ans[row,col] += cfun(k)*Wt[row,k]
+            bns[row,col] = ans[row,col]
+            #if (k%2==0):
+            #    bns[row,col] -= (cfun(k)**2)*t/w(k)
+
+    if verbose:
+        plt.figure()
+        plt.plot(times,ans[:,0],'b-')
+        plt.plot(times,bns[:,0],'r-')
+        plt.grid(1)
+        
+
+    zeroterm = lambda tt,tau: cfun(0)**2/2*tt*(tau-0.5*tt)
+
+    if verbose:
+        fig=plt.figure()
+        ax=fig.gca(projection='3d')
+        ax.set_xlabel('$t$')
+        ax.set_ylabel('$\\tau$')
+        ax.set_zlabel('$f (\\tau, t)$')
+
+        for row in range(0,N_t):
+            t = times[row]
+            plotx = np.linspace(t,tau2,int(plotN*(tau2)/(tau2-t)))
+            ploty = zeroterm(t,plotx)
+            ploty += consts[row]
+            for k in range(1,N_f):
+                col = k-1
+                #print(row,col,ans[row,col],bns[row,col],w(k),consts[row])
+                ploty += ans[row,col]*np.sin(w(k)*plotx)
+                ploty += bns[row,col]*np.cos(w(k)*plotx)
+            ax.plot(t*np.ones(np.shape(plotx)),plotx,ploty,'b-')
+
+        shorts = []
+        for row in range(0,N_t):
+            shorts.append(consts[row])
+            for k in range(1,N_f):
+                col = k-1
+                shorts[-1] += ans[row,col]*np.sin(w(k)*times[row])
+                shorts[-1] += bns[row,col]*np.cos(w(k)*times[row])
+
+        ax.plot(times,times,shorts,'r-')
+    
+    # solution of fourier coefficients done
+
+    rv = []
+
+    for ind in inds:
+        if verbose:
+            print('Evaluating the following index:')
+            print(ind)
+        t_jump = 2**(max([foo[0] for foo in inds])-ind[0])
+        cutoff = 2**ind[1]
+        rv2 = 0.0
+        for k in range(1,cutoff):
+            rv2 += bns[-1,k-1]*np.sin(tau2*w(k))
+        #rv1 = ((cfun(0)**2)*times[-1]/2)*(tau2**2-tau2+tau1-tau1**2)
+        #for k in range(1,cutoff):
+            #rv1 += bns[-1,k-1]/w(k)*(np.sin(tau2*w(k))-np.sin(tau1*w(k)))
+            #rv1 -= ans[-1,k-1]/w(k)*(np.cos(tau2*w(k))-np.cos(tau1*w(k)))
+        #print('moi')
+        #for ti in range(0,len(times)-1,t_jump):
+            #t = times[ti]
+            #rv2 += zeroterm(t,t)
+            #for k in range(1,cutoff):
+                #rv2 += ans[ti,k-1]*np.sin(t*w(k))
+                #rv2 += bns[ti,k-1]*np.cos(t*w(k))
+                #print('%d %d %f %f %f %f'%(ti,k,t,ans[ti,k-1],bns[ti,k-1],zeroterm(t,t)))
+        rv2 *= dt*t_jump
+        #if verbose:
+        #    print('The two terms before exponentiation: %f and %f'%(rv1,rv2))
+        #    print('Mean end value for W(s) %f'%(np.mean(Wt[-1,:])))
+        #rv.append(np.exp(-1*rv1))
+        #rv.append(np.exp(-1*rv2))
+        rv.append(rv2)
+        #rv.append(np.exp(-1*rv1)*np.exp(-1*rv2))
+
+    return rv
+
 
 def infDimHjmModel(inds,F,G,U,Psi,f0,kappa,t_max=1.0,tau_max=2.0,identifierString='Infinite HJM Model',verbose=False,maxLev=30):
 
@@ -380,7 +498,6 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
 
     return rv
 
-
 def hoLeeExample(inds,t_max=1.0,tau_max=2.0,r0=0.05,sig=0.01,verbose=False):
     
     '''
@@ -604,4 +721,85 @@ def infDimTest(inds,verbose=False,maxLev=20):
     identifierString = 'infDim example, kappa=%f'%(kappa,)
     return infDimHjmModel(inds,F,G,U,Psi,f0,kappa,maxLev=maxLev,verbose=verbose)
 
+
+def testcude(inds,tau1=1.0,tau2=1.0):
+    ntimes = max([ind[0] for ind in inds])
+    ntimes = 2**ntimes+1
+    times = np.linspace(0,1,ntimes)
+    dt = times[1]-times[0]
+    nmodes = max([ind[1] for ind in inds])
+    nmodes = 2**nmodes
+    Ws = sp.randn(len(times),nmodes)
+    Ws *= np.sqrt(dt)
+    Ws[0,:] *=0
+    Ws = np.cumsum(Ws,axis=0)
+    Wfinal = Ws[-1,:]
+    for col in range(len(Ws[0])):
+        Wfinal[col] /= (col+1)**2
+        Wfinal[col] *= (np.sin(col*tau2)-np.sin(col*tau2))/(col+1)
+        Ws[:,col] /= (col+1)**2 #(c_k bit)
+        #for row in range(len(Ws)):
+        #    Ws[row,col] *= np.sin(col*times[row])
+    rv1 = []
+    for ind in inds:
+        jump = 2**(max([foo[0] for foo in inds]) - ind[0])
+        cutoff = 2**(ind[1])
+        rv1.append((dt*jump)*np.sum(Ws[0:-1:jump,:cutoff]))
+    rv2 = []
+    for ind in inds:
+        cutoff = 2**(ind[1])
+        rv2.append(np.sum(Wfinal[:cutoff]))
+    #return [np.exp(-1*rv1[foo])*np.exp(-1*rv2[foo]) for foo in range(len(inds))]
+    return rv1
+    #return [np.exp(-1*foo) for foo in rv1]
+
+def testFourierConvergence():
+
+    L = 10.0
+    c = lambda k: 0.5*cCovExp(L,10.0,k)
+
+    inputList = list(itertools.product(range(5),range(5)))
+    inputList = [list(foo) for foo in inputList]
+    M = 100
+
+    #samples = [fourierExample(inputList,c,L=L) for m in range(M)]
+    
+    N1=10
+    N2=10
+
+    rate1 =  np.array([fourierExample([[5,foo] for foo in range(1,N1)],c) for m in range(100)])
+    weakrate1 = np.mean(np.abs(np.diff(rate1,axis=1)),axis=0)
+    strongrate1 = np.mean(np.diff(rate1,axis=1)**2,axis=0)
+    
+    rate2 =  np.array([fourierExample([[foo,5] for foo in range(1,N2)],c) for m in range(100)])
+    weakrate2 = np.mean(np.abs(np.diff(rate2,axis=1)),axis=0)
+    strongrate2 = np.mean(np.diff(rate2,axis=1)**2,axis=0)
+    
+    plt.figure()
+    plt.semilogy(range(1,N1-1),weakrate1)
+    plt.grid(1)
+    plt.xlabel('$log_2 N_f$')
+    plt.ylabel('$E |g-\overline{g}|$')
+    plt.savefig('nfweak.pdf')
+
+    plt.figure()
+    plt.semilogy(range(1,N1-1),strongrate1)
+    plt.grid(1)
+    plt.xlabel('$log_2 N_f$')
+    plt.ylabel('$E (g-\overline{g})^2$')
+    plt.savefig('nfstrong.pdf')
+    
+    plt.figure()
+    plt.semilogy(range(1,N2-1),weakrate2)
+    plt.grid(1)
+    plt.xlabel('$log_2 N_t$')
+    plt.ylabel('$E |g-\overline{g}|$')
+    plt.savefig('ntweak.pdf')
+
+    plt.figure()
+    plt.semilogy(range(1,N2-1),strongrate2)
+    plt.grid(1)
+    plt.xlabel('$log_2 N_t$')
+    plt.ylabel('$E (g-\overline{g})^2$')
+    plt.savefig('ntstrong.pdf')
 
