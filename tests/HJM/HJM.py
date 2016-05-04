@@ -722,7 +722,7 @@ def infDimTest(inds,verbose=False,maxLev=20):
     return infDimHjmModel(inds,F,G,U,Psi,f0,kappa,maxLev=maxLev,verbose=verbose)
 
 
-def testcude(inds,tau1=1.0,tau2=1.0):
+def testcude(inds,tau1=1.0,tau2=2.0):
     ntimes = max([ind[0] for ind in inds])
     ntimes = 2**ntimes+1
     times = np.linspace(0,1,ntimes)
@@ -733,10 +733,10 @@ def testcude(inds,tau1=1.0,tau2=1.0):
     Ws *= np.sqrt(dt)
     Ws[0,:] *=0
     Ws = np.cumsum(Ws,axis=0)
-    Wfinal = Ws[-1,:]
+    Wfinal = 1*Ws[-1,:]
     for col in range(len(Ws[0])):
         Wfinal[col] /= (col+1)**2
-        Wfinal[col] *= (np.sin(col*tau2)-np.sin(col*tau2))/(col+1)
+        Wfinal[col] *= (np.sin(col*tau2)-np.sin(col*tau1))/(col+1)
         Ws[:,col] /= (col+1)**2 #(c_k bit)
         #for row in range(len(Ws)):
         #    Ws[row,col] *= np.sin(col*times[row])
@@ -748,10 +748,10 @@ def testcude(inds,tau1=1.0,tau2=1.0):
     rv2 = []
     for ind in inds:
         cutoff = 2**(ind[1])
-        rv2.append(np.sum(Wfinal[:cutoff]))
+        rv2.append(np.exp(-1*np.sum(Wfinal[:cutoff])))
     #return [np.exp(-1*rv1[foo])*np.exp(-1*rv2[foo]) for foo in range(len(inds))]
-    return rv1
-    #return [np.exp(-1*foo) for foo in rv1]
+    #return rv2
+    return [np.exp(-1*foo) for foo in rv1]
 
 def aTest(ks):
     times = np.linspace(0,1,100)
@@ -812,9 +812,10 @@ def testFourierConvergence():
     plt.ylabel('$E (g-\overline{g})^2$')
     plt.savefig('ntstrong.pdf')
 
-inputs = [10**foo for foo in range(4)]
-outputs = np.array([aTest(inputs) for m in range(1000000)])
-means = np.mean(np.abs(outputs),axis=0)
-plt.loglog(inputs,means)
+plt.figure()
+plt.loglog([2**foo for foo in range(15)], np.mean(np.abs(np.diff([testcude([[2,foo] for foo in range(16)]) for m in range(100)],axis=1))**2,axis=0))
+plt.grid(1)
+
+plt.loglog([2**foo for foo in range(15)], np.mean(np.abs(np.diff([testcude([[2,foo] for foo in range(16)]) for m in range(100)],axis=1)),axis=0))
 plt.grid(1)
 plt.show()
