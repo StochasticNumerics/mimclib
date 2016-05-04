@@ -722,7 +722,15 @@ def infDimTest(inds,verbose=False,maxLev=20):
     return infDimHjmModel(inds,F,G,U,Psi,f0,kappa,maxLev=maxLev,verbose=verbose)
 
 
-def testcude(inds,tau1=1.0,tau2=2.0):
+def testcude(inds,L=10.0,tau1=1.0,tau2=2.0):
+    c = lambda k: np.sqrt(0.5*cCovExp(L,10.0,k)) # fourier term for covariance
+    w = lambda k: np.pi*k/L # frequency k
+    sk = lambda k,x: np.sin(w(k)*x) # sine basis function
+    ck = lambda k,x: np.cos(w(k)*x) # cosine basis function
+    ski = lambda k,t1,t2: (ck(k,t1)-ck(k,t2))/w(k)
+    cki = lambda k,t1,t2: (sk(k,t2)-sk(k,t1))/w(k)
+    zt = lambda t,tau: (c(0)**2)*(tau*t-0.5*t*t) # zero term
+    zi = lambda T,t1,t2: (c(0)**2)*((t2**2-t1**2)*T*0.5-T*T*(t2-t2)) #integral over zero term
     ntimes = max([ind[0] for ind in inds])
     ntimes = 2**ntimes+1
     times = np.linspace(0,1,ntimes)
@@ -733,22 +741,66 @@ def testcude(inds,tau1=1.0,tau2=2.0):
     Ws *= np.sqrt(dt)
     Ws[0,:] *=0
     Ws = np.cumsum(Ws,axis=0)
-    Wfinal = 1*Ws[-1,:]
-    for col in range(len(Ws[0])):
-        Wfinal[col] /= (col+1)**2
-        Wfinal[col] *= (np.sin(col*tau2)-np.sin(col*tau1))/(col+1)
-        Ws[:,col] /= (col+1)**2 #(c_k bit)
-        #for row in range(len(Ws)):
-        #    Ws[row,col] *= np.sin(col*times[row])
+    Wfinal = 1*Ws[-1,1:]
+    ans = 0*Ws[:,1:]
+    bns = 0*Ws[:,1:]
+    zns = 0*Ws[:,0]
+    afinal = 0*Wfinal
+    bfinal = 0*Wfinal
+    zfinal = 0
+    for col in range(len(ans[0])):
+        k = col+1
+        for row in range(len(ans)):
+            t = times[row]
+            ans[row,col] += ((c(k)/w(k))**2 )*(ck(k,t)+sk(k,t)-1.0)
+            bns[row,col] += ((c(k)/w(k))**2 )*(ck(k,t)+sk(k,t)-1.0)
+            if not k%2:
+                ans[row,col] -= c(k)*c(k)*t/w(k)
+                bns[row,col] -=c(k)*c(k)*t/w(k)
+    # drift part done
+    for col in range(len(ans[0])):
+        k = col+1
+        for row in range(len(ans)):
+            t = times[row]
+            ans[row,col] += c(k)*Ws[row,col+1]
+            bns[row,col] += c(k)*Ws[row,col+1]
+    # stochastic bit done
+    for col in range(len(ans[0])):
+            k = col+1
+            for row in range(len(ans)):
+                t =times[row]
+                ans[row,col] *= sk(k,t)
+                bns[row,col] *= ck(k,t)
+    # t=tau set
+    for row in range(len(ans)):
+        t = times[row]
+        zns[row] = Ws[row,0]*c(0)
+        zns[row] += zt(t,t)
+    for col in range(len(ans[0])):
+        k = col + 1
+        T = times[-1]
+        afinal[col] *= c(k)*Wfinal[col]
+        bfinal[col] *= c(k)*Wfinal[col]
+        afinal[col] += ((c(k)/w(k))**2)*(ck(k,T)+sk(k,T)-1.0)
+        bfinal[col] += ((c(k)/w(k))**2)*(ck(k,T)+sk(k,T)-1.0)
+        if not k%2:
+            afinal[col] -=c(k)*c(k)*T/w(k)
+            bfinal[col] -=c(k)*c(k)*T/w(k)
+        afinal *= ski(k,tau1,tau2)
+        bfinal *= cki(k,tau1,tau2)
+    # integrals over the underlyings computed
     rv1 = []
     for ind in inds:
         jump = 2**(max([foo[0] for foo in inds]) - ind[0])
         cutoff = 2**(ind[1])
         rv1.append((dt*jump)*np.sum(Ws[0:-1:jump,:cutoff]))
+        rv1[-1] += dt*jump*np.sum(zns[:-1])
+        rv1[-1] = np.exp(-1*rv1[-1])
     rv2 = []
     for ind in inds:
         cutoff = 2**(ind[1])
-        rv2.append(np.exp(-1*np.sum(Wfinal[:cutoff])))
+        rv2.append(np.sum(Wfinal[:cutoff]))
+        rv2[-1] += zi(times[-1],tau1,tau2)
     #return [np.exp(-1*rv1[foo])*np.exp(-1*rv2[foo]) for foo in range(len(inds))]
     #return rv2
     return [np.exp(-1*foo) for foo in rv1]
@@ -812,10 +864,4 @@ def testFourierConvergence():
     plt.ylabel('$E (g-\overline{g})^2$')
     plt.savefig('ntstrong.pdf')
 
-plt.figure()
-plt.loglog([2**foo for foo in range(15)], np.mean(np.abs(np.diff([testcude([[foo,2] for foo in range(16)]) for m in range(100)],axis=1))**2,axis=0))
-plt.grid(1)
 
-plt.loglog([2**foo for foo in range(15)], np.mean(np.abs(np.diff([testcude([[foo,2] for foo in range(16)]) for m in range(100)],axis=1)),axis=0))
-plt.grid(1)
-plt.show()
