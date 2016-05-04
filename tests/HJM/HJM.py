@@ -722,7 +722,7 @@ def infDimTest(inds,verbose=False,maxLev=20):
     return infDimHjmModel(inds,F,G,U,Psi,f0,kappa,maxLev=maxLev,verbose=verbose)
 
 
-def testcude(inds,L=10.0,tau1=1.0,tau2=2.0):
+def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False):
     c = lambda k: np.sqrt(0.5*cCovExp(L,10.0,k)) # fourier term for covariance
     w = lambda k: np.pi*k/L # frequency k
     sk = lambda k,x: np.sin(w(k)*x) # sine basis function
@@ -748,6 +748,8 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0):
     afinal = 0*Wfinal
     bfinal = 0*Wfinal
     zfinal = 0
+
+    '''
     for col in range(len(ans[0])):
         k = col+1
         for row in range(len(ans)):
@@ -757,6 +759,8 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0):
             if not k%2:
                 ans[row,col] -= c(k)*c(k)*t/w(k)
                 bns[row,col] -=c(k)*c(k)*t/w(k)
+    '''
+
     # drift part done
     for col in range(len(ans[0])):
         k = col+1
@@ -764,6 +768,7 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0):
             t = times[row]
             ans[row,col] += c(k)*Ws[row,col+1]
             bns[row,col] += c(k)*Ws[row,col+1]
+
     # stochastic bit done
     for col in range(len(ans[0])):
             k = col+1
@@ -771,6 +776,7 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0):
                 t =times[row]
                 ans[row,col] *= sk(k,t)
                 bns[row,col] *= ck(k,t)
+
     # t=tau set
     for row in range(len(ans)):
         t = times[row]
@@ -793,9 +799,10 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0):
     for ind in inds:
         jump = 2**(max([foo[0] for foo in inds]) - ind[0])
         cutoff = 2**(ind[1])
-        rv1.append((dt*jump)*np.sum(Ws[0:-1:jump,:cutoff]))
-        rv1[-1] += dt*jump*np.sum(zns[:-1])
-        rv1[-1] = np.exp(-1*rv1[-1])
+        summand = ans[0:-1:jump,:cutoff]+bns[0:-1:jump,:cutoff]
+        rv1.append((dt*jump)*np.sum(summand))
+        #rv1[-1] += dt*jump*np.sum(zns[:-1])
+        #rv1[-1] = np.exp(-1*rv1[-1])
     rv2 = []
     for ind in inds:
         cutoff = 2**(ind[1])
