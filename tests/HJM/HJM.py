@@ -753,6 +753,15 @@ def testcude(inds,tau1=1.0,tau2=1.0):
     return rv1
     #return [np.exp(-1*foo) for foo in rv1]
 
+def aTest(ks):
+    times = np.linspace(0,1,100)
+    dt = times[1]-times[0]
+    W = sp.randn(100)
+    W[0] *=0
+    W *= np.sqrt(dt)
+    W = np.cumsum(W)*dt
+    return [np.sum(np.sin(k*times)*W) for k in ks]
+
 def testFourierConvergence():
 
     L = 10.0
@@ -803,3 +812,9 @@ def testFourierConvergence():
     plt.ylabel('$E (g-\overline{g})^2$')
     plt.savefig('ntstrong.pdf')
 
+inputs = [10**foo for foo in range(4)]
+outputs = np.array([aTest(inputs) for m in range(1000000)])
+means = np.mean(np.abs(outputs),axis=0)
+plt.loglog(inputs,means)
+plt.grid(1)
+plt.show()
