@@ -813,9 +813,9 @@ def testFourierConvergence():
     plt.savefig('ntstrong.pdf')
 
 plt.figure()
-plt.loglog([2**foo for foo in range(15)], np.mean(np.abs(np.diff([testcude([[2,foo] for foo in range(16)]) for m in range(100)],axis=1))**2,axis=0))
+plt.loglog([2**foo for foo in range(15)], np.mean(np.abs(np.diff([testcude([[foo,2] for foo in range(16)]) for m in range(100)],axis=1))**2,axis=0))
 plt.grid(1)
 
-plt.loglog([2**foo for foo in range(15)], np.mean(np.abs(np.diff([testcude([[2,foo] for foo in range(16)]) for m in range(100)],axis=1)),axis=0))
+plt.loglog([2**foo for foo in range(15)], np.mean(np.abs(np.diff([testcude([[foo,2] for foo in range(16)]) for m in range(100)],axis=1)),axis=0))
 plt.grid(1)
 plt.show()
