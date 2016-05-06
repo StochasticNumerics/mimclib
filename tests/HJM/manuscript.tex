@@ -59,17 +59,23 @@ Let us focus on the following HJM type SDE:
 d f \parent{t,\tau} &= \alpha \parent{t,\tau} dt + \beta \parent{t,\tau} d \overline W \parent t \\
 f \parent{0,\tau} &= f_0 \parent \tau ,
 \end{align}
-with the diffusion term given as the infinite-dimensional expansion of
+with the diffusion term given as the infinite-dimensional extension of
 eq. (1.1) in \cite{bjork2013monte}:
 \begin{align}
-\beta \parent{t, \tau} d \overline W \parent t = \ssum{n=0}{\infty} c_n \parent{\sin \parent{\frac{n \pi \tau}{L}} + \cos \parent{\frac{n \pi \tau}{L}}} dW_n \parent t , 
+%\beta \parent{t, \tau} d \overline W \parent t = \ssum{k=0}{\infty} c_n \parent{\sin %\parent{\ffreq{k} \tau} + \cos \parent{\ffreq{k} \tau} dW_n \parent t , 
+\beta \parent{t, \tau} d \overline W \parent t = \ssum{k=0}{\infty}
+c_n \parent{ \sin \parent{\ffreq k \tau} + \cos \parent{\ffreq k \tau} }
 \end{align}
-with $W_n$ independent Brownian motions and $L>>1$. This gives the following Fourier decomposition for the covariance
-of interests:
+with $W_n$ independent Brownian motions and
+\begin{align*}
+\ffreq k \equiv \frac{k \pi }{L}
+\end{align*}
+with $L>>1$. This gives the following Fourier decomposition for the covariance
+of increments:
 \begin{align}
 &\expp{ \beta \parent{t, \tau_1} d \overline W \parent t \beta \parent{t, \tau_2} d \overline W \parent t}
 \\
-= & \ssum{n=0}{\infty} c_n^2 \parent{ \cos \parent{\frac{n \pi \parent{\tau_1-\tau_2 }}{L}}}
+= & \ssum{k=0}{\infty} c_k^2 \parent{ \cos \parent{\ffreq k \parent{\tau_1-\tau_2}}}
 \end{align}
 
 To keep the exponential HJM model risk neutral, we fix the drift of the equation as
@@ -79,19 +85,19 @@ To keep the exponential HJM model risk neutral, we fix the drift of the equation
 c_0^2 \parent{\tau-t}
 \\
 &+
-\ssum{n=1}{\infty }
-\frac{c_n^2}{n}
-\sin \parent{\frac{n \pi \tau}{L}} \parent{\cos \parent{\frac{n \pi t}{L}} -  \sin \parent{\frac{n \pi t}{L}}}
+\ssum{k=1}{\infty }
+\frac{c_k^2}{k}
+\sin \parent{\ffreq k \tau } \parent{\cos \parent{\ffreq q t} -  \sin \parent{\ffreq k t}}
+\\
+&+
+\ssum{k=1}{\infty }
+\frac{c_k^2}{k}
+\cos \parent{ \ffreq k \tau } \parent{\cos \parent{\ffreq k t} -  \sin \parent{\ffreq k t}}
 \\
 &+
 \ssum{n=1}{\infty }
 \frac{c_n^2}{n}
-\cos \parent{\frac{n \pi \tau}{L}} \parent{\cos \parent{\frac{n \pi t}{L}} -  \sin \parent{\frac{n \pi t}{L}}}
-\\
-&+
-\ssum{n=1}{\infty }
-\frac{c_n^2}{n}
-\cos \parent{\frac{2n \pi \tau}{L}}.
+\cos \parent{2 \ffreq k \tau }.
 \end{align*}
 
 The solution to the SDE can be written as
@@ -104,47 +110,52 @@ with
 \begin{align}
 \tilde f \parent{t,\tau} =& c_0^2 t \parent{\tau-\frac{t}{2}},
 \\
-a_n \parent{t} =& \frac{c_n^2 L^2}{\pi^2 n^2} \parent{\cos \parent{\frac{n \pi t}{L}} + \sin \parent{\frac{n \pi t}{L}}-1 } + c_n W_n \parent{t}
-\\
-b_n \parent{t} =& a_n \parent{t} -  \frac{\mathbf{1}_{\frac{n}{2} \in \mathbb Z_+}  c_n^2 L t}{\pi n}.
+a_k \parent{t} = b_k \parent t =& \frac{c_k^2}{\ffreq k^2}\parent{\cos \parent{\ffreq k t} + \sin \parent{\ffreq k t}-1 } - \frac{\mathbf{1}_{\frac{k}{2} \in \mathbb Z_+}  c_j^2  t}{\ffreq k}  + c_k W_k \parent{t} .
 \end{align}
 
 The solution above lends itself to approximate solutions to the quantity of interest.
 First, the discount factor can be approximated as:
 \begin{align*}
-&\int_0^{t_{max}} f \parent{s,s} ds
+&\int_0^{T} f \parent{s,s} ds
 \\
 \approx& \Delta t \ssum{n=1}{N_t} \parent{ f_0 \parent{t_n} + \tilde f \parent{t_n, t_n} +
 \ssum{k=1}{N_f}
-b_k \parent {t_n} \cos \parent{\frac{k \pi t_n}{L}} + a_k \parent {t_n} \sin \parent{\frac{k \pi t_n}{L}}
+b_k \parent {t_n} \cos \parent{ \ffreq k t_n} + a_k \parent {t_n} \sin \parent{\ffreq k t_n}
 }
 \\
 =& F_{N_t,N_f}
 ,
 \end{align*}
 with $t_n = \frac{nT}{N_t}$.
-This approximation gives the follwoing approximation error
-in $N_f$:
+This approximation gives the following approximation error
+in $N_f$.
+
+The natural next step is, of coures, estimating the error in approximating the
+integral by $F_{N_t,N_f}$. Firstly, there is the case of the frequency cutoff:
 \begin{align*}
-&\int_0^{T} f \parent{s,s} ds -\lim_{N_t \rightarrow \infty} F_{N_t,N_f}
+&\expp{ \parent{\int_0^T f \parent{s,s} ds - \lim_{N_t \rightarrow \infty} F_{N_t,N_f}}^2}
 \\
-=& \int_0^T \ssum{k=1}{N_f}
-\frac{c_k^2 L^2}{k^2 \pi^2}
-\parent{1+ \sin \parent{\frac{2 k \pi s}{L}}} ds
+=& \expp{\int_0^T \ssum{k=N_f+1}{\infty} \parent{b_k \parent{t_n} \cos \parent{\ffreq k t_n} + a_k \parent{t_n} \sin \parent{\ffreq k t_n}} ds}
 \\
-&+
- \int_0^T \ssum{k=1}{N_f} c_k W_k \parent s
-\parent{\sin \parent{\frac{ k \pi s}{L}} + \cos \parent{\frac{ k \pi s}{L}}}
-ds
+\approx &
+\expp{\parent{\int_0^T \ssum{k=N_f+1}{\infty} c_k W_k \parent{t} \parent{\sin \parent{\ffreq k t} + \cos \parent{\ffreq k t} }}^2}
 \\
-&-
-\int_0^T \ssum{k=1}{N_f}
-\frac{c_k^2 L}{\pi k} \cos \parent{\frac{ k \pi s}{L}},
-ds,
+= &
+\expp{\parent{ \ssum{k=N_f+1}{\infty} \int_0^T c_k W_k \parent{t} \parent{\sin \parent{\ffreq k t} + \cos \parent{\ffreq k t} } ds}^2}
+\\
+= & \bigo{\ssum{k=N_f+1}{\infty} \parent{\frac{c_k}{k}}^2}.
 \end{align*}
+The bound for the weak error can be obtained using Jensen's inequality. Setting as a test
+case the temporal correlation structure as
+$
+\rho \parent{\tau_1, \tau_2} \propto \expf{ - \kappa \absval{\tau_1-\tau2}}
+$
+it follows that $c^2_k =\frac{\kappa}{L} \frac{\parent{-1}^k\parent{1-\expf{-\absval{\kappa L}}}}{\kappa^2 + \parent{\ffreq k}^2}$. Using this as an example, we plot the empirical strong and weak convergence rates in images \ref{img:cutoff1weak} and \ref{img:cutoff1strong} respectively.
 
+As for the time discretisation error, we are concerned with a rectangle quadrature
+error, giving us weak and strong error rate of $1$ and $2$ respectively.
 
-Similarly, one may the underlying part of the 
+Similarly, one may estimate the underlying part of the 
 payoff functional
 \begin{align*}
 &\int_{\tau_1}^{\tau_2}
@@ -153,21 +164,21 @@ f \parent{T,\tau} d\tau
 \approx & \int_{\tau_1}^{\tau_2}
 f_0 \parent \tau + \tilde f \parent{t_n, t_n} +
 \ssum{k=1}{N_f}
-b_k \parent {T} \cos \parent{\frac{k \pi \tau}{L}} + a_k \parent {T} \sin \parent{\frac{k \pi \tau}{L}}
+b_k \parent T \cos \parent{\ffreq k \tau} + a_k \parent {T} \sin \parent{\ffreq k \tau}
 d \tau.
 \\
-= &+ \int_{\tau_1}^{\tau_2}
-f_0 \parent \tau d \tau + \frac{c_0 T}{2} \parent{\tau_2^2 - \tau_2 +\tau_1 - \tau_1^2} 
+= & \int_{\tau_1}^{\tau_2}
+f_0 \parent \tau  + \frac{c_0 T}{2} \parent{\tau_2^2 - \tau_2 +\tau_1 - \tau_1^2} d \tau
 \\
 &+
 \ssum{k=1}{N_f} 
-\frac{b_k \parent T L}{k \pi} 
-\parent{\sin \parent{\frac{k \pi \tau_2}{L}}  - \sin \parent{\frac{k \pi \tau_1}{L}} }
+\frac{b_k \parent T}{\ffreq k } 
+\parent{\sin \parent{\ffreq k \tau_2}  - \sin \parent{\ffreq k \tau_1} }
 \\
 &-
 \ssum{k=1}{N_f} 
-\frac{a_k \parent T L}{k \pi} 
-\parent{\cos \parent{\frac{k \pi \tau_2}{L}}  - \cos \parent{\frac{k \pi \tau_1}{L}} }
+\frac{a_k \parent T}{\ffreq k} 
+\parent{\cos \parent{\ffreq k \tau_2}  - \cos \parent{\ffreq k \tau_1} }
 \\
 =& \Psi_{N_f} .
 \end{align*}

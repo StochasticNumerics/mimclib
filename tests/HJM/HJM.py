@@ -749,7 +749,6 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False):
     bfinal = 0*Wfinal
     zfinal = 0
 
-    '''
     for col in range(len(ans[0])):
         k = col+1
         for row in range(len(ans)):
@@ -758,8 +757,7 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False):
             bns[row,col] += ((c(k)/w(k))**2 )*(ck(k,t)+sk(k,t)-1.0)
             if not k%2:
                 ans[row,col] -= c(k)*c(k)*t/w(k)
-                bns[row,col] -=c(k)*c(k)*t/w(k)
-    '''
+                bns[row,col] -= c(k)*c(k)*t/w(k)
 
     # drift part done
     for col in range(len(ans[0])):
@@ -768,6 +766,7 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False):
             t = times[row]
             ans[row,col] += c(k)*Ws[row,col+1]
             bns[row,col] += c(k)*Ws[row,col+1]
+            #ans[row,col] += Ws[row,col+1]*c(k)
 
     # stochastic bit done
     for col in range(len(ans[0])):
@@ -775,6 +774,7 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False):
             for row in range(len(ans)):
                 t =times[row]
                 ans[row,col] *= sk(k,t)
+                #ans[row,col]*np.cos(k*t)
                 bns[row,col] *= ck(k,t)
 
     # t=tau set
@@ -800,6 +800,7 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False):
         jump = 2**(max([foo[0] for foo in inds]) - ind[0])
         cutoff = 2**(ind[1])
         summand = ans[0:-1:jump,:cutoff]+bns[0:-1:jump,:cutoff]
+        #ummand = ans[0:-1:jump,:cutoff]
         rv1.append((dt*jump)*np.sum(summand))
         #rv1[-1] += dt*jump*np.sum(zns[:-1])
         #rv1[-1] = np.exp(-1*rv1[-1])
@@ -870,5 +871,20 @@ def testFourierConvergence():
     plt.xlabel('$log_2 N_t$')
     plt.ylabel('$E (g-\overline{g})^2$')
     plt.savefig('ntstrong.pdf')
+
+sample=[testcude([[7,foo] for foo in range(11)]) for m in range(50)]
+plt.figure()
+plt.loglog([2**foo for foo in range(10)],np.mean(np.abs(np.diff(sample,axis=1)),axis=0))
+plt.grid(1)
+plt.xlabel('$N_f$')
+plt.ylabel('Weak Error')
+plt.savefig('weakerr1.pdf')
+
+plt.figure()
+plt.loglog([2**foo for foo in range(10)],np.mean(np.abs(np.diff(sample,axis=1)**2),axis=0))
+plt.grid(1)
+plt.xlabel('$N_f$')
+plt.ylabel('Strong Error')
+plt.savefig('strongerr1.pdf')
 
 
