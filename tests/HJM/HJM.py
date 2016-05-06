@@ -872,19 +872,19 @@ def testFourierConvergence():
     plt.ylabel('$E (g-\overline{g})^2$')
     plt.savefig('ntstrong.pdf')
 
-sample=[testcude([[7,foo] for foo in range(11)]) for m in range(50)]
+sample=[testcude([[foo,4] for foo in range(11)]) for m in range(50)]
 plt.figure()
 plt.loglog([2**foo for foo in range(10)],np.mean(np.abs(np.diff(sample,axis=1)),axis=0))
 plt.grid(1)
-plt.xlabel('$N_f$')
+plt.xlabel('$N_t$')
 plt.ylabel('Weak Error')
-plt.savefig('weakerr1.pdf')
+plt.savefig('weakerr2.pdf')
 
 plt.figure()
 plt.loglog([2**foo for foo in range(10)],np.mean(np.abs(np.diff(sample,axis=1)**2),axis=0))
 plt.grid(1)
-plt.xlabel('$N_f$')
+plt.xlabel('$N_t$')
 plt.ylabel('Strong Error')
-plt.savefig('strongerr1.pdf')
+plt.savefig('strongerr2.pdf')
 
 
