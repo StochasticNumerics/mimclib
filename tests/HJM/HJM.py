@@ -871,17 +871,17 @@ def testFourierConvergence():
     plt.savefig('ntstrong.pdf')
 
 
-rates =[1,2]
+rates =[1.5,3]
 
-N=11
-sample=[testcude([[foo,5] for foo in range(N)]) for m in range(50)]
+N=10
+sample=[testcude([[8,foo] for foo in range(N)]) for m in range(50)]
 plt.figure()
 plt.loglog([2**foo for foo in range(N-1)],np.mean(np.abs(np.diff(sample,axis=1)),axis=0),'b-')
 plt.loglog([2**foo for foo in range(N-1)],[2**(-1*foo*rates[0]) for foo in range(N-1)],'r-')
 plt.grid(1)
 plt.xlabel('$N_f$')
 plt.ylabel('Weak Error')
-plt.savefig('weakerr4.pdf')
+plt.savefig('weakerr5.pdf')
 
 plt.figure()
 plt.loglog([2**foo for foo in range(N-1)],np.mean(np.abs(np.diff(sample,axis=1)**2),axis=0))
@@ -889,6 +889,6 @@ plt.loglog([2**foo for foo in range(N-1)],[2**(-1*foo*rates[1]) for foo in range
 plt.grid(1)
 plt.xlabel('$N_f$')
 plt.ylabel('Strong Error')
-plt.savefig('strongerr4.pdf')
+plt.savefig('strongerr5.pdf')
 
 
