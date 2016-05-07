@@ -261,8 +261,26 @@ we expect, based on the above computations, to observe the following rate
 \expp{ \parent{\mathcal G - \overline G_{N_t,N_f}}^2} = \bigo{N_f^{-3} N_t^{-2}}.
 \end{align*} 
 To complement the component-wise plots in figures \ref{fig:rateFig1}, \ref{img:rateFig2} and
-\ref{img:rateFig3}, we plot the overall approximation of $\mathcal G$ with $\overline G$
+\ref{img:rateFig3}, we plot the overall approximation of $\mathcal G$ with $\overline G_{N_t,N_f}$
 in figure \ref{img:rateFig4}.
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.4\textwidth}
+        \includegraphics[width=\textwidth]{weakerr4.pdf}
+        %\caption{A gull}
+    \end{subfigure}
+    ~ %add desired spacing between images, e. g. ~, \quad, \qquad, \hfill etc. 
+      %(or a blank line to force the subfigure onto a new line)
+    \begin{subfigure}[b]{0.4\textwidth}
+        \includegraphics[width=\textwidth]{strongerr4.pdf}
+        %\caption{A tiger}
+    \end{subfigure}
+    \caption{\label{img:rateFig3} Above: Weak (left) and strong (right) error
+    for the temporal discretisation
+    $\nnorm{\overline G_{65,2N_f}-\overline G_{65,N_f}}{}$,
+    along with the $N_f^{-\frac{3}{2}}$ and $N_f^{3}$ reference lines (red).}
+\end{figure}
 
 Setting $\ell = \parent{\ell_1 , \ell_2}$, we may define a Monte
 Carlo estimator using $m$ independent realisations of $\Psi_{N_f}$ and $F_{N_t,N_f}$:
