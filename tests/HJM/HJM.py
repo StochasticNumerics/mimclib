@@ -876,7 +876,7 @@ def testFourierConvergence():
 
 
 rates =[1.5,3]
-char = 't'
+char = 'f'
 onum = 2
 ret=2
 
