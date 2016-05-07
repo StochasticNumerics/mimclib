@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.15 (TeX Live 2014) (preloaded format=pdflatex 2014.9.10)  7 MAY 2016 21:19
+This is pdfTeX, Version 3.14159265-2.6-1.40.15 (TeX Live 2014) (preloaded format=pdflatex 2014.9.10)  7 MAY 2016 21:37
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1006,22 +1006,17 @@ File: strongerr1.pdf Graphic file (type pdf)
 <use strongerr1.pdf>
 Package pdftex.def Info: strongerr1.pdf used on input line 164.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
-
-Underfull \hbox (badness 10000) in paragraph at lines 168--168
-[]\OT1/cmr/m/sc/10.95 Figure 1.|[][] \OT1/cmr/m/n/10.95 Weak (left) and strong 
-(right) er-ror
- []
-
-<weakerr3.pdf, id=44, 578.16pt x 433.62pt>
+ <weakerr3.pdf, id=44, 578.16pt x 433.62pt>
 File: weakerr3.pdf Graphic file (type pdf)
- <use weakerr3.pdf>
-Package pdftex.def Info: weakerr3.pdf used on input line 178.
-(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
-<strongerr3.pdf, id=45, 578.16pt x 433.62pt>
+<use weakerr3.pdf>
+Package pdftex.def Info: weakerr3.pdf used on input line 179.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+ <strongerr3.pdf, id=45, 578.16pt x 433.62pt>
 File: strongerr3.pdf Graphic file (type pdf)
- <use strongerr3.pdf>
-Package pdftex.def Info: strongerr3.pdf used on input line 184.
+
+<use strongerr3.pdf>
+Package pdftex.def Info: strongerr3.pdf used on input line 185.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
  [2]
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -1044,13 +1039,13 @@ le page
 >] <weakerr2.pdf, id=170, 578.16pt x 433.62pt>
 File: weakerr2.pdf Graphic file (type pdf)
  <use weakerr2.pdf>
-Package pdftex.def Info: weakerr2.pdf used on input line 236.
+Package pdftex.def Info: weakerr2.pdf used on input line 237.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
 <strongerr2.pdf, id=171, 578.16pt x 433.62pt>
 File: strongerr2.pdf Graphic file (type pdf)
  <use strongerr2.pdf>
-Package pdftex.def Info: strongerr2.pdf used on input line 242.
+Package pdftex.def Info: strongerr2.pdf used on input line 243.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
  [4 <./weakerr2.pdf> <./strongerr2.pdf
 
@@ -1059,33 +1054,33 @@ trongerr2.pdf): PDF inclusion: multiple pdfs with page group included in a sing
 le page
 >]
 
-LaTeX Warning: Reference `img:rateFig2' on page 5 undefined on input line 264.
+LaTeX Warning: Reference `img:rateFig2' on page 5 undefined on input line 266.
 
 
-LaTeX Warning: Reference `img:rateFig4' on page 5 undefined on input line 266.
+LaTeX Warning: Reference `img:rateFig4' on page 5 undefined on input line 268.
 
 <weakerr4.pdf, id=234, 578.16pt x 433.62pt>
 File: weakerr4.pdf Graphic file (type pdf)
  <use weakerr4.pdf>
-Package pdftex.def Info: weakerr4.pdf used on input line 271.
+Package pdftex.def Info: weakerr4.pdf used on input line 273.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
 <strongerr4.pdf, id=235, 578.16pt x 433.62pt>
 File: strongerr4.pdf Graphic file (type pdf)
  <use strongerr4.pdf>
-Package pdftex.def Info: strongerr4.pdf used on input line 277.
+Package pdftex.def Info: strongerr4.pdf used on input line 279.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
 <weakerr5.pdf, id=236, 578.16pt x 433.62pt>
 File: weakerr5.pdf Graphic file (type pdf)
  <use weakerr5.pdf>
-Package pdftex.def Info: weakerr5.pdf used on input line 282.
+Package pdftex.def Info: weakerr5.pdf used on input line 284.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
 <strongerr5.pdf, id=237, 578.16pt x 433.62pt>
 File: strongerr5.pdf Graphic file (type pdf)
  <use strongerr5.pdf>
-Package pdftex.def Info: strongerr5.pdf used on input line 288.
+Package pdftex.def Info: strongerr5.pdf used on input line 290.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
  [5 <./weakerr4.pdf> <./strongerr4.pdf
 
@@ -1105,25 +1100,25 @@ le page
 >] <nfstrong.pdf, id=352, 578.16pt x 433.62pt>
 File: nfstrong.pdf Graphic file (type pdf)
  <use nfstrong.pdf>
-Package pdftex.def Info: nfstrong.pdf used on input line 337.
+Package pdftex.def Info: nfstrong.pdf used on input line 339.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
 <nfweak.pdf, id=353, 578.16pt x 433.62pt>
 File: nfweak.pdf Graphic file (type pdf)
  <use nfweak.pdf>
-Package pdftex.def Info: nfweak.pdf used on input line 344.
+Package pdftex.def Info: nfweak.pdf used on input line 346.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
 <ntstrong.pdf, id=354, 578.16pt x 433.62pt>
 File: ntstrong.pdf Graphic file (type pdf)
  <use ntstrong.pdf>
-Package pdftex.def Info: ntstrong.pdf used on input line 352.
+Package pdftex.def Info: ntstrong.pdf used on input line 354.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
 <ntweak.pdf, id=355, 578.16pt x 433.62pt>
 File: ntweak.pdf Graphic file (type pdf)
  <use ntweak.pdf>
-Package pdftex.def Info: ntweak.pdf used on input line 357.
+Package pdftex.def Info: ntweak.pdf used on input line 359.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
  (./manuscript.bbl
 [6 <./nfstrong.pdf> <./nfweak.pdf
@@ -1142,11 +1137,11 @@ pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./n
 tweak.pdf): PDF inclusion: multiple pdfs with page group included in a single p
 age
 >]) [7]
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 373.
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 373.
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 375.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 375.
  (./manuscript.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 373.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 373.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 375.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 375.
 Package rerunfilecheck Info: File `manuscript.out' has not changed.
 (rerunfilecheck)             Checksum: 2A5388BA896DF0A405C531D9488761A0;110.
 
@@ -1156,12 +1151,12 @@ LaTeX Warning: There were undefined references.
 
 LaTeX Warning: There were multiply-defined labels.
 
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 373.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 375.
  ) 
 Here is how much of TeX's memory you used:
  28000 strings out of 493117
  642497 string characters out of 6135433
- 788091 words of memory out of 5000000
+ 788126 words of memory out of 5000000
  30785 multiletter control sequences out of 15000+600000
  13690 words of font info for 54 fonts, out of 8000000 for 9000
  1302 hyphenation exceptions out of 8191
@@ -1183,7 +1178,7 @@ ve/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive
 14/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></usr/local/texlive/2014
 /texmf-dist/fonts/type1/public/amsfonts/cm/cmtt9.pfb></usr/local/texlive/2014/t
 exmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on manuscript.pdf (7 pages, 320937 bytes).
+Output written on manuscript.pdf (7 pages, 320882 bytes).
 PDF statistics:
  579 PDF objects out of 1000 (max. 8388607)
  280 compressed objects within 3 object streams
