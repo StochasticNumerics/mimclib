@@ -148,14 +148,46 @@ integral by $F_{N_t,N_f}$. Firstly, there is the case of the frequency cutoff:
 The bound for the weak error can be obtained using Jensen's inequality. Setting as a test
 case the temporal correlation structure as
 $
-\rho \parent{\tau_1, \tau_2} \propto \expf{ - \kappa \absval{\tau_1-\tau2}}
+\rho \parent{\tau_1, \tau_2} \propto \expf{ - \kappa \absval{\tau_1-\tau_2}}
 $
-it follows that $c^2_k =\frac{\kappa}{L} \frac{\parent{-1}^k\parent{1-\expf{-\absval{\kappa L}}}}{\kappa^2 + \parent{\ffreq k}^2}$. Using this as an example, we plot the empirical strong and weak convergence rates in figures \ref{img:cutoff1weak} and \ref{img:cutoff1strong} respectively.
+it follows that $c^2_k =\frac{\kappa}{L} \frac{\parent{-1}^k\parent{1-\expf{-\absval{\kappa L}}}}{\kappa^2 + \parent{\ffreq k}^2}$. Using this as an example, we plot the empirical strong and weak convergence rates in figure \ref{fig:rateFig1}.
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.4\textwidth}
+        \includegraphics[width=\textwidth]{weakerr1.pdf}
+        %\caption{A gull}
+    \end{subfigure}
+    ~ %add desired spacing between images, e. g. ~, \quad, \qquad, \hfill etc. 
+      %(or a blank line to force the subfigure onto a new line)
+    \begin{subfigure}[b]{0.4\textwidth}
+        \includegraphics[width=\textwidth]{strongerr1.pdf}
+        %\caption{A tiger}
+    \end{subfigure}
+    \caption{\label{fig:rateFig1} Weak (left) and strong (right) error
+    $\nnorm{\int_0^T f \parent{s,s} ds - \lim_{N_t \rightarrow \infty} F_{N_t,N_f}}{}$. $N_t= 2^9+1$.}
+\end{figure}
 
 As for the time discretisation error, we are concerned with a rectangle quadrature
 error, giving us weak and strong error rate of $1$ and $2$ respectively. Empirical
-test of these rates is presented in figures \ref{img:cutoff2weak} and \ref{img:cutoff2strong}
-respectively.
+test of these rates is presented in figure \ref{img:rateFig2}.
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.4\textwidth}
+        \includegraphics[width=\textwidth]{weakerr2.pdf}
+        %\caption{A gull}
+    \end{subfigure}
+    ~ %add desired spacing between images, e. g. ~, \quad, \qquad, \hfill etc. 
+      %(or a blank line to force the subfigure onto a new line)
+    \begin{subfigure}[b]{0.4\textwidth}
+        \includegraphics[width=\textwidth]{strongerr2.pdf}
+        %\caption{A tiger}
+    \end{subfigure}
+    \caption{\label{img:rateFig2} Weak (left) and strong (right) error
+    for the temporal discretisation
+    $\nnorm{F_{2N_t-1,N_f}-F_{N_t,N_f}}{}$. $N_f= 2^4$.}
+\end{figure}
 
 Similarly, one may estimate the underlying part of the 
 payoff functional
@@ -184,17 +216,53 @@ f_0 \parent \tau  + \frac{c_0 T}{2} \parent{\tau_2^2 - \tau_2 +\tau_1 - \tau_1^2
 \\
 =& \Psi_{N_f} .
 \end{align*}
-The corresponding empirical rates for the approximations of the quantity of interest
+This approximation has its own approximation error with respect to $N_f$:
+\begin{align*}
+&\expp{\parent{\int_{\tau_1}^{\tau_2} f \parent{T,\tau} d \tau - \Psi_{N_f}}^2}
+\\
+=& \expp{\parent{\ssum{k=N_f+1}{\infty} \frac{b_k \parent T}{\ffreq k } 
+\parent{\sin \parent{\ffreq k \tau_2}  - \sin \parent{\ffreq k \tau_1} } - \frac{a_k \parent T}{\ffreq k} 
+\parent{\cos \parent{\ffreq k \tau_2}  - \cos \parent{\ffreq k \tau_1} }  }^2}
+\\
+= & \bigo{\ssum{k = N_f+1}{\infty} \frac{c_k^2}{\ffreq k^2}}.
+\end{align*}
+Using the exponentially decaying covariance function, we expect order $3$ strong convergence
+and, using Jensen's inequality, we may bound the weak error to order $\frac{3}{2}$. Accompanying numerical rates are presetend in figure \ref{img:rateFig3}.
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.4\textwidth}
+        \includegraphics[width=\textwidth]{weakerr3.pdf}
+        %\caption{A gull}
+    \end{subfigure}
+    ~ %add desired spacing between images, e. g. ~, \quad, \qquad, \hfill etc. 
+      %(or a blank line to force the subfigure onto a new line)
+    \begin{subfigure}[b]{0.4\textwidth}
+        \includegraphics[width=\textwidth]{strongerr3.pdf}
+        %\caption{A tiger}
+    \end{subfigure}
+    \caption{\label{img:rateFig3} Weak (left) and strong (right) error
+    for the temporal discretisation
+    $\nnorm{\Psi_{2N_f}-\Psi_{N_f}}{}$.}
+\end{figure}
+
+Overall, we may approximate a future price of a zero-coupon bond as
 \begin{align*}
 \mathcal G \parent f =
 \expp{\expf{-\int_0^{t_{T}} f \parent{s,s} ds}\expf{-\int_{\tau_1}^{\tau_2} f \parent{T,\tau} d\tau}}
 \approx
-\expp{
+\underbrace{\expp{
 F_{N_t,N_f}
-\Psi_{N_f} }
+\Psi_{N_f} }}_{\overline G_{N_t,N_f}}.
 \end{align*}
-are presented in fig. \ref{fig:empInfDimRates}
-
+Continuing the case of exponential covariance structure where $c_k \sim \bigo{k^{-2}}$,
+we expect, based on the above computations, to observe the following rate
+\begin{align*}
+\expp{ \parent{\mathcal G - \overline G_{N_t,N_f}}^2} = \bigo{N_f^{-3} N_t^{-2}}.
+\end{align*} 
+To complement the component-wise plots in figures \ref{fig:rateFig1}, \ref{img:rateFig2} and
+\ref{img:rateFig3}, we plot the overall approximation of $\mathcal G$ with $\overline G$
+in figure \ref{img:rateFig4}.
 
 Setting $\ell = \parent{\ell_1 , \ell_2}$, we may define a Monte
 Carlo estimator using $m$ independent realisations of $\Psi_{N_f}$ and $F_{N_t,N_f}$:

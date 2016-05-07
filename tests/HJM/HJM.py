@@ -748,7 +748,6 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False):
     afinal = 0*Wfinal
     bfinal = 0*Wfinal
     zfinal = 0
-
     for col in range(len(ans[0])):
         k = col+1
         for row in range(len(ans)):
@@ -774,7 +773,6 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False):
             for row in range(len(ans)):
                 t =times[row]
                 ans[row,col] *= sk(k,t)
-                #ans[row,col]*np.cos(k*t)
                 bns[row,col] *= ck(k,t)
 
     # t=tau set
@@ -785,15 +783,15 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False):
     for col in range(len(ans[0])):
         k = col + 1
         T = times[-1]
-        afinal[col] *= c(k)*Wfinal[col]
-        bfinal[col] *= c(k)*Wfinal[col]
-        afinal[col] += ((c(k)/w(k))**2)*(ck(k,T)+sk(k,T)-1.0)
-        bfinal[col] += ((c(k)/w(k))**2)*(ck(k,T)+sk(k,T)-1.0)
-        if not k%2:
-            afinal[col] -=c(k)*c(k)*T/w(k)
-            bfinal[col] -=c(k)*c(k)*T/w(k)
-        afinal *= ski(k,tau1,tau2)
-        bfinal *= cki(k,tau1,tau2)
+        afinal[col] = c(k)*Wfinal[col]
+        bfinal[col] = c(k)*Wfinal[col]
+        #afinal[col] += ((c(k)/w(k))**2)*(ck(k,T)+sk(k,T)-1.0)
+        #bfinal[col] += ((c(k)/w(k))**2)*(ck(k,T)+sk(k,T)-1.0)
+        #if not k%2:
+        #    afinal[col] -=c(k)*c(k)*T/w(k)
+        #    bfinal[col] -=c(k)*c(k)*T/w(k)
+        afinal[col] *= ski(k,tau1,tau2)
+        bfinal[col] *= cki(k,tau1,tau2)
     # integrals over the underlyings computed
     rv1 = []
     for ind in inds:
@@ -807,11 +805,11 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False):
     rv2 = []
     for ind in inds:
         cutoff = 2**(ind[1])
-        rv2.append(np.sum(Wfinal[:cutoff]))
+        rv2.append(np.sum(afinal[:cutoff]+bfinal[:cutoff]))
         rv2[-1] += zi(times[-1],tau1,tau2)
     #return [np.exp(-1*rv1[foo])*np.exp(-1*rv2[foo]) for foo in range(len(inds))]
     #return rv2
-    return [np.exp(-1*foo) for foo in rv1]
+    return [np.exp(-1*rv1[foo])*np.exp(-1*rv2[foo]) for foo in range(len(rv2))]
 
 def aTest(ks):
     times = np.linspace(0,1,100)
@@ -872,19 +870,25 @@ def testFourierConvergence():
     plt.ylabel('$E (g-\overline{g})^2$')
     plt.savefig('ntstrong.pdf')
 
-sample=[testcude([[foo,4] for foo in range(11)]) for m in range(50)]
+
+rates =[1.5,3]
+
+N=11
+sample=[testcude([[8,foo] for foo in range(N)]) for m in range(50)]
 plt.figure()
-plt.loglog([2**foo for foo in range(10)],np.mean(np.abs(np.diff(sample,axis=1)),axis=0))
+plt.loglog([2**foo for foo in range(N-1)],np.mean(np.abs(np.diff(sample,axis=1)),axis=0),'b-')
+plt.loglog([2**foo for foo in range(N-1)],[2**(-1*foo*rates[0]) for foo in range(N-1)],'r-')
 plt.grid(1)
-plt.xlabel('$N_t$')
+plt.xlabel('$N_f$')
 plt.ylabel('Weak Error')
-plt.savefig('weakerr2.pdf')
+plt.savefig('weakerr4.pdf')
 
 plt.figure()
-plt.loglog([2**foo for foo in range(10)],np.mean(np.abs(np.diff(sample,axis=1)**2),axis=0))
+plt.loglog([2**foo for foo in range(N-1)],np.mean(np.abs(np.diff(sample,axis=1)**2),axis=0))
+plt.loglog([2**foo for foo in range(N-1)],[2**(-1*foo*rates[1]) for foo in range(N-1)],'r-')
 plt.grid(1)
-plt.xlabel('$N_t$')
+plt.xlabel('$N_f$')
 plt.ylabel('Strong Error')
-plt.savefig('strongerr2.pdf')
+plt.savefig('strongerr4.pdf')
 
 

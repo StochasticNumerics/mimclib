@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.15 (TeX Live 2014) (preloaded format=pdflatex 2014.9.10)  6 MAY 2016 19:50
+This is pdfTeX, Version 3.14159265-2.6-1.40.15 (TeX Live 2014) (preloaded format=pdflatex 2014.9.10)  7 MAY 2016 17:39
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -987,44 +987,101 @@ LaTeX Info: Redefining \nameref on input line 44.
 \@outlinefile=\write5
 \openout5 = `manuscript.out'.
 
- [1{/usr/local/texlive/2014/texmf-var/fonts/map/pdftex/updmap/pdftex.map}]
+ [1{/usr/local/texlive/2014/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] <wea
+kerr1.pdf, id=41, 578.16pt x 433.62pt>
+File: weakerr1.pdf Graphic file (type pdf)
 
-LaTeX Warning: Reference `img:cutoff1weak' on page 2 undefined on input line 15
-3.
+<use weakerr1.pdf>
+Package pdftex.def Info: weakerr1.pdf used on input line 158.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+ <strongerr1.pdf, id=42, 578.16pt x 433.62pt>
+File: strongerr1.pdf Graphic file (type pdf)
 
+<use strongerr1.pdf>
+Package pdftex.def Info: strongerr1.pdf used on input line 164.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
-LaTeX Warning: Reference `img:cutoff1strong' on page 2 undefined on input line 
-153.
+Underfull \hbox (badness 10000) in paragraph at lines 168--168
+[]\OT1/cmr/m/sc/10.95 Figure 1.|[][] \OT1/cmr/m/n/10.95 Weak (left) and strong 
+(right) er-ror
+ []
 
-[2]
-Underfull \vbox (badness 1565) has occurred while \output is active []
+<weakerr2.pdf, id=44, 578.16pt x 433.62pt>
+File: weakerr2.pdf Graphic file (type pdf)
+ <use weakerr2.pdf>
+Package pdftex.def Info: weakerr2.pdf used on input line 178.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
- [3]
-<nfstrong.pdf, id=57, 578.16pt x 433.62pt>
+<strongerr2.pdf, id=45, 578.16pt x 433.62pt>
+File: strongerr2.pdf Graphic file (type pdf)
+ <use strongerr2.pdf>
+Package pdftex.def Info: strongerr2.pdf used on input line 184.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+ [2]
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [3 <./weakerr1.pdf> <./strongerr1.pdf
+
+pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./s
+trongerr1.pdf): PDF inclusion: multiple pdfs with page group included in a sing
+le page
+> <./weakerr2.pdf
+
+pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./w
+eakerr2.pdf): PDF inclusion: multiple pdfs with page group included in a single
+ page
+> <./strongerr2.pdf
+
+pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./s
+trongerr2.pdf): PDF inclusion: multiple pdfs with page group included in a sing
+le page
+>] <weakerr3.pdf, id=170, 578.16pt x 433.62pt>
+File: weakerr3.pdf Graphic file (type pdf)
+ <use weakerr3.pdf>
+Package pdftex.def Info: weakerr3.pdf used on input line 235.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+
+<strongerr3.pdf, id=171, 578.16pt x 433.62pt>
+File: strongerr3.pdf Graphic file (type pdf)
+ <use strongerr3.pdf>
+Package pdftex.def Info: strongerr3.pdf used on input line 241.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+ [4 <./weakerr3.pdf> <./strongerr3.pdf
+
+pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./s
+trongerr3.pdf): PDF inclusion: multiple pdfs with page group included in a sing
+le page
+>]
+
+LaTeX Warning: Reference `img:rateFig4' on page 5 undefined on input line 265.
+
+<nfstrong.pdf, id=237, 578.16pt x 433.62pt>
 File: nfstrong.pdf Graphic file (type pdf)
  <use nfstrong.pdf>
-Package pdftex.def Info: nfstrong.pdf used on input line 233.
+Package pdftex.def Info: nfstrong.pdf used on input line 303.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
-<nfweak.pdf, id=58, 578.16pt x 433.62pt>
+<nfweak.pdf, id=238, 578.16pt x 433.62pt>
 File: nfweak.pdf Graphic file (type pdf)
  <use nfweak.pdf>
-Package pdftex.def Info: nfweak.pdf used on input line 240.
+Package pdftex.def Info: nfweak.pdf used on input line 310.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
-<ntstrong.pdf, id=59, 578.16pt x 433.62pt>
+<ntstrong.pdf, id=239, 578.16pt x 433.62pt>
 File: ntstrong.pdf Graphic file (type pdf)
  <use ntstrong.pdf>
-Package pdftex.def Info: ntstrong.pdf used on input line 248.
+Package pdftex.def Info: ntstrong.pdf used on input line 318.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
 
-<ntweak.pdf, id=60, 578.16pt x 433.62pt>
+<ntweak.pdf, id=240, 578.16pt x 433.62pt>
 File: ntweak.pdf Graphic file (type pdf)
  <use ntweak.pdf>
-Package pdftex.def Info: ntweak.pdf used on input line 253.
+Package pdftex.def Info: ntweak.pdf used on input line 323.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
  (./manuscript.bbl)
-[4 <./nfstrong.pdf> <./nfweak.pdf
+[5]
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 339.
+ [6 <./nfstrong.pdf> <./nfweak.pdf
 
 pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./n
 fweak.pdf): PDF inclusion: multiple pdfs with page group included in a single p
@@ -1040,13 +1097,12 @@ pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./n
 tweak.pdf): PDF inclusion: multiple pdfs with page group included in a single p
 age
 >]
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 269.
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 269.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 339.
  (./manuscript.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 269.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 269.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 339.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 339.
 Package rerunfilecheck Info: File `manuscript.out' has not changed.
-(rerunfilecheck)             Checksum: 1A3AF16A3D08A16E2D296592FEF1BB3A;110.
+(rerunfilecheck)             Checksum: 701E938BD486BC0825343EF8886399CC;110.
 
 
 LaTeX Warning: There were undefined references.
@@ -1054,16 +1110,16 @@ LaTeX Warning: There were undefined references.
 
 LaTeX Warning: There were multiply-defined labels.
 
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 269.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 339.
  ) 
 Here is how much of TeX's memory you used:
- 27941 strings out of 493117
- 641555 string characters out of 6135433
- 785554 words of memory out of 5000000
- 30743 multiletter control sequences out of 15000+600000
+ 27978 strings out of 493117
+ 642139 string characters out of 6135433
+ 787956 words of memory out of 5000000
+ 30769 multiletter control sequences out of 15000+600000
  13690 words of font info for 54 fonts, out of 8000000 for 9000
  1302 hyphenation exceptions out of 8191
- 55i,17n,83p,737b,609s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 55i,18n,83p,737b,609s stack positions out of 5000i,500n,10000p,200000b,80000s
 </usr/local/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb
 ></usr/local/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb
 ></usr/local/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb>
@@ -1081,10 +1137,10 @@ ve/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive
 14/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></usr/local/texlive/2014
 /texmf-dist/fonts/type1/public/amsfonts/cm/cmtt9.pfb></usr/local/texlive/2014/t
 exmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on manuscript.pdf (4 pages, 235188 bytes).
+Output written on manuscript.pdf (6 pages, 289684 bytes).
 PDF statistics:
- 275 PDF objects out of 1000 (max. 8388607)
- 167 compressed objects within 2 object streams
- 17 named destinations out of 1000 (max. 500000)
- 49 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 464 PDF objects out of 1000 (max. 8388607)
+ 238 compressed objects within 3 object streams
+ 22 named destinations out of 1000 (max. 500000)
+ 79 words of extra memory for PDF output out of 10000 (max. 10000000)
 
