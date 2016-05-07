@@ -875,12 +875,13 @@ def testFourierConvergence():
     plt.savefig('ntstrong.pdf')
 
 
-rates =[1,2]
+rates =[1.5,3]
 char = 't'
-onum = 3
+onum = 2
+ret=2
 
 N=10
-sample=[testcude([[foo,4] for foo in range(N)]) for m in range(50)]
+sample=[testcude([[2,foo] for foo in range(N)],ret=ret) for m in range(50)]
 plt.figure()
 plt.loglog([2**foo for foo in range(N-1)],np.mean(np.abs(np.diff(sample,axis=1)),axis=0),'b-')
 plt.loglog([2**foo for foo in range(N-1)],[2**(-1*foo*rates[0]) for foo in range(N-1)],'r-')
