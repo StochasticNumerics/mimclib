@@ -722,7 +722,7 @@ def infDimTest(inds,verbose=False,maxLev=20):
     return infDimHjmModel(inds,F,G,U,Psi,f0,kappa,maxLev=maxLev,verbose=verbose)
 
 
-def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False):
+def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False,ret=0):
     c = lambda k: np.sqrt(0.5*cCovExp(L,10.0,k)) # fourier term for covariance
     w = lambda k: np.pi*k/L # frequency k
     sk = lambda k,x: np.sin(w(k)*x) # sine basis function
@@ -809,6 +809,10 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False):
         rv2[-1] += zi(times[-1],tau1,tau2)
     #return [np.exp(-1*rv1[foo])*np.exp(-1*rv2[foo]) for foo in range(len(inds))]
     #return rv2
+    if ret==1:
+        return rv1
+    if ret==2:
+        return rv2
     return [np.exp(-1*rv1[foo])*np.exp(-1*rv2[foo]) for foo in range(len(rv2))]
 
 def aTest(ks):
