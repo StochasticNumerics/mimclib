@@ -722,7 +722,7 @@ def infDimTest(inds,verbose=False,maxLev=20):
     return infDimHjmModel(inds,F,G,U,Psi,f0,kappa,maxLev=maxLev,verbose=verbose)
 
 
-def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False,ret=0):
+def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False,ret=0,plot=False):
     c = lambda k: np.sqrt(0.5*cCovExp(L,10.0,k)) # fourier term for covariance
     w = lambda k: np.pi*k/L # frequency k
     sk = lambda k,x: np.sin(w(k)*x) # sine basis function
@@ -748,6 +748,7 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False,ret=0):
     afinal = 0*Wfinal
     bfinal = 0*Wfinal
     zfinal = 0
+
     for col in range(len(ans[0])):
         k = col+1
         for row in range(len(ans)):
@@ -758,14 +759,36 @@ def testcude(inds,L=10.0,tau1=1.0,tau2=2.0,verbose=False,ret=0):
                 ans[row,col] -= c(k)*c(k)*t/w(k)
                 bns[row,col] -= c(k)*c(k)*t/w(k)
 
-    # drift part done
+    # drift part done                                                                                                                                                                                 
     for col in range(len(ans[0])):
         k = col+1
         for row in range(len(ans)):
             t = times[row]
             ans[row,col] += c(k)*Ws[row,col+1]
             bns[row,col] += c(k)*Ws[row,col+1]
-            #ans[row,col] += Ws[row,col+1]*c(k)
+            #ans[row,col] += Ws[row,col+1]*c(k) 
+
+    if plot:
+        fig=plt.figure()
+        ax=fig.gca(projection='3d')
+        ax.set_xlabel('$t$')
+        ax.set_ylabel('$\\tau$')
+        ax.set_zlabel('$f (\\tau, t)$')
+        shorts = []
+        for row in range(len(Ws)):
+            plotx = np.linspace(0,tau2,300)
+            t =times[row]
+            plotx = plotx[plotx>=t]
+            ploty = Ws[row,0]*np.ones(np.shape(plotx))
+            shorts.append(Ws[row,0])
+            for col in range(1,len(Ws[0])):
+                ploty += ans[row,col-1]*sk(col,plotx)
+                ploty += bns[row,col-1]*ck(col,plotx)
+                shorts[-1] += ans[row,col-1]*sk(col,t)
+                shorts[-1] += bns[row,col-1]*ck(col,t)
+            ax.plot(t*np.ones(np.shape(plotx)),plotx,ploty,'b-')
+        ax.plot(times,times,shorts,'r-')
+            
 
     # stochastic bit done
     for col in range(len(ans[0])):
@@ -874,28 +897,27 @@ def testFourierConvergence():
     plt.ylabel('$E (g-\overline{g})^2$')
     plt.savefig('ntstrong.pdf')
 
-
 rates =[1,2]
 char = 't'
 onum = 3
 ret=1
-
 N=9
-sample=[testcude([[foo,4] for foo in range(N)],ret=ret) for m in range(50)]
-plt.figure()
-plt.loglog([2**foo for foo in range(N-1)],np.mean(np.abs(np.diff(sample,axis=1)),axis=0),'b-')
-plt.loglog([2**foo for foo in range(N-1)],[2**(-1*foo*rates[0]) for foo in range(N-1)],'r-')
-plt.grid(1)
-plt.xlabel('$N_%s$'%(char,))
-plt.ylabel('Bias')
-plt.savefig('weakerr%d.pdf'%(onum,))
 
-plt.figure()
-plt.loglog([2**foo for foo in range(N-1)],np.mean(np.abs(np.diff(sample,axis=1)**2),axis=0))
-plt.loglog([2**foo for foo in range(N-1)],[2**(-1*foo*rates[1]) for foo in range(N-1)],'r-')
-plt.grid(1)
-plt.xlabel('$N_%s$'%(char,))
-plt.ylabel('Variance')
-plt.savefig('strongerr%d.pdf'%(onum,))
+#sample=[testcude([[foo,4] for foo in range(N)],ret=ret) for m in range(50)]
+#plt.figure()
+#plt.loglog([2**foo for foo in range(N-1)],np.mean(np.abs(np.diff(sample,axis=1)),axis=0),'b-')
+#plt.loglog([2**foo for foo in range(N-1)],[2**(-1*foo*rates[0]) for foo in range(N-1)],'r-')
+#plt.grid(1)
+#plt.xlabel('$N_%s$'%(char,))
+#plt.ylabel('Bias')
+#plt.savefig('weakerr%d.pdf'%(onum,))
+
+#plt.figure()
+#plt.loglog([2**foo for foo in range(N-1)],np.mean(np.abs(np.diff(sample,axis=1)**2),axis=0))
+#plt.loglog([2**foo for foo in range(N-1)],[2**(-1*foo*rates[1]) for foo in range(N-1)],'r-')
+#plt.grid(1)
+#plt.xlabel('$N_%s$'%(char,))
+#plt.ylabel('Variance')
+#plt.savefig('strongerr%d.pdf'%(onum,))
 
 

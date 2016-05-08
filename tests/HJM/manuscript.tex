@@ -302,21 +302,21 @@ in figure \ref{img:rateFig4}.
 \end{figure}
 
 Setting $\ell = \parent{\ell_1 , \ell_2}$, we may define a Monte
-Carlo estimator using $m$ independent realisations of $\Psi_{N_f}$ and $F_{N_t,N_f}$:
+Carlo estimator using $m$ independent realisations of $\overline G_{N_t,N_f}$:
 \begin{align}
 \mathcal A_{\ell_1, \ell_2} 
 \equiv
 \ssum{m=1}{M}
-\frac{F_{C_1 2^{\ell_1}+1,C_2 2^{\ell_2}} \Psi_{C_2 2^{\ell_2} }\parent m}{M}.
+\frac{\overline G_{2^{\ell_1}+1,2^{\ell_2}} \parent m}{M}.
 \end{align}
 
 Similarly, we may extend the above to a MLMC estimator as
 \begin{align*}
-\mathcal{A}_{ML} =& \ssum{m=0}{M_0} \frac{F_{2 C_1 ,C_2 } \Psi_{C_2 }\parent m}{M_0}
+\mathcal{A}_{ML} =& \ssum{m=0}{M_0} \frac{\overline G_{2 C_1 ,C_2 } \parent m}{M_0}
 \\
 &+
 \ssum{\ell_1=1}{L}
-\ssum{m=0}{M_{\ell_1}} \frac{\parent{ F_{C_1 2^{\ell_1}+1,C_2 2^{\ell_1}} \Psi_{C_2 2^{\ell_1} } - F_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_1-1}} \Psi_{C_2 2^{\ell_1} }} \parent m }{M_{\ell_1}},
+\ssum{m=0}{M_{\ell_1}} \frac{\parent{ \overline GF_{C_1 2^{\ell_1}+1,C_2 2^{\ell_1}} - \overline G_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_1-1}} } \parent m }{M_{\ell_1}},
 \\
 \equiv& \ssum{\ell_1=0}{L} \ssum{m=0}{M_{\ell_1}} \frac{\Delta_{\ell_1} \parent m}{M_{\ell_1}}
 \end{align*}
@@ -326,10 +326,10 @@ and, into a MIMC estimator through defining the appropriate two-dimensional diff
 \\
 \Delta_{\ell_1,\ell_2}
 \equiv&
-F_{C_1 2^{\ell_1}+1,C_2 2^{\ell_2}} \Psi_{C_2 2^{\ell_2} } - \mathbf{1}_{\ell_1>1} F_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_2-1}} \Psi_{C_2 2^{\ell_2-1} }
+\overline G_{C_1 2^{\ell_1}+1,C_2 2^{\ell_2}} - \mathbf{1}_{\ell_1>1} \overline G_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_2-1}} 
 \\
-& -\mathbf{1}_{\ell_2>1} F_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_2}} \Psi_{C_2 2^{\ell_2} }
-+ \mathbf{1}_{\ell_1,\ell_2>1} F_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_2-1}} \Psi_{C_2 2^{\ell_2-1} }.
+& -\mathbf{1}_{\ell_2>1} \overline G_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_2}} 
++ \mathbf{1}_{\ell_1,\ell_2>1} \overline G_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_2-1}} .
 \end{align*}
 
 
