@@ -185,10 +185,10 @@ test of these rates is presented in figure \ref{img:rateFig3}.
         \includegraphics[width=\textwidth]{strongerr3.pdf}
         %\caption{A tiger}
     \end{subfigure}
-    \caption{\label{img:rateFig3} Weak (left) and strong (right) error
+    \caption{\label{img:rateFig3} Bias (left) and variance (right) error
     for the temporal discretisation
-    $\nnorm{F_{2N_t-1,N_f}-F_{N_t,N_f}}{}$
-    along with $N_t^{-1}$ and $N_t^{-2}$ reference lines in red. $N_f= 2^4$.}
+    $\nnorm{F_{2N_t-1,16}-F_{N_t,16}}{}$
+    along with $N_t^{-1}$ and $N_t^{-2}$ reference lines in red.}
 \end{figure}
 
 Similarly, one may estimate the underlying part of the 
@@ -251,12 +251,13 @@ and, using Jensen's inequality, we may bound the weak error to order $\frac{3}{2
 
 Overall, we may approximate a future price of a zero-coupon bond as
 \begin{align*}
-\mathcal G \parent f =
+\mathcal G \parent f =&
 \expp{\expf{-\int_0^{t_{T}} f \parent{s,s} ds}\expf{-\int_{\tau_1}^{\tau_2} f \parent{T,\tau} d\tau}}
-\approx
-\underbrace{\expp{
-F_{N_t,N_f}
-\Psi_{N_f} }}_{\overline G_{N_t,N_f}}.
+\\
+\approx&
+\underbrace{\expp{\expf{-
+F_{N_t,N_f}-
+\Psi_{N_f} }}}_{\overline G_{N_t,N_f}}.
 \end{align*}
 Continuing the case of exponential covariance structure where $c_k \sim \bigo{k^{-2}}$,
 we expect, based on the above computations, to observe the following rate
@@ -290,13 +291,13 @@ in figure \ref{img:rateFig4}.
         \includegraphics[width=\textwidth]{strongerr5.pdf}
         %\caption{A tiger}
     \end{subfigure}
-    \caption{\label{img:rateFig4} Above: Weak (left) and strong (right) error
+    \caption{\label{img:rateFig4} Above: Bias (left) and variance (right) error
     for the cutoff
     $\nnorm{\overline G_{65,2N_f}-\overline G_{65,N_f}}{}$,
     along with the $N_f^{-\frac{3}{2}}$ and $N_f^{3}$ reference lines (red).
-    Below: Weak (left) and strong (right) error for the temporal discretisation
+    Below: Bias (left) and variance (right) error for the temporal discretisation
     $\nnorm{\overline G_{2N_t-1,16} - \overline G_{N_t,16}}{}$ with the 
-    $N_t^{-1}$ and $N_t^{-2}$ reference lines for the weak and strong error,
+    $N_t^{-1}$ and $N_t^{-2}$ reference lines for the bias and variance error,
     respectively (red).}
 \end{figure}
 
