@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.15 (TeX Live 2014) (preloaded format=pdflatex 2014.9.10)  25 APR 2016 17:13
+This is pdfTeX, Version 3.14159265-2.6-1.40.15 (TeX Live 2014) (preloaded format=pdflatex 2014.9.10)  8 MAY 2016 11:03
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -870,14 +870,7 @@ Excluding comment 'comment')
 (./macros.tex
 \c@theorem=\count149
 \c@condition=\count150
-) (./manuscript.aux
-
-LaTeX Warning: Label `fig:mouse' multiply defined.
-
-
-LaTeX Warning: Label `sub@fig:mouse' multiply defined.
-
-)
+) (./manuscript.aux)
 \openout1 = `manuscript.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 44.
@@ -894,7 +887,8 @@ LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 44.
 LaTeX Font Info:    ... okay on input line 44.
 LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 44.
 LaTeX Font Info:    Try loading font information for TS1+cmr on input line 44.
- (/usr/local/texlive/2014/texmf-dist/tex/latex/base/ts1cmr.fd
+
+(/usr/local/texlive/2014/texmf-dist/tex/latex/base/ts1cmr.fd
 File: ts1cmr.fd 1999/05/25 v2.5h Standard LaTeX font definitions
 )
 LaTeX Font Info:    ... okay on input line 44.
@@ -987,86 +981,121 @@ LaTeX Info: Redefining \nameref on input line 44.
 \@outlinefile=\write5
 \openout5 = `manuscript.out'.
 
+ [1{/usr/local/texlive/2014/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] <wea
+kerr1.pdf, id=41, 578.16pt x 433.62pt>
+File: weakerr1.pdf Graphic file (type pdf)
 
-
-Package natbib Warning: Citation `bjork2013monte' on page 1 undefined on input 
-line 56.
-
-[1{/usr/local/texlive/2014/texmf-var/fonts/map/pdftex/updmap/pdftex.map}]
-
-Package natbib Warning: Citation `bjork2013monte' on page 2 undefined on input 
-line 107.
-
-[2] <figure_1.pdf, id=52, 578.16pt x 433.62pt>
-File: figure_1.pdf Graphic file (type pdf)
- <use figure_1.pdf>
-Package pdftex.def Info: figure_1.pdf used on input line 160.
-(pdftex.def)             Requested size: 404.70924pt x 303.53192pt.
- [3 <./figure_1.pdf>] <dim_1_strong.pdf, id=107, 578.16pt x 433.62pt>
-File: dim_1_strong.pdf Graphic file (type pdf)
- <use dim_1_strong.pdf>
-Package pdftex.def Info: dim_1_strong.pdf used on input line 174.
+<use weakerr1.pdf>
+Package pdftex.def Info: weakerr1.pdf used on input line 158.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+ <strongerr1.pdf, id=42, 578.16pt x 433.62pt>
+File: strongerr1.pdf Graphic file (type pdf)
 
-<dim_1_weak.pdf, id=108, 578.16pt x 433.62pt>
-File: dim_1_weak.pdf Graphic file (type pdf)
- <use dim_1_weak.pdf>
-Package pdftex.def Info: dim_1_weak.pdf used on input line 181.
+<use strongerr1.pdf>
+Package pdftex.def Info: strongerr1.pdf used on input line 164.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+ <weakerr3.pdf, id=44, 578.16pt x 433.62pt>
+File: weakerr3.pdf Graphic file (type pdf)
 
-<dim_2_strong.pdf, id=109, 578.16pt x 433.62pt>
-File: dim_2_strong.pdf Graphic file (type pdf)
- <use dim_2_strong.pdf>
-Package pdftex.def Info: dim_2_strong.pdf used on input line 189.
+<use weakerr3.pdf>
+Package pdftex.def Info: weakerr3.pdf used on input line 179.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+ <strongerr3.pdf, id=45, 578.16pt x 433.62pt>
+File: strongerr3.pdf Graphic file (type pdf)
 
-<dim_2_weak.pdf, id=110, 578.16pt x 433.62pt>
-File: dim_2_weak.pdf Graphic file (type pdf)
- <use dim_2_weak.pdf>
-Package pdftex.def Info: dim_2_weak.pdf used on input line 194.
+<use strongerr3.pdf>
+Package pdftex.def Info: strongerr3.pdf used on input line 185.
 (pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+ [2]
+Underfull \vbox (badness 10000) has occurred while \output is active []
 
-No file manuscript.bbl.
+ [3 <./weakerr1.pdf> <./strongerr1.pdf
 
-Package natbib Warning: There were undefined citations.
-
-[4 <./dim_1_strong.pdf> <./dim_1_weak.pdf
-
-pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./d
-im_1_weak.pdf): PDF inclusion: multiple pdfs with page group included in a sing
+pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./s
+trongerr1.pdf): PDF inclusion: multiple pdfs with page group included in a sing
 le page
-> <./dim_2_strong.pdf
+> <./weakerr3.pdf
 
-pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./d
-im_2_strong.pdf): PDF inclusion: multiple pdfs with page group included in a si
-ngle page
-> <./dim_2_weak.pdf
+pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./w
+eakerr3.pdf): PDF inclusion: multiple pdfs with page group included in a single
+ page
+> <./strongerr3.pdf
 
-pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./d
-im_2_weak.pdf): PDF inclusion: multiple pdfs with page group included in a sing
+pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./s
+trongerr3.pdf): PDF inclusion: multiple pdfs with page group included in a sing
 le page
->]
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 211.
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 211.
+>] <weakerr2.pdf, id=158, 578.16pt x 433.62pt>
+File: weakerr2.pdf Graphic file (type pdf)
+ <use weakerr2.pdf>
+Package pdftex.def Info: weakerr2.pdf used on input line 237.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+
+<strongerr2.pdf, id=159, 578.16pt x 433.62pt>
+File: strongerr2.pdf Graphic file (type pdf)
+ <use strongerr2.pdf>
+Package pdftex.def Info: strongerr2.pdf used on input line 243.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+ [4 <./weakerr2.pdf> <./strongerr2.pdf
+
+pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./s
+trongerr2.pdf): PDF inclusion: multiple pdfs with page group included in a sing
+le page
+>] <weakerr4.pdf, id=217, 578.16pt x 433.62pt>
+File: weakerr4.pdf Graphic file (type pdf)
+ <use weakerr4.pdf>
+Package pdftex.def Info: weakerr4.pdf used on input line 274.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+
+<strongerr4.pdf, id=218, 578.16pt x 433.62pt>
+File: strongerr4.pdf Graphic file (type pdf)
+ <use strongerr4.pdf>
+Package pdftex.def Info: strongerr4.pdf used on input line 280.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+
+<weakerr5.pdf, id=219, 578.16pt x 433.62pt>
+File: weakerr5.pdf Graphic file (type pdf)
+ <use weakerr5.pdf>
+Package pdftex.def Info: weakerr5.pdf used on input line 285.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+
+<strongerr5.pdf, id=220, 578.16pt x 433.62pt>
+File: strongerr5.pdf Graphic file (type pdf)
+ <use strongerr5.pdf>
+Package pdftex.def Info: strongerr5.pdf used on input line 291.
+(pdftex.def)             Requested size: 167.2989pt x 125.46869pt.
+ [5 <./weakerr4.pdf> <./strongerr4.pdf
+
+pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./s
+trongerr4.pdf): PDF inclusion: multiple pdfs with page group included in a sing
+le page
+> <./weakerr5.pdf
+
+pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./w
+eakerr5.pdf): PDF inclusion: multiple pdfs with page group included in a single
+ page
+> <./strongerr5.pdf
+
+pdfTeX warning: /usr/local/texlive/2014/bin/universal-darwin/pdflatex (file ./s
+trongerr5.pdf): PDF inclusion: multiple pdfs with page group included in a sing
+le page
+>] (./manuscript.bbl) [6]
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 344.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 344.
  (./manuscript.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 211.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 211.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 344.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 344.
 Package rerunfilecheck Info: File `manuscript.out' has not changed.
-(rerunfilecheck)             Checksum: 5385C5FEF487F0F5841768342D880802;96.
-
-
-LaTeX Warning: There were multiply-defined labels.
-
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 211.
+(rerunfilecheck)             Checksum: 701E938BD486BC0825343EF8886399CC;110.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 344.
  ) 
 Here is how much of TeX's memory you used:
- 27937 strings out of 493117
- 641582 string characters out of 6135433
- 786429 words of memory out of 5000000
- 30738 multiletter control sequences out of 15000+600000
- 12723 words of font info for 51 fonts, out of 8000000 for 9000
+ 27971 strings out of 493117
+ 642083 string characters out of 6135433
+ 787954 words of memory out of 5000000
+ 30762 multiletter control sequences out of 15000+600000
+ 13690 words of font info for 54 fonts, out of 8000000 for 9000
  1302 hyphenation exceptions out of 8191
- 55i,19n,83p,737b,609s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 55i,20n,83p,737b,609s stack positions out of 5000i,500n,10000p,200000b,80000s
 </usr/local/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb
 ></usr/local/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb
 ></usr/local/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb>
@@ -1078,14 +1107,16 @@ ocal/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/loca
 l/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/t
 exlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/local/texl
 ive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texli
-ve/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive
-/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></usr/local/texlive/2
-014/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt9.pfb></usr/local/texlive/201
-4/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on manuscript.pdf (4 pages, 253274 bytes).
+ve/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive
+/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2
+014/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/20
+14/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></usr/local/texlive/2014
+/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt9.pfb></usr/local/texlive/2014/t
+exmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
+Output written on manuscript.pdf (6 pages, 274249 bytes).
 PDF statistics:
- 333 PDF objects out of 1000 (max. 8388607)
- 162 compressed objects within 2 object streams
+ 391 PDF objects out of 1000 (max. 8388607)
+ 207 compressed objects within 3 object streams
  22 named destinations out of 1000 (max. 500000)
- 54 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 79 words of extra memory for PDF output out of 10000 (max. 10000000)
 
