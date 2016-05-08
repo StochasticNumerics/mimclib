@@ -877,8 +877,8 @@ def testFourierConvergence():
 
 rates =[1.5,3]
 char = 'f'
-onum = 1
-ret=1
+onum = 2
+ret=2
 
 N=9
 sample=[testcude([[9,foo] for foo in range(N)],ret=ret) for m in range(50)]
