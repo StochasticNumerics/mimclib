@@ -887,7 +887,7 @@ plt.loglog([2**foo for foo in range(N-1)],np.mean(np.abs(np.diff(sample,axis=1))
 plt.loglog([2**foo for foo in range(N-1)],[2**(-1*foo*rates[0]) for foo in range(N-1)],'r-')
 plt.grid(1)
 plt.xlabel('$N_%s$'%(char,))
-plt.ylabel('Weak Error')
+plt.ylabel('Bias')
 plt.savefig('weakerr%d.pdf'%(onum,))
 
 plt.figure()
@@ -895,7 +895,7 @@ plt.loglog([2**foo for foo in range(N-1)],np.mean(np.abs(np.diff(sample,axis=1)*
 plt.loglog([2**foo for foo in range(N-1)],[2**(-1*foo*rates[1]) for foo in range(N-1)],'r-')
 plt.grid(1)
 plt.xlabel('$N_%s$'%(char,))
-plt.ylabel('Strong Error')
+plt.ylabel('Variance')
 plt.savefig('strongerr%d.pdf'%(onum,))
 
 

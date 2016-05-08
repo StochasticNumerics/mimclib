@@ -145,7 +145,7 @@ integral by $F_{N_t,N_f}$. Firstly, there is the case of the frequency cutoff:
 \\
 = & \bigo{\ssum{k=N_f+1}{\infty} \parent{\frac{c_k}{k}}^2}.
 \end{align*}
-The bound for the weak error can be obtained using Jensen's inequality. Setting as a test
+A bound for the bias error can be obtained using Jensen's inequality. Setting as a test
 case the temporal correlation structure as
 $
 \rho \parent{\tau_1, \tau_2} \propto \expf{ - \kappa \absval{\tau_1-\tau_2}}
@@ -164,7 +164,7 @@ it follows that $c^2_k =\frac{\kappa}{L} \frac{\parent{-1}^k\parent{1-\expf{-\ab
         \includegraphics[width=\textwidth]{strongerr1.pdf}
         %\caption{A tiger}
     \end{subfigure}
-    \caption{\label{fig:rateFig1} Weak (left) and strong (right) error
+    \caption{\label{fig:rateFig1} Bias (left) and variance (right) error
     $\nnorm{F_{513,2N_f} - F_{513,N_f}}{}$ along with $N_f^{-\frac{3}{2}}$ and
     	$N_f^{3}$ reference lines in red.}
 \end{figure}
@@ -229,7 +229,7 @@ This approximation has its own approximation error with respect to $N_f$:
 = & \bigo{\ssum{k = N_f+1}{\infty} \frac{c_k^2}{\ffreq k^2}}.
 \end{align*}
 Using the exponentially decaying covariance function, we expect order $3$ strong convergence
-and, using Jensen's inequality, we may bound the weak error to order $\frac{3}{2}$. Accompanying numerical rates are presetend in figure \ref{img:rateFig3}.
+and, using Jensen's inequality, we may bound the weak error to order $\frac{3}{2}$. Accompanying numerical rates are presentend in figure \ref{img:rateFig2}.
 
 \begin{figure}
     \centering
@@ -243,7 +243,7 @@ and, using Jensen's inequality, we may bound the weak error to order $\frac{3}{2
         \includegraphics[width=\textwidth]{strongerr2.pdf}
         %\caption{A tiger}
     \end{subfigure}
-    \caption{\label{img:rateFig3} Weak (left) and strong (right) error
+    \caption{\label{img:rateFig2} Weak (left) and strong (right) error
     for frequency cutoff
     $\nnorm{\Psi_{2N_f}-\Psi_{N_f}}{}$ together with the $N_f^{-\frac{3}{2}}$ and
     $N_f^{-3}$ reference lines in red.}
@@ -290,7 +290,7 @@ in figure \ref{img:rateFig4}.
         \includegraphics[width=\textwidth]{strongerr5.pdf}
         %\caption{A tiger}
     \end{subfigure}
-    \caption{\label{img:rateFig3} Above: Weak (left) and strong (right) error
+    \caption{\label{img:rateFig4} Above: Weak (left) and strong (right) error
     for the cutoff
     $\nnorm{\overline G_{65,2N_f}-\overline G_{65,N_f}}{}$,
     along with the $N_f^{-\frac{3}{2}}$ and $N_f^{3}$ reference lines (red).
@@ -331,38 +331,6 @@ F_{C_1 2^{\ell_1}+1,C_2 2^{\ell_2}} \Psi_{C_2 2^{\ell_2} } - \mathbf{1}_{\ell_1>
 + \mathbf{1}_{\ell_1,\ell_2>1} F_{C_1 2^{\ell_1-1}+1,C_2 2^{\ell_2-1}} \Psi_{C_2 2^{\ell_2-1} }.
 \end{align*}
 
-
-
-\begin{figure}
-    \centering
-    \begin{subfigure}[b]{0.4\textwidth}
-        \includegraphics[width=\textwidth]{nfstrong.pdf}
-        %\caption{A gull}
-        \label{fig:gull}
-    \end{subfigure}
-    ~ %add desired spacing between images, e. g. ~, \quad, \qquad, \hfill etc. 
-      %(or a blank line to force the subfigure onto a new line)
-    \begin{subfigure}[b]{0.4\textwidth}
-        \includegraphics[width=\textwidth]{nfweak.pdf}
-        %\caption{A tiger}
-        \label{fig:tiger}
-    \end{subfigure}
-    \\
-    ~ %add desired spacing between images, e. g. ~, \quad, \qquad, \hfill etc. 
-    %(or a blank line to force the subfigure onto a new line)
-    \begin{subfigure}[b]{0.4\textwidth}
-        \includegraphics[width=\textwidth]{ntstrong.pdf}
-        %\caption{A mouse}
-        \label{fig:mouse}
-    \end{subfigure}
-        \begin{subfigure}[b]{0.4\textwidth}
-        \includegraphics[width=\textwidth]{ntweak.pdf}
-        %\caption{A mouse}
-        \label{fig:mouse}
-    \end{subfigure}
-    \caption{\label{fig:empInfDimRates}Empirical strong and weak convergence rate for
-    the $N_t$ and $N_f$.}
-\end{figure}
 
 \bibliographystyle{agsm}
 \bibliography{references}
