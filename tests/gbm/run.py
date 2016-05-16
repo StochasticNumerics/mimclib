@@ -7,11 +7,12 @@ import os.path
 import numpy as np
 
 def python_wcumsum(x, w):
+    assert(len(x) == w.shape[1])
     output = np.empty_like(w)
     for m in range(0, w.shape[0]):
         output[m, 0] = x[0]
-        for i in range(1, len(output)):
-            output[m, i] = w[m, i]*output[i-1] + x[i]
+        for i in range(1, w.shape[1]):
+            output[m, i] = w[m, i]*output[m, i-1] + x[i]
     return output
 
 def addExtraArguments(parser):
@@ -38,6 +39,7 @@ try:
                                 __arr_double__]
 
     def wcumsum(x, w):
+        assert(len(x) == w.shape[1])
         output = np.empty_like(w)
         __lib__.wcumsum(x, w, w.shape[1], w.shape[0], output)
         return output
