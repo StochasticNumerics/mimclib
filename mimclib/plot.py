@@ -732,16 +732,16 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     except:
         __plot_failed(ax)
 
-    ax = add_fig()
+    ax_time = add_fig()
     try:
-        data_mimc, _ = plotTimeVsTOL(ax, runs_data, label="MIMC",
+        data_time, _ = plotTimeVsTOL(ax_time, runs_data, label="MIMC",
                                      MC_kwargs={"label": "MC Estimate", "fmt": "--r"})
     except:
-        __plot_failed(ax)
+        __plot_failed(ax_time)
 
     ax_est = add_fig()
     try:
-        data_mc, _ = plotTimeVsTOL(ax_est, runs_data, label="MIMC",
+        data_est, _ = plotTimeVsTOL(ax_est, runs_data, label="MIMC",
                                    work_estimate=True,
                                    MC_kwargs={"label": "MC Estimate", "fmt":
                                               "--r"})
@@ -754,16 +754,16 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                 w = w * np.log(params.beta)
                 gamma = gamma * np.log(params.beta)
             func, label = __formatMIMCRate(*mimc.calcMIMCRate(w, s, gamma))
-            ax.add_line(FunctionLine2D(func, data=data_mimc,
-                                       linestyle='--', c='k',
-                                       label=label))
+            ax_time.add_line(FunctionLine2D(func,
+                                            data=data_time,
+                                            linestyle='--', c='k',
+                                            label=label))
             ax_est.add_line(FunctionLine2D(func,
-                                           data=data_mc,
+                                           data=data_est,
                                            linestyle='--', c='k',
                                            label=label))
-
     except:
-        __plot_failed(ax)
+        __plot_failed(ax_est)
 
     def formatPower(rate):
         rate = "{:.2g}".format(rate)
