@@ -115,13 +115,17 @@ CREATE TABLE IF NOT EXISTS {lvlTable} (
     Wl            REAL,
     Tl            REAL,
     Ml            INTEGER,
-    psums         mediumblob,
+    psums_delta   mediumblob,
+    psums_fine    mediumblob,
     FOREIGN KEY (data_id) REFERENCES {dataTable}(data_id) ON DELETE CASCADE,
     UNIQUE KEY idx_run_lvl (data_id, lvl_hash)
 );
 
 CREATE VIEW vw_lvls AS SELECT data_id, lvl,
 El, Vl, Wl, Tl, Ml FROM {lvlTable};
+
+-- CREATE USER 'abdo'@'%';
+-- GRANT ALL PRIVILEGES ON *.* TO 'abdo'@'%' WITH GRANT OPTION;
 '''.format(DBName=self.DBName, runTable=self.runTable,
            dataTable=self.dataTable, lvlTable=self.lvlTable)
 
@@ -161,7 +165,7 @@ VALUES(datetime(), ?, ?, ?, ?, -1, ?)'''.format(runTable=self.runTable),
     def writeRunData(self, run_id, mimc_run, iteration_idx, TOL,
                      totalTime, userdata=None):
         base = 0
-        El = mimc_run.data.calcEl()
+        El = mimc_run.data.calcDeltaEl()
         Vl = mimc_run.Vl_estimate
         Tl = mimc_run.data.calcTl()
         Wl = mimc_run.Wl_estimate
@@ -180,11 +184,12 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?)'''.format(dataTable=self.dataTable),
                 lvl = ",".join(["%d|%d" % (i, j) for i, j in
                                 enumerate(mimc_run.data.lvls[k]) if j > base])
                 cur.execute('''
-INSERT INTO {lvlTable}(lvl, lvl_hash, El, Vl, Wl, Tl, Ml, psums, data_id)
-VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO {lvlTable}(lvl, lvl_hash, El, Vl, Wl, Tl, Ml, psums_delta, psums_fine, data_id)
+VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?, ?)
 '''.format(lvlTable=self.lvlTable, lvl=lvl),
                             [lvl, lvl, El[k], Vl[k], Wl[k], Tl[k], Ml[k],
-                             _pickle(mimc_run.data.psums[k, :]), data_id])
+                             _pickle(mimc_run.data.psums_delta[k, :]),
+                             _pickle(mimc_run.data.psums_fine[k, :]), data_id])
 
     def readRuns(self, run_ids):
         from . import mimc
@@ -210,7 +215,9 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
 '''.format(dataTable=self.dataTable), [run_ids]).fetchall()
 
             lvlsAll = cur.execute('''
-            SELECT dr.data_id, l.lvl, l.psums, l.Ml, l.Tl, l.Wl, l.Vl, r.dim FROM
+            SELECT dr.data_id, l.lvl, l.psums_delta, l.psums_fine, l.Ml,
+                     l.Tl, l.Wl, l.Vl, r.dim
+            FROM
             {lvlTable} l INNER JOIN {dataTable} dr ON
             dr.data_id=l.data_id INNER JOIN {runTable} r on r.run_id=dr.run_id
             WHERE dr.run_id in ? ORDER BY dr.data_id'''.
@@ -227,19 +234,20 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
         dictLvls = dict()
         import itertools
         for run_id, itr in itertools.groupby(lvlsAll, key=lambda x:x[0]):
-            psums, lvls, Ml, Tl, Wl, Vl = [], [], [], [], [], []
+            psums_delta, psums_fine, lvls, Ml, Tl, Wl, Vl = [], [], [], [], [], [], []
             for r in itr:
                 t = np.array(map(int, [p for p in re.split(",|\|", r[1]) if p]),
                              dtype=np.uint32)
                 ind = np.zeros(r[-1], dtype=np.uint)
                 ind[t[::2]] = t[1::2]
                 lvls.append(ind.tolist())
-                psums.append(_unpickle(r[2]))
-                Ml.append(r[3])
-                Tl.append(r[4])
-                Wl.append(r[5])
-                Vl.append(r[6])
-            dictLvls[run_id] = [psums, lvls, Ml, Tl, Wl, Vl]
+                psums_delta.append(_unpickle(r[2]))
+                psums_fine.append(_unpickle(r[3]))
+                Ml.append(r[4])
+                Tl.append(r[5])
+                Wl.append(r[6])
+                Vl.append(r[7])
+            dictLvls[run_id] = [psums_delta, psums_fine, lvls, Ml, Tl, Wl, Vl]
 
         for data in dataAll:
             val = dict()
@@ -256,14 +264,15 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
             val["user_data"] = _unpickle(data[8])
             val["iteration_index"] = data[9]
 
-            psums, lvls, Ml, Tl, Wl, Vl = dictLvls[data_id]
+            psums_delta, psums_fine, lvls, Ml, Tl, Wl, Vl = dictLvls[data_id]
 
             lvls = np.array(lvls)
             sort_rows = lambda a: np.argsort(a.view([('',a.dtype)]*a.shape[1]),0).T[0]
             ind = sort_rows(lvls)
 
             old_data = mimc.MIMCData(run_params[0].dim, lvls=lvls[ind],
-                                     psums=np.array(psums)[ind],
+                                     psums_delta=np.array(psums_delta)[ind],
+                                     psums_fine=np.array(psums_fine)[ind],
                                      M=np.array(Ml)[ind],
                                      t=np.array(Ml)[ind] * np.array(Tl)[ind])
             run = mimc.MIMCRun(old_data=old_data,
@@ -312,7 +321,7 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
             qs.append('creation_date <= ?')
             params.append(to_date)
         wherestr = ("WHERE " + " AND ".join(qs)) if len(qs) > 0 else ''
-        query = '''SELECT DISTINCT run_id FROM {runTable} {wherestr} ORDER BY tag, dim,
+        query = '''SELECT run_id FROM {runTable} {wherestr} ORDER BY tag, dim,
         TOL'''.format(runTable=self.runTable, wherestr=wherestr)
 
         ids = self._fetchArray(query, params)

@@ -22,7 +22,7 @@ def parse_known_args(parser, warn=True, return_unknown=False):
     return knowns
 
 
-def RunStandardTest(fnSampleQoI=None, fnSampleLvl=None,
+def RunStandardTest(fnSampleLvl=None,
                     fnAddExtraArgs=None,
                     fnInit=None,
                     fnSeed=np.random.seed):
@@ -70,13 +70,9 @@ def RunStandardTest(fnSampleQoI=None, fnSampleLvl=None,
                               tag=mimcRun.params.db_tag)
         fnItrDone = lambda *a: db.writeRunData(run_id, mimcRun, *a)
 
-    if fnSampleQoI is not None:
-        fnSampleQoI = lambda inds, fn=fnSampleQoI: fn(mimcRun, inds)
-    if fnSampleLvl is not None:
-        fnSampleLvl = lambda moments, mods, inds, M, fn=fnSampleLvl, *a: fn(mimcRun, moments, mods, inds, M)
+    fnSampleLvl = lambda inds, M, fn=fnSampleLvl, *a: fn(mimcRun, inds, M)
 
-    mimcRun.setFunctions(fnSampleQoI=fnSampleQoI,
-                         fnSampleLvl=fnSampleLvl, fnItrDone=fnItrDone)
+    mimcRun.setFunctions(fnSampleLvl=fnSampleLvl, fnItrDone=fnItrDone)
 
     try:
         mimcRun.doRun()

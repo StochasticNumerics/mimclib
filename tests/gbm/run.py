@@ -46,23 +46,27 @@ except:
         return output
 
 
-def mySampleQoI(run, inds):
+def mySampleQoI(run, inds, M):
     meshes = (run.params.qoi_T/run.fnHierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
-    dW = np.random.normal(size=maxN)/np.sqrt(maxN)
-    solves = np.empty(len(inds))
-    for i, mesh in enumerate(meshes):
-        # Simple Code to solve SDE!
-        assert(maxN % mesh == 0)
-        dWl = np.sum(dW.reshape((-1, maxN//mesh)), axis=1)
-        solves[i] = wcumsum(np.concatenate(([run.params.qoi_S0],
-                                            np.zeros(len(dWl)))),
-                            np.concatenate(([0],
-                                            run.params.qoi_sigma*dWl +
-                                            1 + run.params.qoi_mu/mesh)))[-1]
-    return solves
+    solves = np.zeros((M, len(inds)))
+
+    import time
+    tStart = time.time()
+    dW = np.random.normal(size=(M, maxN))/np.sqrt(maxN)
+    for m in range(0, M):
+        for i, mesh in enumerate(meshes):
+            # Simple Code to solve SDE!
+            assert(maxN % mesh == 0)
+            dWl = np.sum(dW[m, :].reshape((-1, maxN//mesh)), axis=1)
+            solves[m, i] = wcumsum(np.concatenate(([run.params.qoi_S0],
+                                                   np.zeros(len(dWl)))),
+                                   np.concatenate(([0],
+                                                   run.params.qoi_sigma*dWl +
+                                                   1 + run.params.qoi_mu/mesh)))[-1]
+    return solves, time.time()-tStart
 
 if __name__ == "__main__":
     import mimclib.test
-    mimclib.test.RunStandardTest(fnSampleQoI=mySampleQoI,
+    mimclib.test.RunStandardTest(fnSampleLvl=mySampleQoI,
                                  fnAddExtraArgs=addExtraArguments)
