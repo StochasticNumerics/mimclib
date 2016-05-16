@@ -25,9 +25,8 @@ if not args.multi:
     print(cmd_single.format(seed=0, bayesian=True, TOL=0.001, theta="0.2"))
 else:
     realizations = 35
-    TOLs = 0.1*np.sqrt(2.)**-np.arange(0., 10.)
+    TOLs = 0.1*np.sqrt(2.)**-np.arange(0., 16.)
     for TOL in TOLs:
         for i in range(0, realizations):
             print cmd_multi.format(bayesian=True, tag="GBM_test_kurtosis", TOL=TOL,
                                    seed=np.random.randint(2**32-1), theta="0.2")
-

@@ -6,6 +6,13 @@ import warnings
 import os.path
 import numpy as np
 
+def python_wcumsum(x, w):
+    output = np.empty_like(w)
+    for m in range(0, w.shape[0]):
+        output[m, 0] = x[0]
+        for i in range(1, len(output)):
+            output[m, i] = w[m, i]*output[i-1] + x[i]
+    return output
 
 def addExtraArguments(parser):
     parser.add_argument("-qoi_sigma", type=float, default=1.,
@@ -27,24 +34,19 @@ try:
     __lib__ = npct.load_library("libwcumsum.so", __libdir)
     __lib__.wcumsum.restype = None
     __lib__.wcumsum.argtypes = [__arr_double__, __arr_double__,
-                                ct.c_uint32, __arr_double__]
+                                ct.c_uint32, ct.c_uint32,
+                                __arr_double__]
 
     def wcumsum(x, w):
-        output = np.empty(len(x))
-        __lib__.wcumsum(x, w, len(x), output)
+        output = np.empty_like(w)
+        __lib__.wcumsum(x, w, w.shape[1], w.shape[0], output)
         return output
 
 except:
     raise
     warnings.warn("Using Python (very slow) version for wcumsum. Consider running make")
     # wcumsum is like cumsum, but weighted.
-    def wcumsum(x, w):
-        output = np.empty(len(x))
-        output[0] = x[0]
-        for i in range(1, len(output)):
-            output[i] = w[i]*output[i-1] + x[i]
-        return output
-
+    wcumsum = python_cumsum
 
 def mySampleQoI(run, inds, M):
     meshes = (run.params.qoi_T/run.fnHierarchy(inds)).reshape(-1).astype(np.int)
@@ -54,16 +56,14 @@ def mySampleQoI(run, inds, M):
     import time
     tStart = time.time()
     dW = np.random.normal(size=(M, maxN))/np.sqrt(maxN)
-    for m in range(0, M):
-        for i, mesh in enumerate(meshes):
-            # Simple Code to solve SDE!
-            assert(maxN % mesh == 0)
-            dWl = np.sum(dW[m, :].reshape((-1, maxN//mesh)), axis=1)
-            solves[m, i] = wcumsum(np.concatenate(([run.params.qoi_S0],
-                                                   np.zeros(len(dWl)))),
-                                   np.concatenate(([0],
-                                                   run.params.qoi_sigma*dWl +
-                                                   1 + run.params.qoi_mu/mesh)))[-1]
+    for i, mesh in enumerate(meshes):
+        assert(maxN % mesh == 0)
+        dWl = np.sum(dW.reshape((M, -1, maxN//mesh)), axis=2)
+        x = np.concatenate(([run.params.qoi_S0], np.zeros(dWl.shape[1])))
+        w = np.zeros((dWl.shape[0], dWl.shape[1]+1))
+        w[:, 1:] = run.params.qoi_sigma*dWl + 1 + run.params.qoi_mu/mesh
+        solves[:, i] = wcumsum(x, w)[:, -1]
+
     return solves, time.time()-tStart
 
 if __name__ == "__main__":
