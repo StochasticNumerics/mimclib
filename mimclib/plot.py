@@ -183,20 +183,20 @@ def __get_stats(data, groupby=0, staton=1):
 @public
 def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
     """Plots Errors vs TOL of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-
-runs_data is a list
-run_data[i] is another class
-run_data[i].TOL
-run_data[i].finalTOL
-run_data[i].creation_date
-run_data[i].iteration_index
-run_data[i].total_iterations
-run_data[i].totalTime
-run_data[i].run is an instance of mimc.MIMCRun
-run_data[i].run.data is an instance of mimc.MIMCData
-"""
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+    
+    runs_data is a list
+    run_data[i] is another class
+    run_data[i].TOL
+    run_data[i].finalTOL
+    run_data[i].creation_date
+    run_data[i].iteration_index
+    run_data[i].total_iterations
+    run_data[i].totalTime
+    run_data[i].run is an instance of mimc.MIMCRun
+    run_data[i].run.data is an instance of mimc.MIMCData
+    """
 
     exact = kwargs.pop('exact', None)
     if exact is None:
@@ -292,9 +292,9 @@ def __normalize_fmt(args, kwargs):
 @public
 def plotTotalWorkVsLvls(ax, runs_data, *args, **kwargs):
     """Plots Time vs TOL of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-"""
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+    """
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel('Total Work')
     ax.set_yscale('log')
@@ -352,9 +352,9 @@ ax is in instance of matplotlib.axes
 @public
 def plotExpectVsLvls(ax, runs_data, *args, **kwargs):
     """Plots El, Vl vs TOL of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-"""
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+    """
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$E_\ell$')
     ax.set_yscale('log')
@@ -386,9 +386,9 @@ ax is in instance of matplotlib.axes
 @public
 def plotVarVsLvls(ax, runs_data, *args, **kwargs):
     """Plots El, Vl vs TOL of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-"""
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+    """
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
@@ -429,9 +429,9 @@ ax is in instance of matplotlib.axes
 @public
 def plotKurtosisVsLvls(ax, runs_data, *args, **kwargs):
     """Plots El, Vl vs TOL of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-"""
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+    """
     args, kwargs = __normalize_fmt(args, kwargs)
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$\textnormal{Kurt}_\ell$')
@@ -453,9 +453,9 @@ ax is in instance of matplotlib.axes
 @public
 def plotSkewnessVsLvls(ax, runs_data, *args, **kwargs):
     """Plots El, Vl vs TOL of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-"""
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+    """
     args, kwargs = __normalize_fmt(args, kwargs)
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$\textnormal{Skew}_\ell$')
@@ -478,9 +478,9 @@ ax is in instance of matplotlib.axes
 @public
 def plotTimeVsLvls(ax, runs_data, *args, **kwargs):
     """Plots Time vs TOL of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-"""
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+    """
     args, kwargs = __normalize_fmt(args, kwargs)
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel('Time (s)')
@@ -500,9 +500,9 @@ ax is in instance of matplotlib.axes
 @public
 def plotTimeVsTOL(ax, runs_data, *args, **kwargs):
     """Plots Tl vs TOL of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-"""
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+    """
     work_estimate = kwargs.pop("work_estimate", False)
     if kwargs.pop("real_time", False):
         if work_estimate:
@@ -548,9 +548,9 @@ ax is in instance of matplotlib.axes
 @public
 def plotLvlsNumVsTOL(ax, runs_data, *args, **kwargs):
     """Plots L vs TOL of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-"""
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+    """
     summary = np.array([[r.TOL,
                          np.max([np.sum(l) for l in r.run.data.lvls])]
                         for r in runs_data])
@@ -566,9 +566,9 @@ ax is in instance of matplotlib.axes
 @public
 def plotThetaVsTOL(ax, runs_data, *args, **kwargs):
     """Plots theta vs TOL of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-"""
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+    """
     summary = np.array([[r.TOL, r.run.Q.theta] for r in runs_data])
 
     ax.set_xscale('log')
@@ -582,9 +582,9 @@ ax is in instance of matplotlib.axes
 @public
 def plotThetaRefVsTOL(ax, runs_data, eta, chi, *args, **kwargs):
     """Plots theta vs TOL of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-"""
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+    """
     central_delta_moments, _, _, _ = __calc_moments(runs_data)
     El = np.abs(central_delta_moments[:, 0])
     L = lambda r: np.max([np.sum(l) for l in r.run.data.lvls])
@@ -614,9 +614,9 @@ ax is in instance of matplotlib.axes
 @public
 def plotErrorsQQ(ax, runs_data, *args, **kwargs): #(runs, tol, marker='o', color="b", fig=None, label=None):
     """Plots Normal vs Empirical CDF of @runs_data, as
-returned by MIMCDatabase.readRunData()
-ax is in instance of matplotlib.axes
-"""
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+    """
     if "tol" not in kwargs:
         TOLs = [r.TOL for r in runs_data]
         unTOLs = np.unique([r.TOL for r in runs_data])
