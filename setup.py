@@ -15,7 +15,7 @@ def read(fname):
 
 setup(
     name="mimclib",
-    version="0.1.0.dev0",
+    version="0.2.0.dev0",
     author="Abdul-Lateef Haji-Ali",
     author_email="abdullateef.hajiali@kaust.edu.sa",
     description="A library implementing the MIMC and CMLMC methods.",
@@ -37,3 +37,6 @@ setup(
                   extra_compile_args=['-std=c++11'])],
     cmdclass={'install': install},
 )
+
+
+# Need to install the package: libmysqlclient-dev

@@ -29,6 +29,8 @@ def addExtraArguments(parser):
                         help="Exact value")
     parser.add_argument("-o", type=str, default="mimc_results.pdf",
                         action="store", help="Output file")
+    parser.add_argument("-cmd", type=str, action="store",
+                        help="Command to execute after plotting")
 
 
 def main():
@@ -55,6 +57,9 @@ def main():
         raise Exception("No runs!!!")
     miplot.genPDFBooklet(run_data, fileName=args.o, exact=args.qoi_exact)
 
+    if args.cmd is not None:
+        import os
+        os.system(args.cmd.format(args.o))
 
 if __name__ == "__main__":
     main()

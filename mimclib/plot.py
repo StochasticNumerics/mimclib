@@ -246,8 +246,9 @@ def __calc_moments(runs_data, seed=None, direction=None):
     dim = runs_data[0].run.data.dim
     seed = np.array(seed) if seed is not None else np.zeros(dim, dtype=np.uint32)
     direction = np.array(direction) if direction is not None else np.ones(dim, dtype=np.uint32)
-    moments = runs_data[0].run.data.psums.shape[1]
-    psums = np.zeros((0, moments))
+    moments = runs_data[0].run.data.psums_delta.shape[1]
+    psums_delta = np.zeros((0, moments))
+    psums_fine = np.zeros((0, moments))
     Tl = np.zeros(0)
     M = np.zeros(0)
     for curRun in runs_data:
@@ -262,20 +263,26 @@ def __calc_moments(runs_data, seed=None, direction=None):
             cur = cur + direction
         L = len(inds)
         if L > len(M):
-            psums.resize((L, moments), refcheck=False)
+            psums_delta.resize((L, moments), refcheck=False)
+            psums_fine.resize((L, moments), refcheck=False)
             M.resize(L, refcheck=False)
             Tl.resize(L, refcheck=False)
-        psums[:L, :] += curRun.run.data.psums[inds, :]
+        psums_delta[:L, :] += curRun.run.data.psums_delta[inds, :]
+        psums_fine[:L, :] += curRun.run.data.psums_fine[inds, :]
         M[:L] += curRun.run.data.M[inds]
         Tl[:L] += curRun.run.data.t[inds]
 
-    central_moments = np.empty_like(psums)
-    for m in range(1, psums.shape[1]+1):
-        central_moments[:, m-1] = mimc.compute_central_moment(psums,
-                                                              M, m,
-                                                              empty_value=np.inf)
+    central_delta_moments = np.empty_like(psums_delta)
+    central_fine_moments = np.empty_like(psums_fine)
+    for m in range(1, psums_delta.shape[1]+1):
+        central_delta_moments[:, m-1] = mimc.compute_central_moment(psums_delta,
+                                                                    M, m,
+                                                                    empty_value=np.inf)
+        central_fine_moments[:, m-1] = mimc.compute_central_moment(psums_fine,
+                                                                   M, m,
+                                                                   empty_value=np.inf)
     Tl /= M
-    return central_moments, Tl, M
+    return central_delta_moments, central_fine_moments, Tl, M
 
 def __normalize_fmt(args, kwargs):
     if "fmt" in kwargs:        # Normalize behavior of errorbar() and plot()
@@ -353,16 +360,27 @@ ax is in instance of matplotlib.axes
     ax.set_yscale('log')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     if "__calc_moments" in kwargs:
-        central_moments, _, M = kwargs.pop("__calc_moments")
+        central_delta_moments, central_fine_moments, _, M = kwargs.pop("__calc_moments")
     else:
-        central_moments, _, M = __calc_moments(runs_data,
-                                               seed=kwargs.pop('seed', None),
-                                               direction=kwargs.pop('direction', None))
-    El = central_moments[:, 0]
-    Vl = central_moments[:, 1]
-    errorBar = ax.errorbar(np.arange(0, len(El)), np.abs(El), *args,
-                           yerr=3*np.sqrt(np.abs(Vl/M)), **kwargs)
-    return errorBar[0].get_xydata(), [errorBar]
+        central_delta_moments, central_fine_moments, _, M = __calc_moments(runs_data,
+                                                                           seed=kwargs.pop('seed', None),
+                                                                           direction=kwargs.pop('direction', None))
+
+    fine_kwargs = kwargs.pop('fine_kwargs', None)
+    plotObj = []
+    El = central_delta_moments[:, 0]
+    Vl = central_delta_moments[:, 1]
+    plotObj.append(ax.errorbar(np.arange(0, len(El)), np.abs(El), *args,
+                               yerr=3*np.sqrt(np.abs(Vl/M)), **kwargs))
+
+
+    if fine_kwargs is not None:
+        El = central_fine_moments[:, 0]
+        Vl = central_fine_moments[:, 1]
+        plotObj.append(ax.errorbar(np.arange(0, len(El)), np.abs(El),
+                                   yerr=3*np.sqrt(np.abs(Vl/M)), **fine_kwargs))
+
+    return plotObj[0][0].get_xydata(), plotObj
 
 
 @public
@@ -375,24 +393,37 @@ ax is in instance of matplotlib.axes
     ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
     if "__calc_moments" in kwargs:
-        central_moments, _, M = kwargs.pop("__calc_moments")
+        central_delta_moments, central_fine_moments, _, M = kwargs.pop("__calc_moments")
     else:
-        central_moments, _, M = __calc_moments(runs_data,
-                                               seed=kwargs.pop('seed', None),
-                                               direction=kwargs.pop('direction',
-                                                                    None))
-    Vl = central_moments[:, 1]
+        central_delta_moments, central_fine_moments, _, M = __calc_moments(runs_data,
+                                                                           seed=kwargs.pop('seed', None),
+                                                                           direction=kwargs.pop('direction',
+                                                                                                None))
+    fine_kwargs = kwargs.pop('fine_kwargs', None)
+    plotObj = []
+    Vl = central_delta_moments[:, 1]
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    if central_moments.shape[1] >= 4:
-        El4 = central_moments[:, 3]
-        line = ax.errorbar(np.arange(0, len(Vl)), Vl,
-                           yerr=3*np.sqrt(np.abs(El4/M)),
-                           *args, **kwargs)
+    if central_delta_moments.shape[1] >= 4:
+        El4 = central_delta_moments[:, 3]
+        plotObj.append(ax.errorbar(np.arange(0, len(Vl)), Vl,
+                                   yerr=3*np.sqrt(np.abs(El4/M)),
+                                   *args, **kwargs))
     else:
         args, kwargs = __normalize_fmt(args, kwargs)
-        line = ax.plot(np.arange(0, len(Vl)), Vl, *args, **kwargs)
+        plotObj.append(ax.plot(np.arange(0, len(Vl)), Vl, *args, **kwargs))
 
-    return line[0].get_xydata(), [line]
+    if fine_kwargs is not None:
+        Vl = central_fine_moments[:, 1]
+        if central_fine_moments.shape[1] >= 4:
+            El4 = central_fine_moments[:, 3]
+            plotObj.append(ax.errorbar(np.arange(0, len(Vl)), Vl,
+                                   yerr=3*np.sqrt(np.abs(El4/M)),
+                                   **fine_kwargs))
+        else:
+            fine_args, fine_kwargs = __normalize_fmt(args, fine_kwargs)
+            plotObj.append(ax.plot(np.arange(0, len(Vl)), Vl, *fine_args, **fine_kwargs))
+
+    return plotObj[0][0].get_xydata(), plotObj
 
 
 @public
@@ -406,14 +437,14 @@ ax is in instance of matplotlib.axes
     ax.set_ylabel(r'$\textnormal{Kurt}_\ell$')
     ax.set_yscale('log')
     if "__calc_moments" in kwargs:
-        central_moments, _, _ = kwargs.pop("__calc_moments")
+        central_delta_moments, _,  _, _ = kwargs.pop("__calc_moments")
     else:
-        central_moments, _, _ = __calc_moments(runs_data,
-                                               seed=kwargs.pop('seed', None),
-                                               direction=kwargs.pop('direction',
-                                                                    None))
-    Vl = central_moments[:, 1]
-    E4l = central_moments[:, 3]
+        central_delta_moments, _, _, _ = __calc_moments(runs_data,
+                                                        seed=kwargs.pop('seed', None),
+                                                        direction=kwargs.pop('direction',
+                                                                             None))
+    Vl = central_delta_moments[:, 1]
+    E4l = central_delta_moments[:, 3]
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     line = ax.plot(np.arange(0, len(Vl)), E4l/Vl**2, *args, **kwargs)
     return line[0].get_xydata(), [line]
@@ -430,14 +461,14 @@ ax is in instance of matplotlib.axes
     ax.set_ylabel(r'$\textnormal{Skew}_\ell$')
     ax.set_yscale('log')
     if "__calc_moments" in kwargs:
-        central_moments, _, _ = kwargs.pop("__calc_moments")
+        central_delta_moments, _, _, _ = kwargs.pop("__calc_moments")
     else:
-        central_moments, _, _ = __calc_moments(runs_data,
-                                               seed=kwargs.pop('seed', None),
-                                               direction=kwargs.pop('direction',
-                                                                    None))
-    Vl = central_moments[:, 1]
-    E3l = np.abs(central_moments[:, 2])
+        central_delta_moments, _, _, _ = __calc_moments(runs_data,
+                                                        seed=kwargs.pop('seed', None),
+                                                        direction=kwargs.pop('direction',
+                                                                             None))
+    Vl = central_delta_moments[:, 1]
+    E3l = np.abs(central_delta_moments[:, 2])
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     line = ax.plot(np.arange(0, len(Vl)), E3l/Vl**1.5, *args, **kwargs)
     return line[0].get_xydata(), [line]
@@ -455,11 +486,11 @@ ax is in instance of matplotlib.axes
     ax.set_ylabel('Time (s)')
     ax.set_yscale('log')
     if "__calc_moments" in kwargs:
-        _, Tl, M = kwargs.pop("__calc_moments")
+        _, _, Tl, M = kwargs.pop("__calc_moments")
     else:
-        _, Tl, M = __calc_moments(runs_data,
-                                  seed=kwargs.pop('seed', None),
-                                  direction=kwargs.pop('direction', None))
+        _, _, Tl, M = __calc_moments(runs_data,
+                                     seed=kwargs.pop('seed', None),
+                                     direction=kwargs.pop('direction', None))
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     line = ax.plot(np.arange(0, len(Tl)), Tl, *args, **kwargs)
     #line2 = ax.plot(np.arange(0, len(Tl)), M, *args, **kwargs)
@@ -475,19 +506,18 @@ ax is in instance of matplotlib.axes
     work_estimate = kwargs.pop("work_estimate", False)
     if kwargs.pop("real_time", False):
         if work_estimate:
-            raise ValueError("real_time or work_estimate cannot be both True")
+            raise ValueError("real_time and work_estimate cannot be both True")
+        if 'MC_kwargs' in kwargs:
+            raise ValueError("Cannot estimate real time of Monte Carlo")
+
         xy = [[r.TOL, r.totalTime] for r in runs_data]
     elif work_estimate:
         xy = [[r.TOL, np.sum(r.run.data.M*r.run.Wl_estimate),
-               np.max(r.run.Wl_estimate) *
-               np.maximum(r.run.params.M0, r.run.params.Ca *
-                          r.run.all_data.calcVl()[0] * r.TOL**-2.)]
+               np.max(r.run.Wl_estimate) * r.run.estimateMonteCarloSampleCount(r.TOL)]
               for r in runs_data]
     else:
         xy = [[r.TOL, np.sum(r.run.data.t),
-               np.max(r.run.all_data.calcTl()) *
-               np.maximum(r.run.params.M0, r.run.params.Ca *
-                          r.run.all_data.calcVl()[0] * r.TOL**-2.)]
+               np.max(r.run.all_data.calcTl()) * r.run.estimateMonteCarloSampleCount(r.TOL)]
               for r in runs_data]
     ax.set_xscale('log')
     ax.set_yscale('log')
@@ -555,8 +585,8 @@ def plotThetaRefVsTOL(ax, runs_data, eta, chi, *args, **kwargs):
 returned by MIMCDatabase.readRunData()
 ax is in instance of matplotlib.axes
 """
-    central_moments, _, _ = __calc_moments(runs_data)
-    El = np.abs(central_moments[:, 0])
+    central_delta_moments, _, _, _ = __calc_moments(runs_data)
+    El = np.abs(central_delta_moments[:, 0])
     L = lambda r: np.max([np.sum(l) for l in r.run.data.lvls])
     if chi == 1:
         summary = np.array([[r.TOL,
@@ -702,16 +732,16 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     except:
         __plot_failed(ax)
 
-    ax = add_fig()
+    ax_time = add_fig()
     try:
-        data_mimc, _ = plotTimeVsTOL(ax, runs_data, label="MIMC",
+        data_time, _ = plotTimeVsTOL(ax_time, runs_data, label="MIMC",
                                      MC_kwargs={"label": "MC Estimate", "fmt": "--r"})
     except:
-        __plot_failed(ax)
+        __plot_failed(ax_time)
 
     ax_est = add_fig()
     try:
-        data_mc, _ = plotTimeVsTOL(ax_est, runs_data, label="MIMC",
+        data_est, _ = plotTimeVsTOL(ax_est, runs_data, label="MIMC",
                                    work_estimate=True,
                                    MC_kwargs={"label": "MC Estimate", "fmt":
                                               "--r"})
@@ -724,16 +754,16 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                 w = w * np.log(params.beta)
                 gamma = gamma * np.log(params.beta)
             func, label = __formatMIMCRate(*mimc.calcMIMCRate(w, s, gamma))
-            ax.add_line(FunctionLine2D(func, data=data_mimc,
-                                       linestyle='--', c='k',
-                                       label=label))
+            ax_time.add_line(FunctionLine2D(func,
+                                            data=data_time,
+                                            linestyle='--', c='k',
+                                            label=label))
             ax_est.add_line(FunctionLine2D(func,
-                                           data=data_mc,
+                                           data=data_est,
                                            linestyle='--', c='k',
                                            label=label))
-
     except:
-        __plot_failed(ax)
+        __plot_failed(ax_est)
 
     def formatPower(rate):
         rate = "{:.2g}".format(rate)
@@ -753,35 +783,45 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
             label = r'$\exp({}\ell)$'.format(formatPower(rate))
         return func, label
 
-    lvl_funcs = [[0, plotTimeVsLvls, np.array(params.gamma)
+    lvl_funcs = [[0, False, plotTimeVsLvls, np.array(params.gamma)
                   if has_gamma_rate else None],
-                 [1, plotExpectVsLvls, -np.array(params.w)
+                 [1, True, plotExpectVsLvls, -np.array(params.w)
                   if has_w_rate else None],
-                 [2, plotVarVsLvls, -np.array(params.s)
+                 [2, True, plotVarVsLvls, -np.array(params.s)
                   if has_s_rate else None],
-                 [3, plotSkewnessVsLvls, None],
-                 [4, plotKurtosisVsLvls, None]]
+                 [3, False, plotSkewnessVsLvls, None],
+                 [4, False, plotKurtosisVsLvls, None]]
     directions = np.eye(dim, dtype=np.int).tolist()
     cur = np.array(directions[0])
     for i in range(1, dim):
         cur += np.array(directions[i])
         directions.append(cur.tolist())
 
-    max_moment = runs_data[0].run.data.psums.shape[1]
-    for min_moment, plotFunc, rate in lvl_funcs:
+    max_moment = runs_data[0].run.data.psums_delta.shape[1]
+    for min_moment, plotFine, plotFunc, rate in lvl_funcs:
         if min_moment > max_moment:
             continue
         try:
             ax = add_fig()
             add_rates = dict()
-            markers = ['o', 'v', '^', '<', '>', '8', 's', 'p', '*', 'h', 'H', 'D', 'd']
-            linestyles = ['--', '-.', '-', ':', '-']
+            from itertools import cycle
+            markers = cycle(['o', 'v', '^', '<', '>', '8', 's', 'p', '*', 'h', 'H', 'D', 'd'])
+            linestyles = cycle(['--', '-.', '-', ':', '-'])
+            cycler = ax._get_lines.prop_cycler
             for j, direction in enumerate(directions):
-                line_data, _ = plotFunc(ax, runs_data,
-                                        fmt='-'+markers[j % len(markers)],
-                                        label=None if len(directions)==1 else
-                                        "$\ell={}$".format(direction),
-                                        direction=direction)
+                mrk = next(markers)
+                prop = next(cycler)
+                cur_kwargs = {'ax' : ax, 'runs_data': runs_data,
+                              'linestyle' : '-',
+                              'marker' : mrk,
+                              'label': None if len(directions)==1 else "$\ell={}$".format(direction),
+                              'direction' : direction}
+                cur_kwargs.update(prop)
+                if plotFine:
+                    cur_kwargs['fine_kwargs'] = {'linestyle': '--',
+                                                 'marker' : mrk}
+                    cur_kwargs['fine_kwargs'].update(prop)
+                line_data, _ = plotFunc(**cur_kwargs)
                 if rate is None:
                     continue
                 add_rates[np.sum(rate[np.array(direction) != 0])] = line_data
@@ -790,7 +830,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                                          np.abs(x))):
                 func, label = getLevelRate(r)
                 ax.add_line(FunctionLine2D(func, data=add_rates[r][1:, :],
-                                           linestyle=linestyles[j % len(linestyles)],
+                                           linestyle=next(linestyles),
                                            c='k', label=label))
         except:
             __plot_failed(ax)
