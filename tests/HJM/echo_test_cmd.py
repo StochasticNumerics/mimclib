@@ -10,23 +10,25 @@ parser.add_argument("-multi", type="bool", action="store",
 parser.add_argument("-db_host", type=str, action="store",
                     default="localhost",
                     help="True output a single command")
+parser.add_argument("-db_tag", type=str, action="store",
+                    default="foo")
 
 args = parser.parse_known_args()[0]
 
 base = "run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  \
 -qoi_sigma 0.1 -qoi_mu 1 -qoi_seed {seed} -mimc_moments 4 \
--mimc_dim 1 -mimc_w 1 -mimc_s 1 -mimc_gamma 1 -mimc_beta 2 \
+-mimc_dim 2 -mimc_w 1 1.5 -mimc_s 2 3   -mimc_gamma 1 1 -mimc_beta 2 2 \
 -mimc_theta {theta} -mimc_bayesian {bayesian} "
 
 cmd_multi = "python " + base + "-mimc_verbose False -db True -db_tag {tag} " + " -db_host {} ".format(args.db_host)
 cmd_single = "python " + base + " -mimc_verbose True -db False "
 
 if not args.multi:
-    print(cmd_single.format(seed=0, bayesian=True, TOL=0.001, theta="0.2"))
+    print(cmd_single.format(seed=0, bayesian=False, TOL=0.001, theta="0.2"))
 else:
     realizations = 35
     TOLs = 0.1*np.sqrt(2.)**-np.arange(0., 16.)
     for TOL in TOLs:
         for i in range(0, realizations):
-            print cmd_multi.format(bayesian=True, tag="GBM_test_kurtosis", TOL=TOL,
+            print cmd_multi.format(bayesian=False, tag=args.db_tag, TOL=TOL,
                                    seed=np.random.randint(2**32-1), theta="0.2")

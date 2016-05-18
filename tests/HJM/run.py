@@ -6,6 +6,7 @@ import HJM
 import warnings
 import os.path
 import numpy as np
+import time
 
 def python_wcumsum(x, w):
     assert(len(x) == w.shape[1])
@@ -28,7 +29,7 @@ def addExtraArguments(parser):
 
 def mySampleQoI(run, inds, M):
     tStart = time.time()
-    return np.array([testcude(inds) for m in range(M)]), time.time()-tStart
+    return np.array([HJM.testcude(inds) for m in range(M)]), time.time()-tStart
 
 if __name__ == "__main__":
     import mimclib.test
