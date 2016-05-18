@@ -4,7 +4,7 @@ import argparse
 
 parser = argparse.ArgumentParser(add_help=True)
 parser.register('type', 'bool',
-                lambda v: v.lower() in ("yes", "true", "t", "1"))
+                lambda v: v.lower() in ("yes", "true", "t", "1", "y"))
 parser.add_argument("-multi", type="bool", action="store",
                     default=False, help="True output a single command")
 parser.add_argument("-db_host", type=str, action="store",
