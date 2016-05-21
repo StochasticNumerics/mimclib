@@ -16,4 +16,4 @@ deluser:
 #-$(RM) -r $(shell python -m site --user-site)/mimclib-*-py*.egg-info
 
 pip:
-	pip install --user -e .[DB]
+	pip install --user -e .[mysqldb]
