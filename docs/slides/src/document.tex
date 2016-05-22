@@ -12,7 +12,7 @@
   \item Provide an \textbf{easy to use}, \textbf{customizable} and
     \textbf{extendable} open source library for UQ problems, both
     forward and inverse.
-  \item Multilevel and Mult-index versions of Monte Carlo, Quasi Monte
+  \item Multilevel and Multi-index versions of Monte Carlo, Quasi Monte
     Carlo, Stochastic collocation, Least square projection among
     others.
   \item Support parallel computation whenever possible.
@@ -28,7 +28,7 @@
 
 \begin{frame}{What has been done, \lib~\texttt{0.2.0.dev0}}
   \begin{itemize}
-  \item Multilevel and Mult-index versions of Monte Carlo.
+  \item Multilevel and Multi-index versions of Monte Carlo.
   \item Provide easy to use storage facility in MySQL.
   \item Provide easy to customize plotting facility (for common
     plots).
@@ -259,6 +259,7 @@ the variance constraint then, we can obtain the optimal number of samples
   \end{itemize}
 \end{frame}
 
+
 \section{Installation}
 
 \begin{frame}{\lib~showcase}
@@ -304,7 +305,7 @@ the variance constraint then, we can obtain the optimal number of samples
 mysql> CREATE USER 'USER'@'%' \
               IDENTIFIED BY 'password';
 mysql> GRANT ALL PRIVILEGES ON mimc.* TO \
-             'USER@'%' WITH GRANT OPTION;
+             'USER'@'%' WITH GRANT OPTION;
 \end{verbatim}
   \end{itemize}
 \end{frame}
@@ -318,6 +319,23 @@ mysql> SET PASSWORD FOR 'USER'@'%' \
        = PASSWORD('newpassword');
 \end{verbatim}
   \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Installation for Debian/Ubuntu}
+\begin{itemize}
+  \item
+\begin{verbatim}
+> git clone \
+      git@github.com:StochasticNumerics/mimclib.git
+> cd mimclib
+> ./mimc_install.sh
+\end{verbatim}
+  \item Updates all packages on the system
+  \item Installs all prerequisites
+  \item Clones and installs the library
+  \item Creates a database with the current user and no password.
+  \item Standard GBM Example is ready to run.
+\end{itemize}
 \end{frame}
 
 \begin{frame}{The end}
