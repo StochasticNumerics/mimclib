@@ -13,7 +13,7 @@ parser.add_argument("-db_host", type=str, action="store",
 
 args = parser.parse_known_args()[0]
 
-base = "run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  \
+base = "mimc_run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  \
 -qoi_sigma 0.1 -qoi_mu 1 -qoi_seed {seed} -mimc_moments 4 \
 -mimc_dim 1 -mimc_w 1 -mimc_s 1 -mimc_gamma 1 -mimc_beta 2 \
 -mimc_theta {theta} -mimc_bayesian {bayesian} "

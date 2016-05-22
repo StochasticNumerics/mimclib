@@ -1,3 +1,9 @@
 
 *.o
 *~
+*.so
+*.egg*
+*.pyc*
+*.blg*
+#*#
+build/*

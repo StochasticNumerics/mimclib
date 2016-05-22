@@ -1,3 +1,17 @@
+
+"""
+This file contains an example of a mimclib run.
+The example solves a geometric Brownian motion SDE
+with a given constant drift and volatility, with
+given initial value and from zero to a given final value.
+
+This file does NOT contain any parallel programming, but is 
+sequential.
+
+In case of doubt, run the commands produced in echo_test_cmd.py.
+
+"""
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
