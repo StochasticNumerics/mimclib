@@ -1,5 +1,4 @@
 #!/bin/sh
 
 echo -e "Doing a single run of mimclib using the GBM example."
-./echo_test_cmd.py | /bin/bash
-
+make && ./echo_test_cmd.py | /bin/bash

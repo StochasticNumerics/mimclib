@@ -1,7 +1,4 @@
 #!/bin/sh
 
 cat ./.parallelrun_msg.txt
-
-./echo_test_cmd.py -multi 1 -db_tag "Parallelrun_example" | /bin/bash
-
-
+make && ./echo_test_cmd.py -multi 1 -db_tag "Parallelrun_example" | /bin/bash
