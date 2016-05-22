@@ -1,3 +1,10 @@
+
+### Installation on a Debian system:
+
+Command:
+`wget https://raw.githubusercontent.com/StochasticNumerics/mimclib/master/mimc_install.sh && bash mimc_install.sh`
+
+
 ### TODO
 0. This README
 1. Move features and plots from old code (CMLMC and MIMC)
