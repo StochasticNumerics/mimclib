@@ -1,0 +1,66 @@
+\usepackage{etoolbox}
+\usepackage{mathtools}
+
+\makeatletter
+% Detect mode. mathpalette is used to detect the used math style
+\newcommand<>\Alt[3][l]{%
+  \begingroup
+    \providetoggle{Alt@before}%
+    \alt#4{\toggletrue{Alt@before}}{\togglefalse{Alt@before}}%
+    \ifbool{mmode}{%
+      \expandafter\mathpalette
+      \expandafter\math@Alt
+    }{%
+      \expandafter\make@Alt
+    }%
+    {{#1}{#2}{#3}}%
+  \endgroup
+}
+
+% Un-brace the second argument (required because \mathpalette reads the three arguments as one
+\newcommand\math@Alt[2]{\math@@Alt{#1}#2}
+
+% Set the two arguments in boxes. The math style is given by #1. \m@th sets \mathsurround to 0.
+\newcommand\math@@Alt[4]{%
+  \setbox\z@ \hbox{$\m@th #1{#3}$}%
+  \setbox\@ne\hbox{$\m@th #1{#4}$}%
+  \@Alt{#2}%
+}
+
+% Un-brace the argument
+\newcommand\make@Alt[1]{\make@@Alt#1}
+
+% Set the two arguments into normal boxes
+\newcommand\make@@Alt[3]{%
+  \sbox\z@ {#2}%
+  \sbox\@ne{#3}%
+  \@Alt{#1}%
+}
+
+% Place one of the two boxes using \rlap and place a \phantom box with the maximum of the two boxes
+\newcommand\@Alt[1]{%
+  \setbox\tw@\null
+  \ht\tw@\ifnum\ht\z@>\ht\@ne\ht\z@\else\ht\@ne\fi
+  \dp\tw@\ifnum\dp\z@>\dp\@ne\dp\z@\else\dp\@ne\fi
+  \wd\tw@\ifnum\wd\z@>\wd\@ne\dimexpr\wd\z@/2\relax\else\dimexpr\wd\@ne/2\relax\fi
+  %
+  \ifstrequal{#1}{l}{%
+    \rlap{\iftoggle{Alt@before}{\usebox\z@}{\usebox\@ne}}%
+    \copy\tw@
+    \box\tw@
+  }{%
+    \ifstrequal{#1}{c}{%
+      \copy\tw@
+      \clap{\iftoggle{Alt@before}{\usebox\z@}{\usebox\@ne}}%
+      \box\tw@
+    }{%
+      \ifstrequal{#1}{r}{%
+        \copy\tw@
+        \box\tw@
+        \llap{\iftoggle{Alt@before}{\usebox\z@}{\usebox\@ne}}%
+      }{%
+      }%
+    }%
+  }%
+}
+\makeatother

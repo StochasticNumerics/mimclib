@@ -1,11 +1,10 @@
-
 """
 This file contains an example of a mimclib run.
 The example solves a geometric Brownian motion SDE
 with a given constant drift and volatility, with
 given initial value and from zero to a given final value.
 
-This file does NOT contain any parallel programming, but is 
+This file does NOT contain any parallel programming, but is
 sequential.
 
 In case of doubt, run the commands produced in echo_test_cmd.py.
@@ -59,8 +58,7 @@ try:
         return output
 
 except:
-    raise
-    warnings.warn("Using Python (very slow) version for wcumsum. Consider running make")
+    warnings.warn("Using Python's (very slow) version for wcumsum. Consider running make")
     # wcumsum is like cumsum, but weighted.
     wcumsum = python_cumsum
 
