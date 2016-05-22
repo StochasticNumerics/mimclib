@@ -36,7 +36,6 @@
 \providecommand{\intlim}[2]{{\ensuremath{ \int_{ \{ #1 \::\: #2 \}} }}}
 \providecommand{\sumlim}[2]{{\ensuremath{ \sum_{ \{ #1 \::\: #2 \}} }}}
 
-\providecommand{\eqdef}{{\ensuremath{ := } }}
 \providecommand{\rd}{{{\red{\ensuremath{d}}}}}
 
 %\providecommand{\indset}{{\ensuremath{ I }}}
@@ -48,7 +47,7 @@
 \providecommand{\estS}{{\ensuremath{ \Delta S }}}
 \providecommand{\myref}[1]{{\blue{\bf#1}}}
 \providecommand{\vg}{{\ensuremath{V_0}}}
-\providecommand{\work}{\ensuremath{W}}
+\providecommand{\work}[1]{{\ensuremath{\mathrm{Work}}\mspace{-2mu}\left[#1\right]}}% Work
 
 \providecommand{\workEst}{{\ensuremath{ \widetilde W }}}
 \providecommand{\workRem}{{\ensuremath{ \widetilde W_1 }}}
@@ -90,11 +89,8 @@
 %\hspace{4cm} \insertframenumber/\inserttotalframenumber
 \title[\lib\ {[Haji-Ali]}]
 {\lib}
-\subtitle{Our in-house UQ library}
 \author{
-\underline{Abdul-Lateef~Haji-Ali}
-\and
-Ra\'{u}l Tempone
+Abdul-Lateef~Haji-Ali
 }
 \institute{
 King Abdullah University of Science and Technology (KAUST), Saudi
@@ -114,6 +110,12 @@ Arabia.
 
 %\logo{\includegraphics[scale=0.11]{kaust_logo2}\vspace{99900pt}}
 
+\usepackage{src/Alt}
+\usepackage{src/cmnmath}
+
+\newcommand{\estmc}[1]{\mathcal A_{\textnormal{MC}}\en[]{#1}}
+\newcommand{\estmlmc}[1]{\mathcal A_{\textnormal{MLMC}}\en[]{#1}}
+\providecommand{\func}{g}
 %%% Local Variables:
 %%% mode: latex
 %%% TeX-master: "../main"

@@ -39,6 +39,8 @@ def RunStandardTest(fnSampleLvl=None,
                     lambda v: v.lower() in ("yes", "true", "t", "1"))
     parser.add_argument("-db_user", type=str,
                         action="store", help="Database User")
+    parser.add_argument("-db_password", type=str,
+                        action="store", help="Database password")
     parser.add_argument("-db_host", type=str, default='localhost',
                         action="store", help="Database Host")
     parser.add_argument("-db_tag", type=str, default="NoTag",
@@ -61,11 +63,14 @@ def RunStandardTest(fnSampleLvl=None,
 
     fnItrDone = None
     if mimcRun.params.db:
+        db_args = {}
         if hasattr(mimcRun.params, "db_user"):
-            db = mimcdb.MIMCDatabase(user=mimcRun.params.db_user,
-                                     host=mimcRun.params.db_host)
-        else:
-            db = mimcdb.MIMCDatabase(host=mimcRun.params.db_host)
+            db_args["user"] = mimcRun.params.db_user
+        if hasattr(mimcRun.params, "db_password"):
+            db_args["passwd"] = mimcRun.params.db_password
+        if hasattr(mimcRun.params, "db_host"):
+            db_args["host"] = mimcRun.params.db_host
+        db = mimcdb.MIMCDatabase(**db_args)
         run_id = db.createRun(mimc_run=mimcRun,
                               tag=mimcRun.params.db_tag)
         fnItrDone = lambda *a: db.writeRunData(run_id, mimcRun, *a)
