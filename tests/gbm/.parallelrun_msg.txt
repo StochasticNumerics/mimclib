@@ -17,7 +17,9 @@ are of help to the growing user base,
 and help us develop mimclib further.
 
 In case the following run terminates successfully, the next thing you might
-want to look at is plotting.
+want to look at is plotting. This script typically runs for hours, in case
+you want to abort it, you may do so by typincg ctrl+c repeatedly in terminal
+or throug a killsignal.
 
 We wish you a pleasant day of simulations.
 
