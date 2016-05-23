@@ -14,24 +14,32 @@ Command:
 4. Create the database `python -c 'from mimclib.db import MIMCDatabase; print MIMCDatabase().DBCreationScript();' | mysql -u root -p`
 5. If you don't have a mySQL user, create one and give it appropriate privileges `echo -e "CREATE USER '$USER'@'%';\nGRANT ALL PRIVILEGES ON mimc.* TO '$USER'@'%' WITH GRANT OPTION;" | mysql -u root -p`
 
-## Running the GBM Example:
+## Running the GBM Example
 
 ### Single run without the mySQL backend
 
-In the directory tests/gbm, run `./single_run_example`
+In the directory
+[tests/gbm](https://github.com/StochasticNumerics/mimclib/tree/master/tests/gbm),
+run `./single_run_example`
 
 ### Parallel runs, storing the results into mySQL
 
-In the directory tests/gbm run `./parallel_run_example`
+In the directory
+[tests/gbm](https://github.com/StochasticNumerics/mimclib/tree/master/tests/gbm)
+run `./parallel_run_example`
 
-This generates run commands using echo_test_cmd.py,
-and pipelines it to parallel. Each of the commands will
+This generates run commands using
+[echo_test_cmd.py](https://github.com/StochasticNumerics/mimclib/blob/master/tests/gbm/echo_test_cmd.py),
+and pipelines it to
+[parallel](https://www.gnu.org/software/parallel/).
+Each of the commands will
 have a separate random seed and parallel will run them
 asynchronously storing the results in the database with
 the database identifier tag Parallelrun_example.
 
 There are multiple additional tags that can be passed to
-./mimc_run.py, including the initial value of the geometric
+[./mimc_run.py](https://github.com/StochasticNumerics/mimclib/blob/master/tests/gbm/mimc_run.py),
+including the initial value of the geometric
 Brownian walk, final time and others. Feel free to experiment
 with these, but if you do, remember to change the database
 identifier tag db_tag from Parallelrun_example. Failure
@@ -40,9 +48,15 @@ being stored in the database with identical tags.
 
 ## Running your own examples
 
-Following the example in tests/gbm, you can copy the example directory
+Following the example in
+[tests/gbm](https://github.com/StochasticNumerics/mimclib/tree/master/tests/gbm),
+you can copy the example directory
 and generate your own ideas based on that. You can replace the 
-function mySampleQoI in mimc_run.py with your own implementation.
+function
+[mySampleQoI](https://github.com/StochasticNumerics/mimclib/blob/master/tests/gbm/mimc_run.py#L65)
+in
+[mimc_run.py](https://github.com/StochasticNumerics/mimclib/blob/master/tests/gbm/mimc_run.py)
+with your own implementation.
 
 Your implementation needs to return a numpy array with dimensions
 Mxl where M is the input parameter describing the sample size
@@ -53,10 +67,16 @@ corresponding to the jth element of the input parameter inds. All
 elements in the same column of the array will need to correspond to
 the same element in the probability space.
 
+Naturally, if you are not the geometric Brownian motion solver, you can remove
+the compiled version of the code in
+[mimc_run.py](https://github.com/StochasticNumerics/mimclib/blob/master/tests/gbm/mimc_run.py#L41)
+
 If your problem features convergence rates different from the
 geometric brownian walk, remember to adjust these accordingly in
-./echo_test_cmd.py, the most relevant command line parameters here are
-mimc_dim 1, mimc_w 1, mimc_s 1, mimc_gamma and mimc_beta.
+your copy of
+[echo_test_cmd.py](https://github.com/StochasticNumerics/mimclib/blob/master/tests/gbm/echo_test_cmd.py).
+The most relevant command line parameters here are
+[mimc_dim 1, mimc_w 1, mimc_s 1, mimc_gamma and mimc_beta.](https://github.com/StochasticNumerics/mimclib/blob/master/tests/gbm/echo_test_cmd.py#L18)
 
 
 ### Plotting
