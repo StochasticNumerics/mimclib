@@ -6,7 +6,7 @@
 Command:
 `wget https://raw.githubusercontent.com/StochasticNumerics/mimclib/master/mimc_install.sh && bash mimc_install.sh`
 
-### On a generic GNU/Linux system:
+### On a generic GNU/Linux system
 
 1. Install Dependencies: python-pip mysql-server mysql-client libmysqlclient-dev build-essential ipython libpng-dev libfreetype6-dev libxft-dev libpython-dev liblapack-dev libblas-dev gfortran parallel numpy matplotlib scipy mysql-python (Package names may be slightly different in your particular platform)
 2. Clone this repository `https://github.com/StochasticNumerics/mimclib.git`
@@ -81,6 +81,15 @@ The most relevant command line parameters here are
 
 ### Plotting
 
+The essential plotting routine for mimclib can be found at
+[tests/plot_data.py](https://github.com/StochasticNumerics/mimclib/blob/master/tests/plot_data.py).
+This script generates a booklet of different plots describing the convergence and other
+characteristics of a mimc run.
+
+A flavour of how to use plot_data.py for the runs generated in the
+[GBM problem](https://github.com/StochasticNumerics/mimclib#parallel-runs-storing-the-results-into-mysql),
+one may run the command
+`./plot_example` in the directory tests/gbm.
 
 
 ### TODO
