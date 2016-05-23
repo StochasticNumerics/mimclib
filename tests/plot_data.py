@@ -42,7 +42,6 @@ def main():
     db_args = dict()
     if args.db_name is not None:
         db_args["db"] = args.db_name
-    print(args.db_name)
     if args.db_user is not None:
         db_args["user"] = args.db_user
     if args.db_host is not None:
