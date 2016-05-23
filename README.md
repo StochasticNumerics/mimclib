@@ -100,11 +100,11 @@ one may run the command
 ## License
 
 Code in this repository is released under
-(GNU General Public License 2.0)[https://github.com/StochasticNumerics/mimclib/blob/master/LICENSE]
+[GNU General Public License 2.0](https://github.com/StochasticNumerics/mimclib/blob/master/LICENSE)
 
 ## References
 
-(Multi Index Monte Carlo: When Sparsity Meets Sampling)[http://link.springer.com/article/10.1007/s00211-015-0734-5]
+[Multi Index Monte Carlo: When Sparsity Meets Sampling](http://link.springer.com/article/10.1007/s00211-015-0734-5)
 
 
 
