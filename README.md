@@ -1,3 +1,9 @@
+# MIMClib
+
+MIMClib is open source library for UQ problems written mainly in Python.
+The library aims to give the user an easy to use, customizable and extendable
+library to solve a wide class of stochastic problems subject to 
+error tolerance efficiently.
 
 ## Installing
 
@@ -79,7 +85,7 @@ The most relevant command line parameters here are
 [mimc_dim 1, mimc_w 1, mimc_s 1, mimc_gamma and mimc_beta.](https://github.com/StochasticNumerics/mimclib/blob/master/tests/gbm/echo_test_cmd.py#L18)
 
 
-### Plotting
+## Plotting
 
 The essential plotting routine for mimclib can be found at
 [tests/plot_data.py](https://github.com/StochasticNumerics/mimclib/blob/master/tests/plot_data.py).
@@ -91,16 +97,14 @@ A flavour of how to use plot_data.py for the runs generated in the
 one may run the command
 `./plot_example` in the directory tests/gbm.
 
+## License
 
-### TODO
-0. This README
-1. Move features and plots from old code (CMLMC and MIMC)
-2. Implement vector quantities of interest
-3. Logical checks on the convergence of the variance, work and
-   expectation while MLMC is running and printing useful messages to
-   indicate possible solutions. Also a check if TOL << QoI.
-4. Computing and using the kurtosis when possible to give a confidence
-   interval for the variance.
-5. Implementing some form of parallelization support.
-6. Adaptive construction of the MIMC set.
-7. Implement a storing mechanism in files instead of database.
+Code in this repository is released under
+(GNU General Public License 2.0)[https://github.com/StochasticNumerics/mimclib/blob/master/LICENSE]
+
+## References
+
+(Multi Index Monte Carlo: When Sparsity Meets Sampling)[http://link.springer.com/article/10.1007/s00211-015-0734-5]
+
+
+
