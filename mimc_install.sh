@@ -26,7 +26,7 @@
 echo -e "First, update existing packages..."
 
 sudo apt-get update
-sudo apt-get upgrade
+sudo apt-get upgrade    
 
 echo -e "Existing packages upgraded."
 echo -e "Installing packages..."
