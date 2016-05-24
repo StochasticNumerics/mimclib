@@ -26,11 +26,11 @@ class SField(object):
         lib.SFieldGetN.restype = ct.c_ulong
 
         lib.SFieldCreate.argtypes = [ct.c_voidp]
-        lib.SFieldBeginRuns.argtypes = [ct.c_voidp, arr_double,
-                                        arr_uint, ct.c_uint]
+        lib.SFieldBeginRuns.argtypes = [ct.c_voidp, arr_uint, ct.c_uint]
         lib.SFieldEndRuns.argtypes = [ct.c_voidp]
         lib.SFieldSolveFor.argtypes = [ct.c_voidp, arr_double,
-                                       ct.c_uint, ct.c_void_p]
+                                       ct.c_uint, arr_double,
+                                       ct.c_uint]
         lib.SFieldDestroy.argtypes = [ct.c_voidp]
         lib.SFieldGetDim.argtypes = [ct.c_voidp]
         lib.SFieldGetN.argtypes = [ct.c_voidp]
@@ -49,16 +49,16 @@ class SField(object):
     def GetN(self):
         return SField.lib.SFieldGetN(self.ref)
 
-    def BeginRuns(self, mods, nelem):
+    def BeginRuns(self, nelem):
         # The following nelem insures nestedness
-        mods = np.array(mods, dtype=np.double)
         qoi_dim = self.GetDim()
+        self.nelem = nelem
         nelem = nelem.astype(np.uint32)
         assert(nelem.shape[1] == 1 or nelem.shape[1] == qoi_dim)
         if nelem.shape[1] == 1 and qoi_dim != 1:
             nelem = np.tile(nelem, qoi_dim)
         self.checkErrCode(SField.lib.SFieldBeginRuns(self.ref,
-                                                     mods, nelem,
+                                                     nelem,
                                                      nelem.shape[0]))
 
     def EndRuns(self):
@@ -71,14 +71,13 @@ class SField(object):
         return self
 
     def SolveFor(self, Y):
-        goal = ct.c_double()
+        goal = np.zeros(len(self.nelem))
         Y = np.array(Y)
         assert(Y.shape[0] == self.GetN())
-        self.checkErrCode(SField.lib.SFieldSolveFor(self.ref,
-                                                    Y,
-                                                    Y.shape[0],
-                                                    ct.byref(goal)))
-        return goal.value
+        self.checkErrCode(SField.lib.SFieldSolveFor(self.ref, Y,
+                                                    Y.shape[0], goal,
+                                                    len(goal)))
+        return goal
 
     def Sample(self):
         Y = self.random_gen.uniform(-np.sqrt(3), np.sqrt(3), size=self.GetN())

@@ -16,6 +16,15 @@ typedef unsigned long long int uint64;
 typedef unsigned short ind_t;
 typedef unsigned int uint32;
 void GenTDSet(ind_t d, ind_t base, ind_t *td_set, uint32 count);
+#pragma GCC visibility push(default)
+PetscErrorCode SFieldCreate(SField *);
+int SFieldBeginRuns(SField, const unsigned int*, unsigned int);
+int SFieldSolveFor(SField, double *, unsigned int, double *, int);
+int SFieldEndRuns(SField);
+int SFieldGetN(SField sfv);
+int SFieldGetDim(SField sfv);
+int SFieldDestroy(SField *);
+#pragma GCC visibility pop
 
 struct RunData {
     Mat J;
@@ -289,8 +298,7 @@ double Integrate(Vec U, int *pt, int i, CRunContext ctx) {
 }
 
 
-int SFieldBeginRuns(SField sfv, const double *modifier,
-                    const unsigned int *nelem, unsigned int count) {
+int SFieldBeginRuns(SField sfv, const unsigned int *nelem, unsigned int count) {
     mySField sf = (mySField)sfv;
     int i,j;
     assert(!sf->running);
@@ -303,7 +311,6 @@ int SFieldBeginRuns(SField sfv, const double *modifier,
         r->timeAssembly = 0;
         r->timeSolver = 0;
         r->sf  = sf;
-        r->modifier = modifier[i];
 
         // Create sparse Matrix of size prod(mesh)
         Mat J; Vec F; Vec U;
@@ -439,10 +446,13 @@ void JacobianOnD(Mat J, Vec F, int i, int* pt, CRunContext ctx){
 /* } */
 
 int SFieldSolveFor(SField sfv, double *Y,
-                   unsigned int yCount, double *goal) {
+                   unsigned int yCount,
+                   double *goals,
+                   int goals_size) {
     mySField sf = (mySField)sfv;
     assert(yCount == sf->N);
-    assert(Y && goal);
+    assert(goals_size >= sf->running);
+    assert(Y && goals);
 
     sf->Y = Y;
 
@@ -451,7 +461,6 @@ int SFieldSolveFor(SField sfv, double *Y,
     PetscErrorCode ierr;
     // -------------- SOLVE
     int i;
-    double g = 0;
     for (i=0;i<sf->running;i++)
     {
         RunContext r = &sf->run_data[i];
@@ -479,30 +488,9 @@ int SFieldSolveFor(SField sfv, double *Y,
         PetscTime(&toc);
         r->timeSolver  += toc-tic;
 
-        /* Vec l; */
-        /* double scaler; */
-        /* VecDuplicate(r->F,&l); */
-        /* MatMult(r->J, r->U, l); */
-        /* VecAXPY(l, -1, r->F); */
-        /* VecNorm(l, NORM_1, &scaler); */
-        /* printf("SUM: %.12e\n", scaler); */
-
-        /* double x[1]; */
-        /* printf("%d \n\n", pt[0]<r->mesh[0]); */
-        /* for (pt[0] = 1;pt[0]<=r->mesh[0];pt[0]++){ */
-        /*     int lr = linIdx_Sys(sf->d, r->mesh, pt,0,0); */
-        /*     double Ux; */
-        /*     getPoint(pt, x, r); */
-        /*     VecGetValues(r->U,1,&lr,&Ux); */
-        /*     printf("\nX=%.12f, U=%.12f\n", x[0], Ux); */
-        /* } */
-        /* printf("\n\n"); */
-        //VecView(r->U, PETSC_VIEWER_STDOUT_SELF);
-        double value;
-        value = Integrate(r->U,pt,0,r);
-        g += r->modifier*value;
+        *goals = Integrate(r->U,pt,0,r);
+        goals++;
     }
-    *goal = g;
     return 0;
 }
 

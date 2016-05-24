@@ -40,8 +40,8 @@ public:
         s_g_bar_rates(s_g_bar_rates, s_g_bar_rates+maxN) {
     }
 
-    void CalcLogEW(const mul_ind_t &cur, double& lE, double& lW){
-        assert(cur.size() <= MaxDim());
+    void calc_log_EW(const mul_ind_t &cur, double& lE, double& lW){
+        assert(cur.size() <= max_dim());
         double d_work=0, d_error=0;
         double s_work=0, s_error_chi=0, s_error_theta=0;
         unsigned int d = d_err_rates.size();
@@ -66,7 +66,7 @@ public:
         lW = d_work + s_work;
         lE = s_error_chi + std::min(s_error_theta, d_error);
     }
-    ind_t MaxDim(){
+    ind_t max_dim(){
         return d_err_rates.size() + s_g_rates.size();
     }
 private:
@@ -81,16 +81,16 @@ public:
     AnisoProfitCalculator(ind_t d, const double *_wE, const double *_wW) :
         wE(_wE, _wE+d), wW(_wW, _wW+d){
     }
-    void CalcLogEW(const mul_ind_t &cur, double& lE, double& lW){
+    void calc_log_EW(const mul_ind_t &cur, double& lE, double& lW){
         static const int SET_BASE = SparseMIndex::SET_BASE;
-        assert(cur.size() <= MaxDim());
+        assert(cur.size() <= max_dim());
         lW = lE = 0;
         for (auto itr=cur.begin();itr!=cur.end();itr++){
             lW += (itr->value-SET_BASE)*wW[itr->ind];
             lE += (itr->value-SET_BASE)*wE[itr->ind];
         }
     }
-    ind_t MaxDim(){
+    ind_t max_dim(){
         return wE.size();
     }
 private:
@@ -151,73 +151,6 @@ void TensorGrid(ind_t d, ind_t base,
     }
 }
 
-// void GetLevelBoundaries(const PVarSizeList pset,
-//                         const uint32 *levels, uint32 levels_count,
-//                         int32 *inner_bnd, bool *inner_real_lvls){
-//     /////// TODO: The following code does not work with variable size sets.
-//     const VarSizeList& set = *pset;
-//     // std::cout << std::endl << std::endl << set.count() << std::endl;
-//     // for (int i=0;i<set.count();i++)
-//     //     std::cout << limits[i*2] << "," << limits[i*2+1]  << " " << set.get(i) << std::endl;
-//     std::vector<ind_t> bnd_neigh = std::vector<ind_t>(set.count(), 0);
-//     uint32 start = 0;
-//     ind_t max_d = set.max_dim();
-//     for (unsigned int i=0;i<levels_count;i++){
-//         uint32 tmp = i==0 ? 0 : levels[i-1];   // Beginning of level set
-//         for (uint32 k=tmp;k<levels[i];k++){
-//             // Update Neighbors
-//             auto cur = set.get(k);
-//             for (unsigned int j=0;j<cur.size();j++){
-//                 if (cur[j] == SET_BASE) continue;
-//                 cur.step(j, -1);
-//                 uint32 index;
-//                 if (set.find_ind(cur, index))
-//                     bnd_neigh[index]++;
-//                 cur.step(j, 1);
-//             }
-//         }
-//         // Copy to inner_bnd
-//         uint32 first = 0;
-//         for (uint32 k=levels[i];k>start;k--){
-//             if (bnd_neigh[k-1] < max_d){
-//                 first = k-1;
-//                 inner_bnd[k-1] = i;
-//             }
-//         }
-//         start = first;
-//     }
-//     // Check if levels are "real", i.e. they actually reduce the error
-//     inner_real_lvls[0] = true;
-//     int prev_lvl = 0;
-//     for (unsigned int i=1;i<levels_count;i++){
-//         inner_real_lvls[i] = false;
-//         // TODO: We can probably optimize so that we don't have to visit
-//         // all the indices
-//         for (unsigned int k=0;k<levels[i] && !inner_real_lvls[i];k++){
-//             // (inner_bnd[k] >= i)  (inner_bnd[k] >= prev_lvl)
-//             //      True               True                 -> False (Both levels have the same bnd)
-//             //      True               False                -> False (Current level adds to bnd)
-//             //      False              True                 -> True  (Current level removes from bnd)
-//             //      False              False                -> False (Current level does not change bnd)
-//             inner_real_lvls[i] = ((inner_bnd[k] < static_cast<int>(i)) &&
-//                                   (inner_bnd[k] >= prev_lvl));
-//         }
-//         if (inner_real_lvls[i])
-//             prev_lvl = i;
-//     }
-
-//     // Always include the last level
-//     inner_real_lvls[levels_count-1] = true;
-// }
-
-// void GetBoundaryInd(uint32 setSize, uint32 l, int32 i,
-//                     int32* sel, int32* inner_bnd, bool* bnd_ind){
-//     // bnd_ind[self.sel][np.logical_and(self.inner_bnd >= self.i, inds < self.l)] = True
-//     for (unsigned int j=0;j<setSize && j < l;j++){
-//         bnd_ind[sel[j]] = (inner_bnd[j] >= i);
-//     }
-// }
-
 void FreeMemory(void **data)
 {
     free(*data);
@@ -242,9 +175,9 @@ bool compare_setprof(const setprof_t& first, const setprof_t& second)
 PVarSizeList GetIndexSet(const PProfitCalculator profCalc,
                          double max_prof,
                          double **p_profits) {
-    ind_t max_d = profCalc->MaxDim();
+    ind_t max_d = profCalc->max_dim();
     ind_mul_ind_t ind_set;
-    ind_set.push_back(setprof_t(mul_ind_t(), profCalc->CalcLogProf(mul_ind_t())));
+    ind_set.push_back(setprof_t(mul_ind_t(), profCalc->calc_log_prof(mul_ind_t())));
 
     double cur_prof;
     ind_mul_ind_t::iterator itrCur = ind_set.begin();
@@ -255,7 +188,7 @@ PVarSizeList GetIndexSet(const PProfitCalculator profCalc,
 
             ind_t cur_size = itrCur->size;
             cur_ind.step(cur_size);
-            while ((cur_prof=profCalc->CalcLogProf(cur_ind)) <= max_prof){
+            while ((cur_prof=profCalc->calc_log_prof(cur_ind)) <= max_prof){
                 ind_set.push_back(setprof_t(cur_ind, cur_prof));
                 cur_ind.step(cur_size);
             }
@@ -327,24 +260,51 @@ void GenTDSet(ind_t d, ind_t base, ind_t *td_set, uint32 count){
 /// C-Accessors to C++ methods
 double GetMinOuterProfit(const PVarSizeList pset,
                          const PProfitCalculator profCalc){
-    return pset->GetMinOuterProfit(profCalc);
+    return pset->get_min_outer_profit(profCalc);
 }
 
 void CalculateSetProfit(const PVarSizeList pset,
                         const PProfitCalculator profCalc,
                         double *log_error, double *log_work){
-    pset->CalculateSetProfit(profCalc, log_error, log_work, pset->count());
+    pset->calc_set_profit(profCalc, log_error, log_work, pset->count());
 }
 
 
 void CheckAdmissibility(const PVarSizeList pset, ind_t d_start, ind_t d_end,
                         bool *admissible){
-    pset->CheckAdmissibility(d_start, d_end, admissible, pset->count());
+    pset->check_admissibility(d_start, d_end, admissible, pset->count());
 }
 
 void MakeProfitsAdmissible(const PVarSizeList pset, ind_t d_start, ind_t d_end,
                            double *pProfits){
-    pset->MakeProfitsAdmissible(d_start, d_end, pProfits, pset->count());
+    pset->make_profits_admissible(d_start, d_end, pProfits, pset->count());
+}
+
+PVarSizeList VarSizeList_expand_set(const PVarSizeList pset,
+                                    const double* error,
+                                    const double* work,
+                                    uint32 count,
+                                    ind_t dimLookahead){
+    PVarSizeList result = new VarSizeList();
+    *result = pset->expand_set(error, work, count, dimLookahead);
+    return result;
+}
+
+PVarSizeList VarSizeList_copy(const PVarSizeList lhs){
+    if (lhs)
+        return new VarSizeList(*lhs);
+    PVarSizeList pset = new VarSizeList();
+    return pset;
+}
+PVarSizeList VarSizeList_set_diff(const PVarSizeList lhs, const PVarSizeList rhs){
+    PVarSizeList result = new VarSizeList();
+    *result = lhs->set_diff(*rhs);
+    return result;
+}
+PVarSizeList VarSizeList_set_union(const PVarSizeList lhs, const PVarSizeList rhs){
+    PVarSizeList result = new VarSizeList();
+    *result = lhs->set_union(*rhs);
+    return result;
 }
 
 
@@ -435,4 +395,17 @@ int VarSizeList_find(const PVarSizeList pset, ind_t *j, ind_t *data,
     uint32 index;
     bool bfound = pset->find_ind(SparseMIndex(j, data, size), index);
     return bfound?index:-1;
+}
+
+void VarSizeList_get_adaptive_order(const PVarSizeList pset,
+                                    const double *error,
+                                    const double *work,
+                                    uint32 *adaptive_order,
+                                    uint32 count,
+                                    ind_t seedLookahead){
+    pset->get_adaptive_order(error, work, adaptive_order, count, seedLookahead);
+}
+
+void VarSizeList_check_errors(const PVarSizeList pset, const double *errors, bool* strange, uint32 count){
+    pset->check_errors(errors, strange, count);
 }

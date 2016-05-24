@@ -15,7 +15,7 @@ parser.add_argument("-db_host", type=str, action="store",
 
 args = parser.parse_known_args()[0]
 dim = args.mimc_dim
-base = "run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  -mimc_dim {dim} -qoi_seed {seed} -qoi_dim 3 \
+base = "mimc_run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  -mimc_dim {dim} -qoi_seed {seed} -qoi_dim 3 \
 -qoi_x0 0.3,0.2,0.6 -qoi_sigma 0.16 -qoi_scale 1 -ksp_rtol 1e-25 \
 -mimc_theta 0.2 -qoi_scale 50 \
 -ksp_type gmres -mimc_w {w} -mimc_s {s} -mimc_gamma {gamma} -mimc_beta {beta} \

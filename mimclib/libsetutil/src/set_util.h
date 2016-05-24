@@ -14,6 +14,8 @@ extern "C"{
     typedef unsigned int bool;
 #endif
 
+    void VarSizeList_check_errors(const PVarSizeList, const double *errors, bool* strange, uint32 count);
+
     PProfitCalculator GetMISCProfit(ind_t d, ind_t maxN,
                          const double *d_err_rates, const double *d_work_rates,
                          const double *s_g_rates, const double *s_g_bar_rates);
@@ -27,6 +29,18 @@ extern "C"{
     void MakeProfitsAdmissible(const PVarSizeList, ind_t d_start, ind_t d_end,
                                double *pProfits);
 
+    PVarSizeList VarSizeList_expand_set(const PVarSizeList pset,
+                                        const double* error, const double* work,
+                                        uint32 count, ind_t dimLookahead);
+    PVarSizeList VarSizeList_copy(const PVarSizeList from);
+    PVarSizeList VarSizeList_set_diff(const PVarSizeList lhs, const PVarSizeList rhs);
+    PVarSizeList VarSizeList_set_union(const PVarSizeList lhs, const PVarSizeList rhs);
+    void VarSizeList_get_adaptive_order(const PVarSizeList pset,
+                                        const double *error,
+                                        const double *work,
+                                        uint32 *adaptive_order,
+                                        uint32 count,
+                                        ind_t seedLookahead);
     /* void GetLevelBoundaries(const PVarSizeList, const uint32 *levels, */
     /*                         uint32 levels_count, int32 *inner_bnd, */
     /*                         bool *inner_real_lvls); */
@@ -36,6 +50,10 @@ extern "C"{
 
     PVarSizeList GetIndexSet(const PProfitCalculator profCalc,
                              double max_prof, double **p_profits);
+
+    void GetAdaptiveOrder(const PVarSizeList,
+                          double *log_profits,
+                          uint32 *out_order);
 
     void GenTDSet(ind_t d, ind_t base, ind_t *td_set, uint32 count);
     void TensorGrid(ind_t d, ind_t base, const ind_t *m, ind_t* tensor_grid,

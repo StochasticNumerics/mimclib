@@ -15,6 +15,9 @@ static inline double sign(double x) {return x>0?1:-1;}
 void legendre_quadrature(int *n, const double **points, const double **weights);  // Over interval [-1,1] with pdf 1/4
 void hermite_quadrature(int *n, const double **points, const double **weights);   // Over interval [-inf,inf] with pdf exp(-x^2)
 
+#pragma GCC visibility push(default)
 void myPetscInit(int argc, char *argv[]);
 void myPetscFinal();
+#pragma GCC visibility pop
+
 #endif

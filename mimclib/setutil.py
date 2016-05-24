@@ -137,11 +137,41 @@ __lib__.VarSizeList_find.restype = ct.c_int32
 __lib__.VarSizeList_find.argtypes = [ct.c_voidp, __arr_ind_t__,
                                      __arr_ind_t__, __ct_ind_t__]
 
+__lib__.VarSizeList_expand_set.restype = ct.c_voidp
+__lib__.VarSizeList_expand_set.argtypes = [ct.c_voidp, __arr_double__,
+                                           __arr_double__,
+                                           ct.c_uint32, __ct_ind_t__]
+__lib__.VarSizeList_set_diff.restype = ct.c_voidp
+__lib__.VarSizeList_set_diff.argtypes = [ct.c_voidp, ct.c_voidp]
+__lib__.VarSizeList_set_union.restype = ct.c_voidp
+__lib__.VarSizeList_set_union.argtypes = [ct.c_voidp, ct.c_voidp]
+
+__lib__.VarSizeList_copy.restype = ct.c_voidp
+__lib__.VarSizeList_copy.argtypes = [ct.c_voidp]
+
+__lib__.VarSizeList_get_adaptive_order.restype = None
+__lib__.VarSizeList_get_adaptive_order.argtypes = [ct.c_voidp,
+                                                   __arr_double__,
+                                                   __arr_double__,
+                                                   __arr_uint32__,
+                                                   ct.c_uint32,
+                                                   __ct_ind_t__]
+
+
+__lib__.VarSizeList_check_errors.restype = None
+__lib__.VarSizeList_check_errors.argtypes = [ct.c_voidp,
+                                             __arr_double__,
+                                             __arr_bool__,
+                                             ct.c_uint32]
+
 
 @public
 class VarSizeList(object):
-    def __init__(self, _handle, min_dim=0):
-        self._handle = _handle
+    def __init__(self, _handle=None, min_dim=0):
+        if _handle is None:
+            self._handle = __lib__.VarSizeList_copy(0)
+        else:
+            self._handle = _handle
         self.min_dim = min_dim
 
     def __del__(self):
@@ -265,19 +295,58 @@ class VarSizeList(object):
         E, W = self.CalcLogEW(U)
         return W-E
 
-    def GetAllBoundaries(C, lvls=None):
-        if lvls is None:
-            lvls = np.array([len(C)], dtype=np.uint32)
-        else:
-            lvls = np.array(lvls, dtype=np.uint32)
+    # def GetAllBoundaries(C, lvls=None):
+    #     if lvls is None:
+    #         lvls = np.array([len(C)], dtype=np.uint32)
+    #     else:
+    #         lvls = np.array(lvls, dtype=np.uint32)
 
-        inner_bnd = -1*np.ones(len(C), dtype=np.int32)
-        real_lvls = np.zeros(len(lvls), dtype=np.bool)
-        __lib__.GetLevelBoundaries(C._handle, lvls, len(lvls), inner_bnd, real_lvls)
-        return inner_bnd, real_lvls
+    #     inner_bnd = -1*np.ones(len(C), dtype=np.int32)
+    #     real_lvls = np.zeros(len(lvls), dtype=np.bool)
+    #     __lib__.GetLevelBoundaries(C._handle, lvls, len(lvls), inner_bnd, real_lvls)
+    #     return inner_bnd, real_lvls
+
+    def expand_set(self, error, work, seedLookahead=5):
+        assert(len(error) == len(self))
+        assert(len(work) == len(self))
+        return VarSizeList(__lib__.VarSizeList_expand_set(self._handle,
+                                                          np.array(error, dtype=np.float),
+                                                          np.array(work, dtype=np.float),
+                                                          len(error),
+                                                          seedLookahead),
+                           min_dim=self.min_dim)
+
+    def set_diff(self, rhs):
+        return VarSizeList(__lib__.VarSizeList_set_diff(self._handle,
+                                                        rhs._handle),
+                           min_dim=self.min_dim)
+
+    def set_union(self, rhs):
+        return VarSizeList(__lib__.VarSizeList_set_union(self._handle,
+                                                         rhs._handle),
+                           min_dim=self.min_dim)
+
+    def get_adaptive_order(self, error, work, seedLookahead=5):
+        assert(len(self) == len(error))
+        assert(len(self) == len(work))
+        adaptive_order = np.empty(len(self), dtype=np.uint32)
+        __lib__.VarSizeList_get_adaptive_order(self._handle,
+                                               error, work,
+                                               adaptive_order,
+                                               len(self),
+                                               seedLookahead)
+        return adaptive_order
+
+    def check_errors(self, errors):
+        assert(len(errors) == len(self))
+        strange = np.empty(len(self), dtype=np.bool)
+        __lib__.VarSizeList_check_errors(self._handle,
+                                         errors,
+                                         strange,
+                                         len(errors))
+        return strange
 
 
-@public
 class ProfCalculator(object):
     def GetIndexSet(self, max_prof):
         import ctypes as ct

@@ -141,6 +141,7 @@ SparseMIndex(const ind_t *j, const ind_t *ind, ind_t d) : m_max_size(0){
             return false;   // Both indices are exhausted
         return itr_a == a.end();
     }
+
 private:
     iterator begin() { return m_indices.begin(); }
     iterator end() { return m_indices.end(); }
@@ -186,16 +187,16 @@ typedef SparseMIndex mul_ind_t;
 class ProfitCalculator {
 public:
     virtual ~ProfitCalculator(){}
-    virtual void CalcLogEW(const mul_ind_t &ind, double& lE, double& lW)=0;
-    virtual double CalcLogProf(const mul_ind_t &ind) { double lE, lW; CalcLogEW(ind, lE, lW); return lW-lE;};
-    virtual ind_t MaxDim()=0;
+    virtual void calc_log_EW(const mul_ind_t &ind, double& lE, double& lW)=0;
+    virtual double calc_log_prof(const mul_ind_t &ind) { double lE, lW; calc_log_EW(ind, lE, lW); return lW-lE;};
+    virtual ind_t max_dim()=0;
 };
 
 typedef ProfitCalculator* PProfitCalculator;
 
 class VarSizeList {
 public:
-    VarSizeList(uint32 reserve=1) { m_ind_set.reserve(1); }
+ VarSizeList(uint32 reserve=1) : m_max_dim(0) { m_ind_set.reserve(1); }
     VarSizeList(const VarSizeList &set, const uint32 *idx, uint32 _count)
     {
         for (uint32 i=0;i<_count;i++){
@@ -204,14 +205,15 @@ public:
             push_back(set.m_ind_set[idx[i]]);
         }
     }
-VarSizeList(const VarSizeList &set) : m_ind_set(set.m_ind_set) , m_ind_map(set.m_ind_map)
+ VarSizeList(const VarSizeList &set) : m_ind_set(set.m_ind_set) , m_ind_map(set.m_ind_map), m_max_dim(set.m_max_dim)
     { }
 
     ind_t max_dim() const {
-        ind_t max_d = 0;
-        for (auto itr=m_ind_set.begin();itr!=m_ind_set.end();itr++)
-            max_d = std::max(max_d, itr->size());
-        return max_d;
+        return m_max_dim;
+        /* ind_t max_d = 0; */
+        /* for (auto itr=m_ind_set.begin();itr!=m_ind_set.end();itr++) */
+        /*     max_d = std::max(max_d, itr->size()); */
+        /* return max_d; */
     }
 
     const mul_ind_t& get(uint32 i) const {
@@ -248,14 +250,14 @@ VarSizeList(const VarSizeList &set) : m_ind_set(set.m_ind_set) , m_ind_map(set.m
         return m_ind_set.size();
     }
 
-    void all_dim(uint32 *dim, uint32 size){
+    void all_dim(uint32 *dim, uint32 size) const{
         assert(size >= count());
         uint32 i=0;
         for (auto itr=m_ind_set.begin();itr!=m_ind_set.end();itr++)
             dim[i++] = itr->size();
     }
 
-    void all_active_dim(uint32 *active_dim, uint32 size){
+    void all_active_dim(uint32 *active_dim, uint32 size) const{
         assert(size >= count());
         uint32 i=0;
         for (auto itr=m_ind_set.begin();itr!=m_ind_set.end();itr++)
@@ -289,24 +291,49 @@ VarSizeList(const VarSizeList &set) : m_ind_set(set.m_ind_set) , m_ind_map(set.m
         assert(!has_ind(ind));
         m_ind_set.push_back(ind);
         m_ind_map[ind] = m_ind_set.size()-1;
+        m_max_dim = std::max(m_max_dim, ind.size());
     }
 
+    bool push_back_admiss(const mul_ind_t& ind){
+        if (!this->has_ind(ind) && this->is_ind_admissible(ind)){
+            push_back(ind);
+            return true;
+        }
+        return false;
+    }
 
-    double GetMinOuterProfit(const PProfitCalculator profCalc) const;
-    void CheckAdmissibility(ind_t d_start, ind_t d_end,
+    double get_min_outer_profit(const PProfitCalculator profCalc) const;
+    void check_admissibility(ind_t d_start, ind_t d_end,
                             bool *admissible, uint32 count) const;
-    void MakeProfitsAdmissible(ind_t d_start, ind_t d_end,
+    void make_profits_admissible(ind_t d_start, ind_t d_end,
                                double *pProfits, uint32 count) const;
-    void CalculateSetProfit(const PProfitCalculator profCalc,
+    void calc_set_profit(const PProfitCalculator profCalc,
                             double *log_error,
                             double *log_work, uint32 count) const;
-    void GetLevelBoundaries(const uint32 *levels, uint32 levels_count,
-                            int32 *inner_bnd, bool *inner_real_lvls);
+    void get_level_boundaries(const uint32 *levels, uint32 levels_count,
+                              int32 *inner_bnd, bool *inner_real_lvls) const;
 
+    std::vector<ind_t> count_neighbors() const;
+
+    VarSizeList expand_set(const double *error,
+                           const double *work,
+                           uint32 count, ind_t dimLookahead) const;
+    bool is_ind_admissible(const mul_ind_t& ind) const;
+    VarSizeList set_diff(const VarSizeList& rhs) const;
+    VarSizeList set_union(const VarSizeList& rhs) const;
+
+    void get_adaptive_order(const double *error,
+                            const double *work,
+                            uint32 *adaptive_order,
+                            uint32 count,
+                            ind_t seedLookahead) const;
+
+    void check_errors(const double *errors, bool* strange, uint32 count) const;
 protected:
     typedef std::vector<mul_ind_t> ind_vector;
     ind_vector  m_ind_set;
     std::map<mul_ind_t, unsigned int> m_ind_map;
+    ind_t m_max_dim;
 };
 
 typedef VarSizeList* PVarSizeList;
