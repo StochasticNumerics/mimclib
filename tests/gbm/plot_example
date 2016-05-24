@@ -2,5 +2,4 @@
 
 cat .plot_example.txt
 
-../plot_data.py -db_tag "GBM_testcase" -o ./gbm/example_plot.pdf
-
+../plot_data.py -db_tag "GBM_testcase" -o example_plot.pdf
