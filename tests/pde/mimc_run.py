@@ -20,9 +20,11 @@ def SamplePDE(sf, run, inds, M):
     return solves, time.time() - timeStart
 
 if __name__ == "__main__":
+    import mimclib.test
+    import warnings
+    warnings.simplefilter('ignore', category=mimclib.test.ArgumentWarning)
     from pdelib.SField import SField
     SField.Init()
     with SField() as sf:
-        import mimclib.test
         mimclib.test.RunStandardTest(fnSampleLvl=lambda *a: SamplePDE(sf, *a))
     SField.Final()

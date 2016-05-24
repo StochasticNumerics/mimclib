@@ -360,7 +360,7 @@ Not needed if -bayesian is False.")
                       help="Variance in prior of the power \
 in the weak convergence model, negative values lead to disabling the fitting. \
 Not needed if -bayesian is False.")
-            add_store('bayes_fit_lvls', type=float, default=1000,
+            add_store('bayes_fit_lvls', type=int, default=1000,
                       help="Maximum number of levels used to fit data. \
 Not needed if -bayesian is False.")
 

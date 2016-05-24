@@ -12,11 +12,12 @@ class ArgumentWarning(Warning):
         return self.message
 
 
-def parse_known_args(parser, warn=True, return_unknown=False):
+def parse_known_args(parser, return_unknown=False):
     knowns, unknowns = parser.parse_known_args()
     for a in unknowns:
         if a.startswith('-'):
             warnings.warn(ArgumentWarning("Argument {} was not used!".format(a)))
+            
     if return_unknown:
         return knowns, unknowns
     return knowns
