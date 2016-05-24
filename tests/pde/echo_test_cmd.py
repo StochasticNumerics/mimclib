@@ -9,11 +9,9 @@ parser.add_argument("-multi", type="bool", action="store",
                     default=False, help="True output a single command")
 parser.add_argument("-mimc_dim", type=int, action="store",
                     default=1, help="MIMC dim")
-parser.add_argument("-db_host", type=str, action="store",
-                    default="localhost",
-                    help="True output a single command")
 
-args = parser.parse_known_args()[0]
+args, unknowns = parser.parse_known_args()
+
 dim = args.mimc_dim
 base = "mimc_run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  -mimc_dim {dim} -qoi_seed {seed} -qoi_dim 3 \
 -qoi_x0 0.3,0.2,0.6 -qoi_sigma 0.16 -qoi_scale 1 -ksp_rtol 1e-25 \
@@ -27,7 +25,9 @@ base = "mimc_run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  -mimc_dim {dim} -qoi_seed
                                    s=" ".join(["4"]*dim),
                                    beta=" ".join(["2"]*dim))
 
-cmd_multi = "python " + base + "-mimc_verbose False -db True -db_tag {tag} " + " -db_host {} ".format(args.db_host)
+base += " ".join(unknowns)
+
+cmd_multi = "python " + base + " -mimc_verbose False -db True -db_tag {tag} "
 cmd_single = "python " + base + " -mimc_verbose True -db False "
 
 if not args.multi:
