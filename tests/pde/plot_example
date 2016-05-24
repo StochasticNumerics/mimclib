@@ -1,0 +1,6 @@
+#!/bin/bash
+
+cat .plot_example.txt
+
+../plot_data.py -db_tag "Parallelrun_example" -o ./gbm/example_plot.pdf
+

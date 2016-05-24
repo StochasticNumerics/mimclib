@@ -1,0 +1,4 @@
+#!/bin/sh
+
+cat ./.parallelrun_msg.txt
+make && ./echo_test_cmd.py -multi 1 -db_tag "Parallelrun_example" | parallel -j 5
