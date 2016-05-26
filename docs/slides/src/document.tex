@@ -354,6 +354,21 @@ mysql> SET PASSWORD FOR 'USER'@'%' \
 \end{itemize}
 \end{frame}
 
+
+\section{GBM Example}
+\begin{frame}{Problem setup: Geometric Brownian Motion}
+Given $S(0), \mu$ and $\sigma$, define
+  \[
+    S(t) = S(0) + \mu \int_{0}^T S(t) \di{t} + \sigma \int_{0}^T S(t) \di{W}(t)
+\]
+
+We can find (using It\^o integral and a log transformation)
+\[\aligned
+\E{S(t)} &= S(0) e^{\mu t}\\
+\var{S(t)} &= \op*{S(0)}^2 e^{2 \mu t} \op*{e^{\sigma^2 t} - 1}
+\endaligned\]
+\end{frame}
+
 \begin{frame}{The end}
   \begin{itemize}
   \item Slides can be found on GitHub under {``docs''}
@@ -361,15 +376,10 @@ mysql> SET PASSWORD FOR 'USER'@'%' \
     \item You can post questions in the ``Issues'' page.
   \item Next time
     \begin{itemize}
-    \item Go through a simple example based on SDE of Geometric
-      Brownian Motion.
-    \item Go through a simple example based on an Elliptic PDE in
-      3D.
     \item Next, next time: Multi-index Monte Carlo applied on PDEs in
       3D.
     \end{itemize}
   \end{itemize}
-
 \end{frame}
 
 % \begin{frame}[fragile]{A typical python example for a single MLMC run}

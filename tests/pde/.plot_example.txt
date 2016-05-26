@@ -1,5 +1,0 @@
-If all goes well, this script should
-plot the relevant plots of the parallel
-mimc run. Output will be produced to
-parallel_example.pdf
-

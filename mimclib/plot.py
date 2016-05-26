@@ -349,7 +349,7 @@ def plotTotalWorkVsLvls(ax, runs_data, *args, **kwargs):
         if hasattr(curRun.run.params, "beta"):
             rate *= np.log(curRun.run.params.beta)
         ax.add_line(FunctionLine2D(lambda x, tol=TOL, r=rate: tol**-2 * np.exp(r*x),
-                                   data=total_work[:, :2],
+                                   data=np.array([lvls, total_work[:, 1]]).transpose(),
                                    linestyle='--', c='k'))
     return plotObj
 
@@ -870,6 +870,8 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     try:
         line_data, _ = plotLvlsNumVsTOL(ax, runs_data)
         if has_beta and has_w_rate and has_gamma_rate:
+            import IPython
+            IPython.embed()
             if has_beta:
                 rate = 1./np.min(np.array(params.w) * np.log(params.beta))
             else:

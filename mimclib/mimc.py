@@ -436,7 +436,7 @@ Bias={:.12e}\nStatErr={:.12e}\
         L = L or len(self.all_data.lvls)-1
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        hl = self.fnHierarchy(np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
+        hl = self.fnHierarchy(lvls=np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
         return self.Q.W * hl[-1]**self.Q.w[0]
 
     def _estimateBayesianVl(self, L=None):
@@ -446,7 +446,7 @@ Bias={:.12e}\nStatErr={:.12e}\
         L = L or oL
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        hl = self.fnHierarchy(np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
+        hl = self.fnHierarchy(lvls=np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
         M = np.concatenate((self.all_data[1:].M, np.zeros(L-oL)))
         s1 = np.concatenate((self.all_data.psums_delta[1:, 0], np.zeros(L-oL)))
         m1 = np.concatenate((self.all_data[1:].calcDeltaEl(), np.zeros(L-oL)))
@@ -471,7 +471,7 @@ Bias={:.12e}\nStatErr={:.12e}\
         L = len(self.all_data.lvls)-1
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        hl = self.fnHierarchy(np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
+        hl = self.fnHierarchy(lvls=np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
         begin = np.maximum(1, L-self.params.bayes_fit_lvls)
         M = self.all_data[begin:].M
         # m1 = self.all_data[begin:].calcDeltaEl()
@@ -500,7 +500,7 @@ estimate optimal number of levels"
             bias_est = self._estimateBayesianBias(L)
             if bias_est >= TOL and L < LsRange[-1]:
                 continue
-            Wl = self.fnWorkModel(np.arange(0, L+1).reshape((-1, 1)))
+            Wl = self.fnWorkModel(lvls=np.arange(0, L+1).reshape((-1, 1)))
             M = self._calcTheoryM(TOL,
                                   theta=self._calcTheta(TOL, bias_est),
                                   Vl=self._estimateBayesianVl(L), Wl=Wl)
@@ -515,7 +515,7 @@ estimate optimal number of levels"
         self._estimateQParams()
         self.Vl_estimate = self.all_data.calcDeltaVl() if not self.params.bayesian \
                            else self._estimateBayesianVl()
-        self.Wl_estimate = self.fnWorkModel(self.data.lvls)
+        self.Wl_estimate = self.fnWorkModel(lvls=self.data.lvls)
         self.bias = self._estimateBias()
         self.stat_error = np.inf if np.any(self.data.M == 0) \
                           else self.params.Ca * \
@@ -536,7 +536,7 @@ estimate optimal number of levels"
         psums_fine = np.zeros((len(p)))
         while calcM < M:
             curM = np.minimum(M-calcM, self.params.maxM)
-            values, time = self.fnSampleLvl(inds, curM)
+            values, time = self.fnSampleLvl(inds=inds, M=curM)
             total_time += time
             # TODO: Consider moving to C/C++
             # psums_delta_j = \sum_{i} (\sum_{k} mod_k values_{i,k})**p_j
@@ -660,7 +660,7 @@ estimate optimal number of levels"
                 print("{} took {}".format(TOL, totalTime))
                 print("################################################")
             if self.fnItrDone:
-                self.fnItrDone(itrIndex, TOL, totalTime)
+                self.fnItrDone(iteration_idx=itrIndex, TOL=TOL, totalTime=totalTime)
             if isclose(TOL, finalTOL) and self.totalErrorEst() < finalTOL:
                 break
 

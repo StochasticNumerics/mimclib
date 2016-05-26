@@ -1,4 +1,28 @@
 #!/bin/sh
 
-cat ./.parallelrun_msg.txt
-make && ./echo_test_cmd.py -multi 1 | parallel -j 11
+echo "\
+This script runs a batch of mimc runs of the GBM example in parallel.
+
+Please try out running the single sequential run first, as it depends
+on much fewer dependencies. In case you face problems running the
+parallel example, but not the single example, make sure that:
+
+1. You have MySQL running on your machine with appropriate access rights
+2. You have GNU parallel installed
+
+In case you have problems, please consult the issue tracker at:
+https://github.com/StochasticNumerics/mimclib/issues?utf8=%E2%9C%93&q=is%3Aissue+
+
+In case you are facing a previously unreported issue, we strongly
+encourage you to submit an issue, as they are of help to the growing
+user base, and help us develop mimclib further.
+
+In case the following run terminates successfully, the next thing you
+might want to look at is plotting (using tests/plot_data.py). This
+script typically runs for hours, in case you want to abort it, you may
+do so by typincg ctrl+c repeatedly in terminal or through a killsignal.
+
+We wish you a pleasant day of simulations.\
+"
+
+make && ./echo_test_cmd.py -multi 1  $@ | parallel -j 11

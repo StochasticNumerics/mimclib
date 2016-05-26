@@ -1,5 +1,6 @@
 #!/bin/bash
 
-cat .plot_example.txt
+echo "If all goes well, this script should plot the relevant plots of the
+parallel mimc run. Output will be produced to 'PDE_testcase_dim1.pdf'"
 
-../plot_data.py -db_tag "PDE_testcase_dim1" -o example_plot.pdf
+../plot_data.py -db_tag "PDE_testcase_dim1" -o PDE_testcase_dim1.pdf $@

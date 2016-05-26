@@ -17,7 +17,7 @@ def parse_known_args(parser, return_unknown=False):
     for a in unknowns:
         if a.startswith('-'):
             warnings.warn(ArgumentWarning("Argument {} was not used!".format(a)))
-            
+
     if return_unknown:
         return knowns, unknowns
     return knowns
@@ -74,9 +74,9 @@ def RunStandardTest(fnSampleLvl=None,
         db = mimcdb.MIMCDatabase(**db_args)
         run_id = db.createRun(mimc_run=mimcRun,
                               tag=mimcRun.params.db_tag)
-        fnItrDone = lambda *a: db.writeRunData(run_id, mimcRun, *a)
+        fnItrDone = lambda **kwargs: db.writeRunData(run_id, mimcRun, **kwargs)
 
-    fnSampleLvl = lambda inds, M, fn=fnSampleLvl, *a: fn(mimcRun, inds, M)
+    fnSampleLvl = lambda inds, M, fn=fnSampleLvl: fn(mimcRun, inds, M)
 
     mimcRun.setFunctions(fnSampleLvl=fnSampleLvl, fnItrDone=fnItrDone)
 

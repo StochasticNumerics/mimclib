@@ -17,7 +17,7 @@ base = "mimc_run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  -mimc_dim {dim} -qoi_seed
 -qoi_x0 0.3,0.2,0.6 -qoi_sigma 0.16 -qoi_scale 1 -ksp_rtol 1e-25 \
 -mimc_theta 0.2 -qoi_scale 50 \
 -ksp_type gmres -mimc_w {w} -mimc_s {s} -mimc_gamma {gamma} -mimc_beta {beta} \
--mimc_bayes_fit_lvls 5 \
+-mimc_bayes_fit_lvls 3 -mimc_moments 4 \
 -mimc_bayesian {bayesian} ".format(bayesian="{bayesian}", TOL="{TOL}",
                                    dim=dim, seed="{seed}",
                                    gamma=" ".join([str(int(3/dim))]*dim),
