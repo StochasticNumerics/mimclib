@@ -314,7 +314,7 @@ are the same as the argument ones")
                   help="Use Bayesian fitting to estimate bias, variance and optimize number \
 of levels in every iteration. This is based on CMLMC.")
         add_store('dim', type=int, help="Number of dimensions used in MIMC")
-        add_store('moments', type=int, default=2, help="Number of moments to compute")
+        add_store('moments', type=int, default=4, help="Number of moments to compute")
         add_store('reuse_samples', type='bool', default=True,
                   help="Reuse samples between iterations")
         add_store('abs_bnd', type='bool', default=False,
