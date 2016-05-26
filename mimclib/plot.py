@@ -175,7 +175,9 @@ def __get_stats(data, groupby=0, staton=1):
     y = []
     for k, itr in itertools.groupby(data, key=lambda xx: xx[groupby]):
         all_y = [d[staton] for d in itr]
-        y.append([np.min(all_y), np.mean(all_y), np.max(all_y)])
+        y.append([np.nanpercentile(all_y, 5),
+                  np.nanpercentile(all_y, 50),
+                  np.nanpercentile(all_y, 95)])
         x.append(k)
     return np.array(x), np.array(y)
 
