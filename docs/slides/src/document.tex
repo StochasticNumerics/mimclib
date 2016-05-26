@@ -359,8 +359,13 @@ mysql> SET PASSWORD FOR 'USER'@'%' \
 \begin{frame}{Problem setup: Geometric Brownian Motion}
 Given $S(0), \mu$ and $\sigma$, define
   \[
-    S(t) = S(0) + \mu \int_{0}^T S(t) \di{t} + \sigma \int_{0}^T S(t) \di{W}(t)
+    \di S(t) = \mu S(t) \di{t} + \sigma S(t) \di{W}(t)
 \]
+Euler-Maruyama discretization
+\[\aligned
+  S_{n+1} &= S_{n} + \mu  S_n \Delta t + \sigma S_n \Delta W_n\\
+&= S_{n} \op*{1 + \mu  \Delta t + \sigma \Delta W_n}
+\endaligned\]
 
 We can find (using It\^o integral and a log transformation)
 \[\aligned
