@@ -1,4 +1,9 @@
 #!/usr/bin/python
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+
 import mimclib.db as mimcdb
 import mimclib.plot as miplot
 import warnings
@@ -11,7 +16,6 @@ try:
     warnings.simplefilter('ignore', MatplotlibDeprecationWarning)
 except:
     pass   # Ignore
-
 
 def addExtraArguments(parser):
     parser.register('type', 'bool', lambda v: v.lower() in ("yes",
@@ -27,6 +31,8 @@ def addExtraArguments(parser):
                         help="Database Tag")
     parser.add_argument("-qoi_exact", type=float, action="store",
                         help="Exact value")
+    parser.add_argument("-only_final", type='bool', action="store",
+                        default=True, help="Plot only final iterations")
     parser.add_argument("-o", type=str, default="mimc_results.pdf",
                         action="store", help="Output file")
     parser.add_argument("-cmd", type=str, action="store",
@@ -51,8 +57,9 @@ def main():
     if args.db_tag is None:
         warnings.warn("You did not select a database tag!!")
     run_data = db.readRuns(db.getRunsIDs(tag=args.db_tag, done_flag=1))
-    run_data = [d for d in run_data if d.iteration_index+1 ==
-                d.total_iterations]
+    if args.only_final:
+        run_data = [d for d in run_data if d.iteration_index+1 ==
+                    d.total_iterations]
     if len(run_data) == 0:
         raise Exception("No runs!!!")
     miplot.genPDFBooklet(run_data, fileName=args.o, exact=args.qoi_exact)

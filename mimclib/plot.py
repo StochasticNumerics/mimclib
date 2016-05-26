@@ -1,3 +1,7 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import numpy as np
 import matplotlib.pylab as plt
 from . import mimc
@@ -200,21 +204,31 @@ def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
     run_data[i].run.data is an instance of mimc.MIMCData
     """
 
+    num_kwargs = kwargs.pop('num_kwargs', None)
     exact = kwargs.pop('exact', None)
+    relative_error = kwargs.pop('relative', True)
     if exact is None:
         # Calculate mean based on data
-        minTOL = np.min([r.finalTOL for r in runs_data])
+        # final_run_data = [d for d in run_data if d.iteration_index+1
+        #                   == d.total_iterations]
+        # minTOL = np.min([r.TOL for r in runs_data])
+        # minfinalTOL = np.min([r.TOL for r in final_runs_data])
+        # if minfinalTOL > minTOL:
+        #     warnings.warn("The runs with the least tolerance are not done")
+
+        # exact = np.mean([r.run.data.calcEg() for r in final_run_data if
+        #                  r.TOL == minfinalTOL])
+        minfinalTOL = np.min([r.finalTOL for r in runs_data])
         exact = np.mean([r.run.data.calcEg() for r in runs_data if
-                         r.finalTOL == minTOL])
+                         r.finalTOL == minfinalTOL])
+        print("Computed exact value is:", exact)
 
+    modifier = (1./exact) if relative_error else 1.
     xy = np.array([[r.finalTOL, np.abs(exact - r.run.data.calcEg()),
-                    r.run.totalErrorEst()]
-                   for r in runs_data])
-    relative_error = kwargs.pop('relative', True)
-    if relative_error:
-        xy[:, 1:] = xy[:, 1:]/exact
-    TOLs, error_est = __get_stats(xy, staton=2)
+                    r.run.totalErrorEst()] for r in runs_data])
+    xy[:, 1:] = xy[:, 1:] * modifier
 
+    TOLs, error_est = __get_stats(xy, staton=2)
     plotObj = []
 
     ax.set_xlabel('TOL')
@@ -237,10 +251,23 @@ def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
                                          error_est[:, 2]-error_est[:, 1]],
                                    **ErrEst_kwargs))
     if TOLRef_kwargs is not None:
-        plotObj.append(ax.add_line(FunctionLine2D.ExpLine(1, const=1./exact
-                                                          if relative_error
-                                                          else 1.,
+        plotObj.append(ax.add_line(FunctionLine2D.ExpLine(1, const=modifier,
                                                           **TOLRef_kwargs)))
+
+    if num_kwargs is not None:
+        import itertools
+        xy = xy[xy[:,0].argsort()]
+        for TOL, itr in itertools.groupby(xy, key=lambda x: x[0]):
+            curItr = np.array(list(itr))
+            invalid = np.sum(curItr[:, 0]*modifier <= curItr[:, 1])
+            if invalid == 0:
+                continue
+            ax.text(TOL, 1.5*TOL*modifier,
+                    "{:g}\%".format(np.round(100.*invalid / len(curItr))),
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    **num_kwargs)
+
     return xy[sel, :2], plotObj
 
 
@@ -743,7 +770,8 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
         plotErrorsVsTOL(ax, runs_data, exact=exact,
                         relative=True,
                         ErrEst_kwargs={'label': 'Error Estimate'},
-                        TOLRef_kwargs={'linestyle': '--', 'c': 'k', 'label': 'TOL'})
+                        TOLRef_kwargs={'linestyle': '--', 'c': 'k', 'label': 'TOL'},
+                        num_kwargs={'color': 'r'})
     except:
         __plot_failed(ax)
 
