@@ -28,16 +28,6 @@ def python_wcumsum(x, w):
             output[m, i] = w[m, i]*output[m, i-1] + x[i]
     return output
 
-def addExtraArguments(parser):
-    parser.add_argument("-qoi_sigma", type=float, default=1.,
-                        action="store", help="Volatility in GBM")
-    parser.add_argument("-qoi_mu", type=float, default=1.,
-                        action="store", help="Drift in GBM")
-    parser.add_argument("-qoi_T", type=float, default=1.,
-                        action="store", help="Final time in GBM")
-    parser.add_argument("-qoi_S0", type=float, default=1.,
-                        action="store", help="Initial condition in GBM")
-
 try:
     # Try to import the DLL version of wcumsum,
     # This makes solving the SDE much faster
@@ -60,7 +50,18 @@ try:
 except:
     warnings.warn("Using Python's (very slow) version for wcumsum. Consider running make")
     # wcumsum is like cumsum, but weighted.
-    wcumsum = python_cumsum
+    wcumsum = python_wcumsum
+
+
+def addExtraArguments(parser):
+    parser.add_argument("-qoi_sigma", type=float, default=1.,
+                        action="store", help="Volatility in GBM")
+    parser.add_argument("-qoi_mu", type=float, default=1.,
+                        action="store", help="Drift in GBM")
+    parser.add_argument("-qoi_T", type=float, default=1.,
+                        action="store", help="Final time in GBM")
+    parser.add_argument("-qoi_S0", type=float, default=1.,
+                        action="store", help="Initial condition in GBM")
 
 def mySampleQoI(run, inds, M):
     meshes = (run.params.qoi_T/run.fnHierarchy(inds)).reshape(-1).astype(np.int)

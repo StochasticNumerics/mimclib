@@ -431,10 +431,13 @@ def plotVarVsLvls(ax, runs_data, *args, **kwargs):
             plotObj.append(ax.plot(np.arange(0, len(Vl)), Vl, *fine_args, **fine_kwargs))
 
     if estimate_kwargs is not None:
-        mdat = np.ma.masked_array(Vl_estimate, np.isnan(Vl_estimate))
-        med = np.ma.median(mdat, 1).filled(np.nan)
-        min_vl = np.min(mdat, 1).filled(np.nan)
-        max_vl = np.max(mdat, 1).filled(np.nan)
+        # mdat = np.ma.masked_array(Vl_estimate, np.isnan(Vl_estimate))
+        # med = np.ma.median(mdat, 1).filled(np.nan)
+        # import IPython
+        # IPython.embed()
+        min_vl = np.nanpercentile(Vl_estimate, 5, axis=1)
+        med = np.nanpercentile(Vl_estimate, 50, axis=1)
+        max_vl = np.nanpercentile(Vl_estimate, 95, axis=1)
         #err = np.sqrt(((np.sum(Vl_estimate**2, 1)/M) - avg**2)/M)
         plotObj.append(ax.errorbar(np.arange(0, len(Vl)),
                                    med, yerr=[med-min_vl, max_vl-med],
