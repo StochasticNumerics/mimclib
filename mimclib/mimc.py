@@ -408,16 +408,17 @@ Bias={:.12e}\nStatErr={:.12e}\
                                 self.stat_error,
                                 self.totalErrorEst())
         V = self.Vl_estimate
+        Vl = self.data.calcDeltaVl()
         E = self.data.calcDeltaEl()
         T = self.data.calcTl()
 
-        output += ("{:<8}{:^20}{:^20}{:>8}{:>15}\n".format(
-            "Level", "E", "V", "M", "Time"))
+        output += ("{:<8}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
+            "Level", "E", "V", "sampleV", "M", "Time"))
         for i in range(0, len(self.data.lvls)):
             assert(V[i]>=0)
             #,100 * np.sqrt(V[i]) / np.abs(E[i])
-            output += ("{:<8}{:>+20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
-                str(self.data.lvls[i]), E[i], V[i], self.data.M[i], T[i]))
+            output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
+                str(self.data.lvls[i]), E[i], V[i], Vl[i], self.data.M[i], T[i]))
         return output
 
     ################## Bayesian specific functions

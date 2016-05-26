@@ -431,13 +431,13 @@ def plotVarVsLvls(ax, runs_data, *args, **kwargs):
             plotObj.append(ax.plot(np.arange(0, len(Vl)), Vl, *fine_args, **fine_kwargs))
 
     if estimate_kwargs is not None:
-        fin = np.isfinite(Vl_estimate)
-        M = np.sum(fin, 1)
-        Vl_estimate[np.logical_not(fin)] = 0
-        avg = np.sum(Vl_estimate, 1)/M
-        err = np.sqrt(((np.sum(Vl_estimate**2, 1)/M) - avg**2)/M)
+        mdat = np.ma.masked_array(Vl_estimate, np.isnan(Vl_estimate))
+        med = np.ma.median(mdat, 1).filled(np.nan)
+        min_vl = np.min(mdat, 1).filled(np.nan)
+        max_vl = np.max(mdat, 1).filled(np.nan)
+        #err = np.sqrt(((np.sum(Vl_estimate**2, 1)/M) - avg**2)/M)
         plotObj.append(ax.errorbar(np.arange(0, len(Vl)),
-                                   avg, yerr=3*err,
+                                   med, yerr=[med-min_vl, max_vl-med],
                                    **estimate_kwargs))
     return plotObj[0][0].get_xydata(), plotObj
 
@@ -628,7 +628,7 @@ def plotThetaRefVsTOL(ax, runs_data, eta, chi, *args, **kwargs):
     return summary, [line]
 
 @public
-def plotErrorsQQ(ax, runs_data, *args, **kwargs): #(runs, tol, marker='o', color="b", fig=None, label=None):
+def plotErrorsQQ(ax, runs_data, *args, **kwargs):
     """Plots Normal vs Empirical CDF of @runs_data, as
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
@@ -870,8 +870,6 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     try:
         line_data, _ = plotLvlsNumVsTOL(ax, runs_data)
         if has_beta and has_w_rate and has_gamma_rate:
-            import IPython
-            IPython.embed()
             if has_beta:
                 rate = 1./np.min(np.array(params.w) * np.log(params.beta))
             else:

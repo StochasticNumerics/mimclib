@@ -4,4 +4,4 @@
 echo "If all goes well, this script should plot the relevant plots of the
 parallel mimc run. Output will be produced to 'GBM_testcase.pdf'"
 
-../plot_data.py -db_tag "GBM_testcase" -o GBM_testcase.pdf $@
+../plot_data.py -db_tag "GBM_testcase" -o GBM_testcase.pdf $*

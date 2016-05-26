@@ -13,7 +13,8 @@ args, unknowns = parser.parse_known_args()
 base = "mimc_run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  \
 -qoi_sigma 0.1 -qoi_mu 1 -qoi_seed {seed} -mimc_moments 4 \
 -mimc_dim 1 -mimc_w 1 -mimc_s 1 -mimc_gamma 1 -mimc_beta 2 \
--mimc_theta {theta} -mimc_bayesian {bayesian} -mimc_bayes_fit_lvls 4 "
+-mimc_theta {theta} -mimc_bayesian {bayesian} -mimc_bayes_fit_lvls 4 \
+-mimc_bayes_k1 0.005 "
 
 
 base += " ".join(unknowns)
