@@ -373,7 +373,7 @@ def plotTotalWorkVsLvls(ax, runs_data, *args, **kwargs):
                                    *args,
                                    **kwargs))
 
-    if hasattr(curRun.run.params, "s") and hasattr(curRun.run.params, "gamma"):
+    if curRun.run.params.dim == 1 and hasattr(curRun.run.params, "s") and hasattr(curRun.run.params, "gamma"):
         rate = np.array(curRun.run.params.gamma) - np.array(curRun.run.params.s)
         if hasattr(curRun.run.params, "beta"):
             rate *= np.log(curRun.run.params.beta)
@@ -428,12 +428,14 @@ def plotVarVsLvls(ax, runs_data, *args, **kwargs):
     ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
     if "__calc_moments" in kwargs:
-        central_delta_moments, central_fine_moments, _, M, Vl_estimate = kwargs.pop("__calc_moments")
+        central_delta_moments, central_fine_moments, \
+            _, M, Vl_estimate = kwargs.pop("__calc_moments")
     else:
-        central_delta_moments, central_fine_moments, _, M, Vl_estimate = __calc_moments(runs_data,
-                                                                                        seed=kwargs.pop('seed', None),
-                                                                                        direction=kwargs.pop('direction',
-                                                                                        None))
+        central_delta_moments, central_fine_moments, \
+            _, M, Vl_estimate = __calc_moments(runs_data,
+                                               seed=kwargs.pop('seed', None),
+                                               direction=kwargs.pop('direction',
+                                                                    None))
     fine_kwargs = kwargs.pop('fine_kwargs', None)
     estimate_kwargs = kwargs.pop('estimate_kwargs', None)
     plotObj = []
@@ -784,7 +786,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     ax_time = add_fig()
     try:
         data_time, _ = plotTimeVsTOL(ax_time, runs_data, label="MIMC",
-                                     MC_kwargs={"label": "MC Estimate", "fmt": "--r"})
+                                     MC_kwargs=None if dim > 1 else {"label": "MC Estimate", "fmt": "--r"})
     except:
         __plot_failed(ax_time)
 
@@ -792,7 +794,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     try:
         data_est, _ = plotTimeVsTOL(ax_est, runs_data, label="MIMC",
                                    work_estimate=True,
-                                   MC_kwargs={"label": "MC Estimate", "fmt":
+                                   MC_kwargs= None if dim > 1 else {"label": "MC Estimate", "fmt":
                                               "--r"})
         if has_s_rate and has_gamma_rate and has_w_rate:
             s = np.array(params.s)
@@ -863,15 +865,15 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                 cur_kwargs = {'ax' : ax, 'runs_data': runs_data,
                               'linestyle' : '-',
                               'marker' : mrk,
-                              'label': None if len(directions)==1 else "$\ell={}$".format(direction),
-                              'direction' : direction, 'label' : 'Difference'}
+                              'label': '$\Delta$' if len(directions)==1 else "$\ell={}$".format(direction),
+                              'direction' : direction}
                 cur_kwargs.update(prop)
                 if plotFine:
                     cur_kwargs['fine_kwargs'] = {'linestyle': '--',
-                                                 'marker' : mrk, 'label' : 'QoI'}
+                                                 'marker' : mrk}
                     cur_kwargs['fine_kwargs'].update(prop)
 
-                if plotEstimate:
+                if dim == 1 and plotEstimate:
                     cur_kwargs['estimate_kwargs'] = {'linestyle': ':',
                                                      'marker' : mrk,
                                                      'label' : 'Corrected estimate'}

@@ -610,8 +610,8 @@ estimate optimal number of levels"
         self.bias = np.inf
         self.stat_error = np.inf
         import gc
-        def isclose(a, b, rel_tol=1e-09, abs_tol=0.0):
-            return abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
+        def less(a, b, rel_tol=1e-09, abs_tol=0.0):
+            return a-b <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
 
         for itrIndex, TOL in enumerate(TOLs):
             if verbose:
@@ -662,7 +662,7 @@ estimate optimal number of levels"
                 print("################################################")
             if self.fnItrDone:
                 self.fnItrDone(iteration_idx=itrIndex, TOL=TOL, totalTime=totalTime)
-            if isclose(TOL, finalTOL) and self.totalErrorEst() < finalTOL:
+            if less(TOL, finalTOL) and self.totalErrorEst() <= finalTOL:
                 break
 
 @public

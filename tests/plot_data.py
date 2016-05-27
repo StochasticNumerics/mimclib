@@ -33,7 +33,7 @@ def addExtraArguments(parser):
                         help="Exact value")
     parser.add_argument("-only_final", type='bool', action="store",
                         default=True, help="Plot only final iterations")
-    parser.add_argument("-o", type=str, default="mimc_results.pdf",
+    parser.add_argument("-o", type=str,
                         action="store", help="Output file")
     parser.add_argument("-cmd", type=str, action="store",
                         help="Command to execute after plotting")
@@ -52,6 +52,8 @@ def main():
         db_args["user"] = args.db_user
     if args.db_host is not None:
         db_args["host"] = args.db_host
+    if args.o is None:
+        args.o = args.db_tag + ".pdf"
     db = mimcdb.MIMCDatabase(**db_args)
 
     if args.db_tag is None:
