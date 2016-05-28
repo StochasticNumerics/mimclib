@@ -1,0 +1,42 @@
+#!/bin/sh
+
+if ! git clone -b maint https://bitbucket.org/petsc/petsc petsc ; then
+   RESULT=$?
+   echo "Cloning PETSC failed!"
+   exit $RESULT
+fi
+
+cd petsc
+
+if ! ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran --with-debugging=0 COPTFLAGS='-O3' CXXOPTFLAGS='-O3' FOPTFLAGS='-O3' \
+     --with-c2html=0 --with-mpi=0; then
+   RESULT=$?
+   echo "Configure PETSC failed!"
+   exit $RESULT
+fi
+
+export PETSC_DIR=$PWD
+export PETSC_ARCH=arch-linux2-c-opt
+
+if ! make all ; then
+    RESULT=$?
+    echo "Make PETSC failed!"
+    exit $RESULT
+fi
+
+cd ../../../mimclib/libsetutil
+if ! make ; then
+    RESULT=$?
+    echo "Make libsetutil failed!"
+    exit $RESULT
+fi
+
+cd ../../tests/pde/pdelib/
+rm -f libset_util.a
+ln -s ../../../mimclib/libsetutil/libset_util.a ./
+
+if ! make ; then
+    RESULT=$?
+    echo "Make pdelib failed!"
+    exit $RESULT
+fi

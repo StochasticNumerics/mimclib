@@ -786,7 +786,8 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     ax_time = add_fig()
     try:
         data_time, _ = plotTimeVsTOL(ax_time, runs_data, label="MIMC",
-                                     MC_kwargs=None if dim > 1 else {"label": "MC Estimate", "fmt": "--r"})
+                                     MC_kwargs=None if dim > 1
+                                     else {"label": "MC Estimate", "fmt": "--r"})
     except:
         __plot_failed(ax_time)
 

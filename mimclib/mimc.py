@@ -370,8 +370,9 @@ Not needed if -bayesian is False.")
             add_store('max_TOL', type=float, default=0.1,
                       help="The (approximate) tolerance for \
 the first iteration. Not needed if TOLs is provided to doRun.")
-            add_store('M0', type=int, default=10, help="The initial number of samples \
-used to estimate the sample variance when not using the Bayesian estimators. \
+            add_store('M0', nargs='+', type=int, default=[10],
+                      help="Initial number of samples used to estimate the \
+sample variance on levels when not using the Bayesian estimators. \
 Not needed if fnExtendLvls is provided.")
             add_store('maxM', type=int, default=1000, help="Maximum number of \
 samples to compute per call to user function")
@@ -586,7 +587,7 @@ estimate optimal number of levels"
 
     def estimateMonteCarloSampleCount(self, TOL):
         theta = np.maximum(self._calcTheta(TOL, self.bias), self.params.theta)
-        return np.maximum(self.params.M0,
+        return np.maximum(np.reshape(self.params.M0, (1,))[-1],
                           int(np.ceil((theta * TOL / self.params.Ca)**-2 * self.Vl_estimate[0])))
 
     def doRun(self, finalTOL=None, TOLs=None, verbose=None):
@@ -688,8 +689,10 @@ def extend_lvls_tensor(dim, lvls, M0, min_deg=1):
         if deg >= min_deg:
             break
         seeds = newlvls
-    return out_lvls, M0*np.ones(len(out_lvls), dtype=np.int)
-
+    if len(M0) < len(lvls): # Exhausted
+        return out_lvls, M0[-1]*np.ones(len(out_lvls), dtype=np.int)
+    M = np.pad(M0, (0,len(lvls) + len(out_lvls)), 'constant', constant_values=M[-1])
+    return out_lvls, M[len(lvls):]
 
 @public
 def extend_lvls_td(w, lvls, M0, min_deg=2):
@@ -705,7 +708,10 @@ def extend_lvls_td(w, lvls, M0, min_deg=2):
         newlvls = [lvl.tolist() for lvl in all_lvls if lvl.tolist()
                    not in lvls]
         if len(newlvls) > 0:
-            return newlvls, M0*np.ones(len(newlvls), dtype=np.int)
+            if len(M0) < len(lvls): # Exhausted
+                return newlvls, M0[-1]*np.ones(len(newlvls), dtype=np.int)
+            M = np.pad(M0, (0,len(lvls) + len(newlvls)), 'constant', constant_values=M0[-1])
+            return newlvls, M[len(lvls):]
 
 
 @public

@@ -55,13 +55,10 @@ def main():
     if args.o is None:
         args.o = args.db_tag + ".pdf"
     db = mimcdb.MIMCDatabase(**db_args)
-
     if args.db_tag is None:
         warnings.warn("You did not select a database tag!!")
-    run_data = db.readRuns(db.getRunsIDs(tag=args.db_tag, done_flag=1))
-    if args.only_final:
-        run_data = [d for d in run_data if d.iteration_index+1 ==
-                    d.total_iterations]
+    run_data = db.readRuns(tag=args.db_tag, done_flag=1,
+                           iteration_idx=-1 if args.only_final else None)
     if len(run_data) == 0:
         raise Exception("No runs!!!")
     miplot.genPDFBooklet(run_data, fileName=args.o, exact=args.qoi_exact)

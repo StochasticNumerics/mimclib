@@ -191,7 +191,7 @@ VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?, ?)
                              _pickle(mimc_run.data.psums_delta[k, :]),
                              _pickle(mimc_run.data.psums_fine[k, :]), data_id])
 
-    def readRuns(self, run_ids):
+    def readRunsByID(self, run_ids):
         from . import mimc
         import re
         lstvalues = []
@@ -339,6 +339,26 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
         if ids.size > 0:
             return ids[:, 0]
         return ids
+
+    def filterRuns(self, runs, iteration_idx=None):
+        if iteration_idx is not None:
+            ii = np.array(iteration_idx).reshape((-1,))
+            from_end = ii<0
+            runs = [d for d in runs if d.iteration_index in
+                    d.total_iterations*from_end + ii]
+        return runs
+
+    def readRuns(self, minTOL=None, maxTOL=None, dim=None, tag=None,
+                 TOL=None, from_date=None, to_date=None,
+                 done_flag=None, iteration_idx=None):
+        runs_ids = self.getRunsIDs(minTOL=minTOL, maxTOL=maxTOL,
+                                   dim=dim, tag=tag, TOL=TOL,
+                                   from_date=from_date, to_date=to_date,
+                                   done_flag=done_flag)
+        if len(runs_ids) == 0:
+            return []
+        return self.filterRuns(self.readRunsByID(runs_ids),
+                               iteration_idx=iteration_idx)
 
     def deleteRuns(self, run_ids):
         with DBConn(**self.connArgs) as cur:
