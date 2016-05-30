@@ -322,7 +322,7 @@ of levels in every iteration. This is based on CMLMC.")
 estimating bias (sometimes that's too conservative).")
         add_store('const_theta', type='bool', default=False,
                   help="Use the same theta for all iterations")
-        add_store('Ca', type=float, default=3,
+        add_store('confidence', type=float, default=0.95,
                   help="Parameter to control confidence level")
         add_store('theta', type=float, default=0.5,
                   help="Minimum theta or error splitting parameter.")
@@ -519,8 +519,10 @@ estimate optimal number of levels"
                            else self._estimateBayesianVl()
         self.Wl_estimate = self.fnWorkModel(lvls=self.data.lvls)
         self.bias = self._estimateBias()
+        from scipy.stats import norm
+        Ca = norm.ppf(self.params.confidence)
         self.stat_error = np.inf if np.any(self.data.M == 0) \
-                          else self.params.Ca * \
+                          else Ca * \
                                np.sqrt(np.sum(self.Vl_estimate / self.data.M))
 
     def _addLevels(self, lvls):
@@ -578,7 +580,9 @@ estimate optimal number of levels"
         return self.params.theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
-        M = (theta * TOL / self.params.Ca)**-2 *\
+        from scipy.stats import norm
+        Ca = norm.ppf(self.params.confidence)
+        M = (theta * TOL / Ca)**-2 *\
             np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
         M = np.maximum(M, minM)
         if ceil:
@@ -587,8 +591,10 @@ estimate optimal number of levels"
 
     def estimateMonteCarloSampleCount(self, TOL):
         theta = np.maximum(self._calcTheta(TOL, self.bias), self.params.theta)
+        from scipy.stats import norm
+        Ca = norm.ppf(self.params.confidence)
         return np.maximum(np.reshape(self.params.M0, (1,))[-1],
-                          int(np.ceil((theta * TOL / self.params.Ca)**-2 * self.Vl_estimate[0])))
+                          int(np.ceil((theta * TOL / Ca)**-2 * self.Vl_estimate[0])))
 
     def doRun(self, finalTOL=None, TOLs=None, verbose=None):
         self._checkFunctions()
