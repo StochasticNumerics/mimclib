@@ -51,7 +51,8 @@ def compute_central_moment(psums, M, moment, empty_value=0):
         idx = np.abs(val) < np.finfo(float).eps
         val[idx] = np.abs(val[idx])
         if np.min(val)<0.0:
-            raise ArithmeticError("Significantly negative even moment! Possible problem in computing sums up to {}.".format(moment))
+            warnings.warn("Significantly negative {}'th moment = {}! \
+Possible problem in computing sums.".format(moment, np.min(val)))
     return val
 
 
@@ -463,7 +464,10 @@ Bias={:.12e}\nStatErr={:.12e}\
         G_4 = self.params.bayes_k1 + \
               0.5*(s2 -2*s1*m1 + s1*m1 +
                    M*self.params.bayes_k0*(m1-mu)**2 / (self.params.bayes_k0+M) )
-        return np.concatenate((self.all_data[0].calcDeltaVl(), G_4 / G_3))
+        Vl_estimate = np.concatenate((self.all_data[0].calcDeltaVl(), G_4 / G_3))
+        # Vl_sample = self.all_data.calcDeltaVl()
+        # Vl_estimate[:len(Vl_sample)] = Vl_sample
+        return Vl_estimate
 
     def _estimateQParams(self):
         if not self.params.bayesian:

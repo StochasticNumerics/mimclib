@@ -343,12 +343,12 @@ def plotTotalWorkVsLvls(ax, runs_data, *args, **kwargs):
     direction = np.array(direction) if direction is not None else np.ones(dim, dtype=np.uint32)
 
     plotObj = []
-    runs_data = sorted(runs_data, key=lambda r: r.TOL)
+    runs_data = sorted(runs_data, key=lambda r: r.finalTOL)
     import itertools
     label_fmt = kwargs.pop('label_fmt', None)
-    TOLs = np.unique([r.TOL for r in runs_data])
+    TOLs = np.unique([r.finalTOL for r in runs_data])
     TOLs = TOLs[:kwargs.pop("max_TOLs", len(TOLs))]
-    for TOL, itr in itertools.groupby(runs_data, key=lambda r: r.TOL):
+    for TOL, itr in itertools.groupby(runs_data, key=lambda r: r.finalTOL):
         if TOL not in TOLs:
             continue
 
@@ -560,14 +560,14 @@ def plotTimeVsTOL(ax, runs_data, *args, **kwargs):
         if 'MC_kwargs' in kwargs:
             raise ValueError("Cannot estimate real time of Monte Carlo")
 
-        xy = [[r.TOL, r.totalTime] for r in runs_data]
+        xy = [[r.finalTOL, r.totalTime] for r in runs_data]
     elif work_estimate:
-        xy = [[r.TOL, np.sum(r.run.data.M*r.run.Wl_estimate),
-               np.max(r.run.Wl_estimate) * r.run.estimateMonteCarloSampleCount(r.TOL)]
+        xy = [[r.finalTOL, np.sum(r.run.data.M*r.run.Wl_estimate),
+               np.max(r.run.Wl_estimate) * r.run.estimateMonteCarloSampleCount(r.finalTOL)]
               for r in runs_data]
     else:
-        xy = [[r.TOL, np.sum(r.run.data.t),
-               np.max(r.run.all_data.calcTl()) * r.run.estimateMonteCarloSampleCount(r.TOL)]
+        xy = [[r.finalTOL, np.sum(r.run.data.t),
+               np.max(r.run.all_data.calcTl()) * r.run.estimateMonteCarloSampleCount(r.finalTOL)]
               for r in runs_data]
     ax.set_xscale('log')
     ax.set_yscale('log')
@@ -601,7 +601,7 @@ def plotLvlsNumVsTOL(ax, runs_data, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
-    summary = np.array([[r.TOL,
+    summary = np.array([[r.finalTOL,
                          np.max([np.sum(l) for l in r.run.data.lvls])]
                         for r in runs_data])
 
@@ -619,7 +619,7 @@ def plotThetaVsTOL(ax, runs_data, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
-    summary = np.array([[r.TOL, r.run.Q.theta] for r in runs_data])
+    summary = np.array([[r.finalTOL, r.run.Q.theta] for r in runs_data])
 
     ax.set_xscale('log')
     ax.set_xlabel('TOL')
@@ -639,14 +639,14 @@ def plotThetaRefVsTOL(ax, runs_data, eta, chi, *args, **kwargs):
     El = np.abs(central_delta_moments[:, 0])
     L = lambda r: np.max([np.sum(l) for l in r.run.data.lvls])
     if chi == 1:
-        summary = np.array([[r.TOL,
+        summary = np.array([[r.finalTOL,
                              (1. + (1./(2.*eta))*1./(L(r)+1.))**-1,
-                             1-El[L(r)]/r.TOL]
+                             1-El[L(r)]/r.finalTOL]
                             for r in runs_data])
     else:
-        summary = np.array([[r.TOL,
+        summary = np.array([[r.finalTOL,
                              (1. + (1./(2.*eta))*(1.-chi)/(1.-chi**(L(r)+1.)))**-1,
-                             1-El[L(r)]/r.TOL]
+                             1-El[L(r)]/r.finalTOL]
                             for r in runs_data])
     TOL, thetaRef = __get_stats(summary, staton=1)
 
@@ -667,6 +667,8 @@ def plotErrorsQQ(ax, runs_data, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
+    # Use TOL instead of finalTOL. The normality is proven w.r.t. to TOL of MLMC
+    # not the finalTOL of MLMC (might be different sometimes)
     if "tol" not in kwargs:
         TOLs = [r.TOL for r in runs_data]
         unTOLs = np.unique([r.TOL for r in runs_data])
@@ -746,8 +748,8 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     if "params" in kwargs:
         params = kwargs.pop("params")
     else:
-        maxTOL = np.max([r.TOL for r in runs_data])
-        params = next(r.run.params for r in runs_data if r.TOL == maxTOL)
+        maxTOL = np.max([r.finalTOL for r in runs_data])
+        params = next(r.run.params for r in runs_data if r.finalTOL == maxTOL)
 
     dim = params.dim
     legend_outside = kwargs.pop("legend_outside", 5)
