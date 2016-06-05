@@ -201,7 +201,7 @@ VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?, ?)
 
         with DBConn(**self.connArgs) as cur:
             runAll = cur.execute(
-                        '''SELECT r.run_id, r.params, r.TOL, r.comment, count(*)
+                        '''SELECT r.run_id, r.params, r.TOL, r.comment, count(*), r.tag
                         FROM {runTable} r INNER JOIN {dataTable} dr ON
                         r.run_id = dr.run_id WHERE r.run_id in ? GROUP BY
                         r.run_id, r.params, r.TOL, r.comment'''.
@@ -229,7 +229,7 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
         dictRuns = dict()
         for run in runAll:
             dictRuns[run[0]] = [_unpickle(run[1]), run[2], run[3],
-                                run[4]]
+                                run[4], run[5]]
 
         dictLvls = dict()
         import itertools
@@ -258,6 +258,7 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
             val["finalTOL"] = run_params[1]
             val["comment"] = run_params[2]
             val["total_iterations"] = run_params[3]
+            val["tag"] = run_params[4]
             val["TOL"] = data[2]
             val["creation_date"] = data[3]
             val["totalTime"] = data[4]

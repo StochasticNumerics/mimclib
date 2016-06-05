@@ -639,7 +639,7 @@ estimate optimal number of levels"
                 self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
                                           self.params.theta)
                 if len(self.data.lvls) == 0 or \
-                   (not self.params.bayesian and self.bias > (1 - self.Q.theta) * TOL):
+                   (not self.params.bayesian and self.bias > (1 - self.params.theta) * TOL):
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
                     newlvls, newTodoM = self.fnExtendLvls()
