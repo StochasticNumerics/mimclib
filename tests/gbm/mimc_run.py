@@ -19,6 +19,8 @@ import warnings
 import os.path
 import numpy as np
 
+warnings.filterwarnings("error")
+
 def python_wcumsum(x, w):
     assert(len(x) == w.shape[1])
     output = np.empty_like(w)
@@ -63,10 +65,35 @@ def addExtraArguments(parser):
     parser.add_argument("-qoi_S0", type=float, default=1.,
                         action="store", help="Initial condition in GBM")
 
+import mimclib
+class CustomClass(mimclib.mimc.custom_obj):
+    def __init__(self, d):
+        self.data = d
+
+    def __add__(self, d):
+        return CustomClass(self.data + d.data)
+
+    def __mul__(self, scale):
+        if isinstance(scale, CustomClass):
+            return CustomClass(scale.data * self.data)
+        return CustomClass(scale * self.data)
+
+    def __pow__(self, power):
+        return CustomClass(self.data**power)
+
+    def __truediv__(self, scale):
+        return CustomClass(self.data/scale)
+
+    def __str__(self):
+        return str(self.data)
+
+# TODO: Set exception hooks
 def mySampleQoI(run, inds, M):
     meshes = (run.params.qoi_T/run.fnHierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
-    solves = np.zeros((M, len(inds)))
+    # TODO: Figure out a better way to construct the following object
+    solves = np.array([[None]*len(inds)]*M)
+    #solves = np.zeros((M, len(inds)))
 
     import time
     tStart = time.time()
@@ -77,8 +104,7 @@ def mySampleQoI(run, inds, M):
         x = np.concatenate(([run.params.qoi_S0], np.zeros(dWl.shape[1])))
         w = np.zeros((dWl.shape[0], dWl.shape[1]+1))
         w[:, 1:] = run.params.qoi_sigma*dWl + 1 + run.params.qoi_mu/mesh
-        solves[:, i] = wcumsum(x, w)[:, -1]
-
+        solves[:, i] = [CustomClass(d) for d in wcumsum(x, w)[:, -1]]
     return solves, time.time()-tStart
 
 if __name__ == "__main__":

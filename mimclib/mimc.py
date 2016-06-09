@@ -14,31 +14,70 @@ def public(sym):
     __all__.append(sym.__name__)
     return sym
 
-def compute_raw_moments(psums, M, empty_value=0):
+@public
+class custom_obj(object):
+    # Used to add samples. Supposedly not used if M is fixed to 1
+    def __add__(self, d):  # d type is custom_obj
+        raise NotImplementedError("You should implement the __add__ function")
+
+    # Used to compute delta samples. Supposedly only multiples 1 and -1
+    # Might be more if the combination technique is used.
+    def __mul__(self, scale): # scale is float
+        raise NotImplementedError("You should implement the __mul__ function")
+
+    # Used for moment computation. Supposedly not used if moments==1
+    def __pow__(self, power): # power is float
+        raise NotImplementedError("You should implement the __mul__ function")
+
+    # Used to compute moments from sums. Supposedly not used if M is fixed to 1
+    def __truediv__(self, scale): # scale is integer
+        if scale == 1:
+            return self
+        raise NotImplementedError("You should implement the __truediv__ function")
+
+
+class empty_obj(object):
+    def __init__(self, shape):
+        self.resize(shape)
+
+    def __add__(self, newarr):
+        assert(newarr.shape == self.shape)
+        return newarr  # Forgot about this object
+
+    def resize(self, shape, refcheck=False):
+        # TODO: Should handle integer weights better than this
+        if isinstance(shape, tuple):
+            self.shape = shape
+        else:
+            self.shape = (shape, )
+
+
+def compute_raw_moments(psums, M):
     '''
-    Returns the raw moments or empty_value when M=0.
+    Returns the raw moments or None when M=0.
     '''
     idx = M != 0
-    val = np.empty_like(psums, dtype=np.float)
+    val = np.empty_like(psums)
     val[idx, :] = psums[idx, :] / np.tile(M[idx].reshape((-1,1)),
                                           (1, psums.shape[1]))
-    val[M == 0, :] = empty_value
+    val[M == 0, :] = None
     return val
 
-def compute_central_moment(psums, M, moment, empty_value=0):
+def compute_central_moment(psums, M, moment):
     '''
-    Returns the centralized moments or empty_value when M=0.
+    Returns the centralized moments or None when M=0.
     '''
-    raw = compute_raw_moments(psums, M, empty_value=empty_value)
+    raw = compute_raw_moments(psums, M)
     if moment == 1:
         return raw[:, 0]
     n = moment
-    val = (-1)**n * raw[:, 0]**n
+    pn = np.tile(n, raw.shape[0])
+    val = (raw[:, 0]**pn) * (-1)**n
     # From http://mathworld.wolfram.com/CentralMoment.html
     nfact = np.math.factorial(n)
     for k in range(1, moment+1):
         nchoosek = nfact / (np.math.factorial(k) * np.math.factorial(n-k))
-        val += nchoosek * (-1)**(n-k) * raw[:, k-1] * raw[:, 0]**(n-k)
+        val +=  (raw[:, k-1] * raw[:, 0]**(pn-k)) * nchoosek * (-1)**(n-k)
     if moment % 2 == 1:
         return val
     # The moment should be positive
@@ -70,6 +109,7 @@ class MIMCData(object):
 
     def __init__(self, dim, lvls=None, psums_delta=None,
                  psums_fine=None, t=None, M=None, moments=2):
+        self.moments = moments
         self.dim = dim
         self.lvls = lvls          # MIMC lvls
         self.psums_delta = psums_delta        # sums of lvls
@@ -79,13 +119,14 @@ class MIMCData(object):
         if self.lvls is None:
             self.lvls = []
         if self.psums_delta is None:
-            self.psums_delta = np.empty((0, moments))
+            self.psums_delta = empty_obj((0, moments))
         if self.psums_fine is None:
-            self.psums_fine = np.empty((0, moments))
+            self.psums_fine = empty_obj((0, moments))
         if self.t is None:
             self.t = np.empty(0)
         if self.M is None:
             self.M = np.empty(0, dtype=np.int)
+
         assert(len(self.lvls) == self.psums_fine.shape[0])
         assert(len(self.lvls) == self.psums_delta.shape[0])
         assert(len(self.lvls) == self.M.shape[0])
@@ -112,10 +153,10 @@ class MIMCData(object):
         return self.dim
 
     def computedMoments(self):
-        return self.psums_delta.shape[1]
+        return self.moments
 
     def calcDeltaVl(self):
-        return self.calcDeltaCentralMoment(2, empty_value=np.inf)
+        return self.calcDeltaCentralMoment(2)
 
     def calcDeltaEl(self, moment=1):
         '''
@@ -127,16 +168,16 @@ class MIMCData(object):
         assert(moment > 0)
         idx = self.M != 0
         val = np.zeros_like(self.M, dtype=np.float)
+        import IPython
+        IPython.embed()
         val[idx] = self.psums_delta[idx, moment-1] / self.M[idx]
         return val
 
-    def calcDeltaCentralMoment(self, moment, empty_value=np.inf):
-        return compute_central_moment(self.psums_delta, self.M, moment,
-                                      empty_value=empty_value)
+    def calcDeltaCentralMoment(self, moment):
+        return compute_central_moment(self.psums_delta, self.M, moment)
 
-    def calcFineCentralMoment(self, moment, empty_value=np.inf):
-        return compute_central_moment(self.psums_delta, self.M, moment,
-                                      empty_value=empty_value)
+    def calcFineCentralMoment(self, moment):
+        return compute_central_moment(self.psums_delta, self.M, moment)
 
     def calcTl(self):
         idx = self.M != 0
@@ -150,7 +191,6 @@ class MIMCData(object):
     def addSamples(self, psums_delta, psums_fine, M, t):
         assert psums_fine.shape[0] == len(M) and psums_delta.shape[0] == len(M) \
             and len(M) == len(t) and np.min(M) >= 0, "Inconsistent arguments "
-
         self.psums_delta += psums_delta
         self.psums_fine += psums_fine
         self.M += M
@@ -159,8 +199,8 @@ class MIMCData(object):
     def zero_samples(self):
         self.M = np.zeros_like(self.M)
         self.t = np.zeros_like(self.t)
-        self.psums_delta = np.zeros_like(self.psums_delta)
-        self.psums_fine = np.zeros_like(self.psums_fine)
+        self.psums_delta = empty_obj((len(self.lvls), self.computedMoments()))
+        self.psums_fine = empty_obj((len(self.lvls), self.computedMoments()))
 
     def addLevels(self, new_lvls):
         assert(len(new_lvls) > 0)
@@ -535,24 +575,26 @@ estimate optimal number of levels"
             self.all_data.addLevels(lvls)
 
 
-    def SampleLvl(self, p, mods, inds, M):
+    def SampleLvl(self, mods, inds, M):
         # fnSampleLvl(inds, M) -> Returns a matrix of size (M, len(ind)) and
         # the time estimate
         calcM = 0
         total_time = 0
-        psums_delta = np.zeros((len(p)))
-        psums_fine = np.zeros((len(p)))
+        p = np.arange(1, self.data.computedMoments()+1)
+        psums_delta = empty_obj(len(p))
+        psums_fine = empty_obj(len(p))
         while calcM < M:
             curM = np.minimum(M-calcM, self.params.maxM)
             values, time = self.fnSampleLvl(inds=inds, M=curM)
             total_time += time
             # TODO: Consider moving to C/C++
             # psums_delta_j = \sum_{i} (\sum_{k} mod_k values_{i,k})**p_j
-            psums_delta += np.sum(np.tile(np.sum(np.tile(mods, (values.shape[0], 1))*values,\
-                                           axis=1), (len(p), 1))**\
-                            np.tile(p, (len(values),1)).transpose(), axis=1)
-            psums_fine += np.sum(np.tile(values[:, 0], (len(p), 1))**\
-                               np.tile(p, (len(values),1)).transpose(), axis=1)
+
+            A1 = np.tile(np.sum(values*np.tile(mods, (values.shape[0], 1)), axis=1), (len(p), 1))
+            A2 = np.tile(values[:, 0], (len(p), 1))
+            B = np.tile(p, (len(values),1)).transpose()
+            psums_delta += np.sum(A1**B , axis=1)
+            psums_fine += np.sum(A2**B, axis=1)
             calcM += values.shape[0]
         return calcM, psums_delta, psums_fine, total_time
 
@@ -560,9 +602,9 @@ estimate optimal number of levels"
         lvls = self.data.lvls
         s = len(lvls)
         M = np.zeros(s, dtype=np.int)
-        psums_delta = np.zeros_like(self.data.psums_delta)
-        psums_fine = np.zeros_like(self.data.psums_fine)
-        p = np.arange(1, psums_delta.shape[1]+1)
+        # TODO: Better way?
+        psums_delta = np.array([None]*np.prod((s, self.data.computedMoments()))).reshape((s, self.data.computedMoments()))
+        psums_fine = np.array([None]*np.prod((s, self.data.computedMoments()))).reshape((s, self.data.computedMoments()))
         t = np.zeros(s)
         for i in range(0, s):
             if totalM[i] <= self.data.M[i]:
@@ -570,8 +612,7 @@ estimate optimal number of levels"
             if verbose:
                 print("# Doing", totalM[i]-self.data.M[i], "of level", lvls[i])
             mods, inds = lvl_to_inds_general(lvls[i])
-            M[i], psums_delta[i, :], psums_fine[i, :],  t[i] = self.SampleLvl(p, mods,
-                                                                      inds,
+            M[i], psums_delta[i, :], psums_fine[i, :],  t[i] = self.SampleLvl(mods, inds,
                                                                       totalM[i] - self.data.M[i])
         self.data.addSamples(psums_delta, psums_fine, M, t)
         if self.all_data != self.data:
