@@ -7,6 +7,12 @@ import itertools
 import warnings
 from . import setutil
 
+# TODO: Figure out a way to add_store an np.array
+# TODO: Somehow we need to access psums using both a single and double elements
+# TODO: Figure out how to do Obj+i and i+Obj
+# TODO: Figure out how to create an empty instance given a type
+# TODO: Figure out a way to install Python docs (numpy and matplotlib locally)
+
 __all__ = []
 
 
@@ -35,6 +41,8 @@ class custom_obj(object):
             return self
         raise NotImplementedError("You should implement the __truediv__ function")
 
+    def __sub__(self, d):
+        return self + d*-1
 
 class empty_obj(object):
     def __init__(self, shape):
@@ -42,7 +50,7 @@ class empty_obj(object):
 
     def __add__(self, newarr):
         assert(newarr.shape == self.shape)
-        return newarr  # Forgot about this object
+        return newarr  # Forget about this object
 
     def resize(self, shape, refcheck=False):
         # TODO: Should handle integer weights better than this
@@ -81,6 +89,7 @@ def compute_central_moment(psums, M, moment):
     if moment % 2 == 1:
         return val
     # The moment should be positive
+    # TODO: Debug for objects
     if np.min(val)<0.0:
         """
         There might be kurtosis values that are actually
@@ -97,7 +106,6 @@ Possible problem in computing sums.".format(moment, np.min(val)))
 
 @public
 class MIMCData(object):
-
     """
     MIMC Data is a class for describing necessary data
     for a MIMC data, such as the dimension of the problem,
@@ -111,26 +119,30 @@ class MIMCData(object):
                  psums_fine=None, t=None, M=None, moments=2):
         self.moments = moments
         self.dim = dim
-        self.lvls = lvls          # MIMC lvls
-        self.psums_delta = psums_delta        # sums of lvls
-        self.psums_fine = psums_fine  # sums of lvls
-        self.t = t                # Time of lvls
-        self.M = M                # Number of samples in each lvl
-        if self.lvls is None:
-            self.lvls = []
-        if self.psums_delta is None:
-            self.psums_delta = empty_obj((0, moments))
-        if self.psums_fine is None:
-            self.psums_fine = empty_obj((0, moments))
-        if self.t is None:
-            self.t = np.empty(0)
-        if self.M is None:
-            self.M = np.empty(0, dtype=np.int)
+        self.lvls = []            # MIMC lvls
+        import copy
+        if lvls is not None:
+            self.lvls = copy.copy(lvls)
 
-        assert(len(self.lvls) == self.psums_fine.shape[0])
-        assert(len(self.lvls) == self.psums_delta.shape[0])
-        assert(len(self.lvls) == self.M.shape[0])
-        assert(len(self.lvls) == self.t.shape[0])
+        self.psums_delta = np.empty((len(self.lvls), moments), dtype=object)
+        self.psums_fine = np.empty((len(self.lvls), moments), dtype=object)
+        self.t = np.zeros(len(self.lvls))      # Time of lvls
+        self.M = np.zeros(len(self.lvls), dtype=np.int)      # Number of samples in each lvl
+
+        if psums_delta is not None:
+            self.psums_delta = psums_delta.copy()
+        if self.psums_fine is None:
+            self.psums_fine = psums_fine.copy()
+
+        if t is not None:
+            self.t = t.copy()
+        if M is not None:
+            self.M = M.copy()
+
+        assert(len(self.lvls) == len(self.psums_fine))
+        assert(len(self.lvls) == len(self.psums_delta))
+        assert(len(self.lvls) == len(self.M))
+        assert(len(self.lvls) == len(self.t))
 
     def calcEg(self):
         """
@@ -143,11 +155,13 @@ class MIMCData(object):
         return len(self.lvls)
 
     def __getitem__(self, ind):
+        # Reshape everything to allow ind to be a single index or a list
         return MIMCData(self.dim,
                         lvls=np.array(self.lvls, dtype=object)[ind].reshape((-1,self.dim)).tolist(),
-                        psums_delta=self.psums_delta[ind, :].reshape((-1, self.psums_delta.shape[1])),
-                        psums_fine=self.psums_fine[ind, :].reshape((-1, self.psums_fine.shape[1])),
-                        t=self.t[ind].reshape(-1), M=self.M[ind].reshape(-1))
+                        psums_delta=self.psums_delta[ind].reshape((-1, self.psums_delta.shape[1])),
+                        psums_fine=self.psums_fine[ind].reshape((-1, self.psums_delta.shape[1])),
+                        t=self.t[ind].reshape(-1),
+                        M=self.M[ind].reshape(-1))
 
     def Dim(self):
         return self.dim
@@ -167,10 +181,9 @@ class MIMCData(object):
             raise ValueError("The {}'th moment was not computed".format(moment))
         assert(moment > 0)
         idx = self.M != 0
-        val = np.zeros_like(self.M, dtype=np.float)
-        import IPython
-        IPython.embed()
+        val = np.empty_like(self.psums_delta[:, moment-1])
         val[idx] = self.psums_delta[idx, moment-1] / self.M[idx]
+        val[np.logical_not(idx)] = None
         return val
 
     def calcDeltaCentralMoment(self, moment):
@@ -188,27 +201,37 @@ class MIMCData(object):
     def calcTotalTime(self, ind=None):
         return np.sum(self.t)
 
-    def addSamples(self, psums_delta, psums_fine, M, t):
-        assert psums_fine.shape[0] == len(M) and psums_delta.shape[0] == len(M) \
-            and len(M) == len(t) and np.min(M) >= 0, "Inconsistent arguments "
-        self.psums_delta += psums_delta
-        self.psums_fine += psums_fine
-        self.M += M
-        self.t += t
+    def addSamples(self, lvl_idx, M, psums_delta, psums_fine, t):
+        assert psums_delta.shape == psums_fine.shape and \
+            psums_fine.shape[0] == self.computedMoments(), "Inconsistent arguments "
+        if self.M[lvl_idx] == 0:
+            self.psums_delta[lvl_idx] = psums_delta
+            self.psums_fine[lvl_idx] = psums_fine
+            self.M[lvl_idx] = M
+            self.t[lvl_idx] = t
+        else:
+            self.psums_delta[lvl_idx] += psums_delta
+            self.psums_fine[lvl_idx] += psums_fine
+            self.M[lvl_idx] += M
+            self.t[lvl_idx] += t
+        if psums_delta.dtype != self.psums_delta.dtype:
+            self.psums_delta = self.psums_delta.astype(psums_delta.dtype)
+        if psums_fine.dtype != self.psums_fine.dtype:
+            self.psums_fine = self.psums_fine.astype(psums_fine.dtype)
 
     def zero_samples(self):
         self.M = np.zeros_like(self.M)
         self.t = np.zeros_like(self.t)
-        self.psums_delta = empty_obj((len(self.lvls), self.computedMoments()))
-        self.psums_fine = empty_obj((len(self.lvls), self.computedMoments()))
+        self.psums_delta = np.empty((len(lvls), moments), dtype=object)
+        self.psums_fine = np.empty((len(lvls), moments), dtype=object)
 
     def addLevels(self, new_lvls):
         assert(len(new_lvls) > 0)
         prev = len(self.lvls)
         self.lvls.extend(new_lvls)
         s = len(self.lvls)
-        self.psums_delta.resize((s, self.psums_delta.shape[1]), refcheck=False)
-        self.psums_fine.resize((s, self.psums_fine.shape[1]), refcheck=False)
+        self.psums_delta.resize((s, self.computedMoments()), refcheck=False)
+        self.psums_fine.resize((s, self.computedMoments()), refcheck=False)
         self.t.resize(s, refcheck=False)
         self.M.resize(s, refcheck=False)
         return prev
@@ -274,17 +297,21 @@ supported in one dimensional problem")
             self.Q = MyDefaultDict(theta=np.nan)
 
     def _checkFunctions(self):
+        self.params.gamma = np.array(self.params.gamma)
+        self.params.beta = np.array(self.params.beta)
+        self.params.w = np.array(self.params.w)
+        self.params.s = np.array(self.params.s)
         # If self.params.reuse_samples is True then
         # all_data will always equal data
         if self.fnWorkModel is None and hasattr(self.params, "gamma"):
             self.fnWorkModel = lambda lvls: work_estimate(lvls,
                                                           np.log(self.params.beta) *
-                                                          np.array(self.params.gamma))
+                                                          self.params.gamma)
 
         if self.fnHierarchy is None:
             self.fnHierarchy = lambda lvls: get_geometric_hl(lvls,
                                                              self.params.h0inv,
-                                                             np.array(self.params.beta))
+                                                             self.params.beta)
 
         if self.params.bayesian and self.fnWorkModel is None:
             raise NotImplementedError("Bayesian parameter fitting is only \
@@ -302,9 +329,9 @@ are the same as the argument ones")
         #                                                 self.params.M0,
         #                                                 self.params.min_lvls/self.params.dim))
         if self.fnExtendLvls is None:
-            weights = np.array(self.params.beta) * (np.array(self.params.w) +
-                                                    (np.array(self.params.s) -
-                                                     np.array(self.params.gamma))/2.)
+            weights = self.params.beta * (self.params.w +
+                                          (self.params.s -
+                                           self.params.gamma)/2.)
             weights /= np.sum(weights)
             if len(weights) == 1:
                 weights = weights[0]*np.ones(self.params.dim)
@@ -445,7 +472,7 @@ Not needed if fnHierarchy is provided.")
         output = "Time={:.12e}\nEg={:.12e}\n\
 Bias={:.12e}\nStatErr={:.12e}\
 \nTotalErrEst={:.12e}\n".format(self.data.calcTotalTime(),
-                                self.data.calcEg(),
+                                np.abs(self.data.calcEg()),
                                 self.bias,
                                 self.stat_error,
                                 self.totalErrorEst())
@@ -460,7 +487,8 @@ Bias={:.12e}\nStatErr={:.12e}\
             assert(V[i]>=0)
             #,100 * np.sqrt(V[i]) / np.abs(E[i])
             output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
-                str(self.data.lvls[i]), E[i], V[i], Vl[i], self.data.M[i], T[i]))
+                str(self.data.lvls[i]), np.abs(E[i]), V[i], np.abs(Vl[i]),
+                self.data.M[i], T[i]))
         return output
 
     ################## Bayesian specific functions
@@ -471,7 +499,7 @@ Bias={:.12e}\nStatErr={:.12e}\
                 return np.inf
             bnd_val = self.data[bnd].calcDeltaEl()
             if self.params.abs_bnd:
-                return np.abs(np.sum(np.abs(bnd_val)))
+                return np.sum(np.abs(bnd_val))
             return np.abs(np.sum(bnd_val))
         return self._estimateBayesianBias()
 
@@ -484,7 +512,7 @@ Bias={:.12e}\nStatErr={:.12e}\
 
     def _estimateBayesianVl(self, L=None):
         if np.sum(self.all_data.M) == 0:
-            return self.all_data.calcDeltaVl()
+            return np.abs(self.all_data.calcDeltaVl()).astype(np.float)
         oL = len(self.all_data.lvls)-1
         L = L or oL
         if L <= 1:
@@ -502,9 +530,10 @@ Bias={:.12e}\nStatErr={:.12e}\
         #       0.5*M*(s2 + self.params.bayes_k0 * (m1 - mu)**2 /
         #              (self.params.bayes_k0 + M)) - 0.5*m1**2
         G_4 = self.params.bayes_k1 + \
-              0.5*(s2 -2*s1*m1 + s1*m1 +
-                   M*self.params.bayes_k0*(m1-mu)**2 / (self.params.bayes_k0+M) )
-        Vl_estimate = np.concatenate((self.all_data[0].calcDeltaVl(), G_4 / G_3))
+              0.5*(np.abs(s2 - s1*m1*2 + s1*m1).astype(np.float) +
+                   M*self.params.bayes_k0*(np.abs(m1).astype(np.float)-mu)**2 / (self.params.bayes_k0+M) )
+        Vl_estimate = np.concatenate((np.abs(self.all_data[0].calcDeltaVl()).astype(np.float),
+                                      G_4 / G_3))
         # Vl_sample = self.all_data.calcDeltaVl()
         # Vl_estimate[:len(Vl_sample)] = Vl_sample
         return Vl_estimate
@@ -518,20 +547,24 @@ Bias={:.12e}\nStatErr={:.12e}\
         if L <= 1:
             raise Exception("Must have at least 2 levels")
         hl = self.fnHierarchy(lvls=np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
-        begin = np.maximum(1, L-self.params.bayes_fit_lvls)
-        M = self.all_data[begin:].M
+        included = np.nonzero(np.logical_and(self.all_data.M > 0,
+                                  np.arange(0, len(self.all_data.lvls)) >= np.maximum(1, L-self.params.bayes_fit_lvls)))[0]
+        M = self.all_data[included].M
         # m1 = self.all_data[begin:].calcDeltaEl()
         # m2 = self.all_data[begin:].calcDeltaEl(moment=2)
         # wl = hl[begin:]**self.Q.w[0] - hl[(begin-1):-1]**self.Q.w[0]
         # sl = (hl[begin:]**(self.Q.s[0]/2.) - hl[(begin-1):-1]**(self.Q.s[0]/2.))**-2
         # self.Q.W = np.abs(np.sum(wl * sl * M * m1) / np.sum(M * wl**2 * sl))
         # self.Q.S = np.sum(sl * (m2 - 2*m1*self.Q.W*wl + self.Q.W**2*wl**2)) / np.sum(M)
-        s1 = self.all_data.psums_delta[begin:, 0]
-        s2 = self.all_data.psums_delta[begin:, 1]
-        t1 = hl[(begin-1):-1]**self.Q.w[0] - hl[begin:]**self.Q.w[0]
-        t2 = (hl[(begin-1):-1]**(self.Q.s[0]/2.) - hl[begin:]**(self.Q.s[0]/2.))**-2
+
+        s1 = self.all_data.psums_delta[included, 0]
+        s2 = self.all_data.psums_delta[included, 1]
+        t1 = hl[included-1]**self.Q.w[0] - hl[included]**self.Q.w[0]
+        t2 = (hl[included-1]**(self.Q.s[0]/2.) - hl[included]**(self.Q.s[0]/2.))**-2
         self.Q.W = np.abs(np.sum(s1 * t1 * t2) / np.sum(M * t1**2 * t2))
-        self.Q.S = np.sum(t2*(s2 - 2*s1*t1*self.Q.W + M*self.Q.W**2*t1**2)) / np.sum(M)
+        #self.Q.S = np.sum((s2 - s1*self.Q.W*t1*2 + self.Q.W*M**2*t1**2)*t2) / np.sum(M)
+        self.Q.S = (np.abs(np.sum(s2 - s1*self.Q.W*t1*2*t2)) \
+                    + np.sum(self.Q.W*M**2*t1**2*t2)) / np.sum(M)
         if self.params.bayes_w_sig > 0 or self.params.bayes_s_sig > 0:
             # TODO: Estimate w=q_1, s=q_2
             raise NotImplemented("TODO, estimate w and s")
@@ -602,9 +635,6 @@ estimate optimal number of levels"
         lvls = self.data.lvls
         s = len(lvls)
         M = np.zeros(s, dtype=np.int)
-        # TODO: Better way?
-        psums_delta = np.array([None]*np.prod((s, self.data.computedMoments()))).reshape((s, self.data.computedMoments()))
-        psums_fine = np.array([None]*np.prod((s, self.data.computedMoments()))).reshape((s, self.data.computedMoments()))
         t = np.zeros(s)
         for i in range(0, s):
             if totalM[i] <= self.data.M[i]:
@@ -612,11 +642,12 @@ estimate optimal number of levels"
             if verbose:
                 print("# Doing", totalM[i]-self.data.M[i], "of level", lvls[i])
             mods, inds = lvl_to_inds_general(lvls[i])
-            M[i], psums_delta[i, :], psums_fine[i, :],  t[i] = self.SampleLvl(mods, inds,
-                                                                      totalM[i] - self.data.M[i])
-        self.data.addSamples(psums_delta, psums_fine, M, t)
-        if self.all_data != self.data:
-            self.all_data.addSamples(psums_delta, psums_fine, M, t)
+            args = self.SampleLvl(mods, inds, totalM[i] -
+                                  self.data.M[i])
+
+            self.data.addSamples(i, *args)
+            if self.all_data != self.data:
+                self.all_data.addSamples(i, *args)
         self._estimateAll()
 
     def _calcTheta(self, TOL, bias_est):

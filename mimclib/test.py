@@ -5,6 +5,14 @@ from __future__ import print_function
 import numpy as np
 import warnings
 
+__all__ = []
+
+
+def public(sym):
+    __all__.append(sym.__name__)
+    return sym
+
+@public
 class ArgumentWarning(Warning):
     def __init__(self, message):
         self.message = message

@@ -68,6 +68,7 @@ def addExtraArguments(parser):
 import mimclib
 class CustomClass(mimclib.mimc.custom_obj):
     def __init__(self, d):
+        assert(np.isscalar(d))
         self.data = d
 
     def __add__(self, d):
@@ -87,7 +88,11 @@ class CustomClass(mimclib.mimc.custom_obj):
     def __str__(self):
         return str(self.data)
 
-# TODO: Set exception hooks
+    def __abs__(self):
+        # return norm (L2, L_infty, etc...)
+        return np.abs(self.data)
+
+
 def mySampleQoI(run, inds, M):
     meshes = (run.params.qoi_T/run.fnHierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
@@ -109,5 +114,9 @@ def mySampleQoI(run, inds, M):
 
 if __name__ == "__main__":
     import mimclib.test
+    import mimclib.ipython
+    import sys
+    sys.excepthook = mimclib.ipython.excepthook()
+
     mimclib.test.RunStandardTest(fnSampleLvl=mySampleQoI,
                                  fnAddExtraArgs=addExtraArguments)
