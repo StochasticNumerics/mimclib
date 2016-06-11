@@ -542,8 +542,6 @@ Bias={:.12e}\nStatErr={:.12e}\
                                       G_4[1:] / G_3))
         # Vl_sample = self.all_data.calcDeltaVl()
         # Vl_estimate[:len(Vl_sample)] = Vl_sample
-        from . import ipython
-        ipython.embed()
         return Vl_estimate
 
     def _estimateQParams(self):
@@ -571,8 +569,8 @@ Bias={:.12e}\nStatErr={:.12e}\
         t2 = (hl[included-1]**(self.Q.s[0]/2.) - hl[included]**(self.Q.s[0]/2.))**-2
         self.Q.W = np.abs(np.sum(s1 * t1 * t2) / np.sum(M * t1**2 * t2))
         #self.Q.S = np.sum((s2 - s1*self.Q.W*t1*2 + self.Q.W*M**2*t1**2)*t2) / np.sum(M)
-        self.Q.S = (np.abs(np.sum(s2 - s1*self.Q.W*t1*2*t2)) \
-                    + np.sum(self.Q.W*M**2*t1**2*t2)) / np.sum(M)
+        self.Q.S = (np.sum(np.abs(s2*t2) - np.abs(s1*self.Q.W*t1*2*t2)) \
+                    + np.sum(M*self.Q.W**2*t1**2*t2)) / np.sum(M)
         if self.params.bayes_w_sig > 0 or self.params.bayes_s_sig > 0:
             # TODO: Estimate w=q_1, s=q_2
             raise NotImplemented("TODO, estimate w and s")
