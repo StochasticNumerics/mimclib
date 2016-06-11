@@ -69,16 +69,19 @@ def compute_central_moment(psums, M, moment):
     raw = compute_raw_moments(psums, M)
     if moment == 1:
         return raw[:, 0]
+
     n = moment
-    pn = np.tile(n, raw.shape[0])
-    from . import ipython
-    ipython.embed()
-    val = (raw[:, 0]**pn) * (-1)**n
+    pn = np.array([n])
+    val = (raw[:, 0]**pn[:, np.newaxis]) * (-1)**n
     # From http://mathworld.wolfram.com/CentralMoment.html
     nfact = np.math.factorial(n)
     for k in range(1, moment+1):
         nchoosek = nfact / (np.math.factorial(k) * np.math.factorial(n-k))
         val +=  (raw[:, k-1] * raw[:, 0]**(pn-k)) * nchoosek * (-1)**(n-k)
+
+    from . import ipython
+    ipython.embed()
+
     if moment % 2 == 1:
         return val
     return val
@@ -152,7 +155,7 @@ class MIMCData(object):
         Return the sum of the sample estimators for
         all the levels
         """
-        return np.sum(self.calcDeltaEl())
+        return np.sum(self.calcDeltaEl(), axis=0)
 
     def __len__(self):
         return len(self.lvls)
@@ -203,7 +206,7 @@ class MIMCData(object):
         return val
 
     def calcTotalTime(self, ind=None):
-        return np.sum(self.t)
+        return np.sum(self.t, axis=0)
 
     def addSamples(self, lvl_idx, M, psums_delta, psums_fine, t):
         assert psums_delta.shape == psums_fine.shape and \
@@ -344,7 +347,7 @@ are the same as the argument ones")
             weights = self.params.beta * (self.params.w +
                                           (self.params.s -
                                            self.params.gamma)/2.)
-            weights /= np.sum(weights)
+            weights /= np.sum(weights, axis=0)
             if len(weights) == 1:
                 weights = weights[0]*np.ones(self.params.dim)
 
@@ -477,7 +480,7 @@ Not needed if fnHierarchy is provided.")
         return mimcgrp
 
     def calcTotalWork(self):
-        return np.sum(self.Wl_estimate * self.data.M)
+        return np.sum(self.Wl_estimate * self.data.M, axis=0)
 
     def totalErrorEst(self):
         return self.bias + self.stat_error
@@ -529,7 +532,7 @@ Bias={:.12e}\nStatErr={:.12e}\
         return self.Q.W * hl[-1]**self.Q.w[0]
 
     def _estimateBayesianVl(self, L=None):
-        if np.sum(self.all_data.M) == 0:
+        if np.sum(self.all_data.M, axis=0) == 0:
             return self.fnNorm(self.all_data.calcDeltaVl())
         oL = len(self.all_data.lvls)-1
         L = L or oL
@@ -566,7 +569,7 @@ Bias={:.12e}\nStatErr={:.12e}\
     def _estimateQParams(self):
         if not self.params.bayesian:
             return
-        if np.sum(self.all_data.M) == 0:
+        if np.sum(self.all_data.M, axis=0) == 0:
             return   # Cannot really estimate anything without at least some samples
         L = len(self.all_data.lvls)-1
         if L <= 1:
@@ -579,8 +582,8 @@ Bias={:.12e}\nStatErr={:.12e}\
         s2 = self.all_data.psums_delta[included, 1]
         t1 = hl[included-1]**self.Q.w[0] - hl[included]**self.Q.w[0]
         t2 = (hl[included-1]**(self.Q.s[0]/2.) - hl[included]**(self.Q.s[0]/2.))**-2
-        self.Q.W = self.fnNorm1(np.sum(s1 * t1 * t2) / np.sum(M * t1**2 * t2))
-        self.Q.S = (np.sum(self.fnNorm(s2*t2) - self.fnNorm(s1*self.Q.W*t1*2*t2)) \
+        self.Q.W = self.fnNorm1(np.sum(s1 * t1[:, np.newaxis] * t2[:, np.newaxis], axis=0) / np.sum(M * t1**2 * t2, axis=0))
+        self.Q.S = (np.sum(self.fnNorm(s2*t2[:, np.newaxis]) - self.fnNorm(s1*self.Q.W*t1[:, np.newaxis]*2*t2[:, np.newaxis]), axis=0) \
                     + np.sum(M*self.Q.W**2*t1**2*t2)) / np.sum(M)
         if self.params.bayes_w_sig > 0 or self.params.bayes_s_sig > 0:
             # TODO: Estimate w=q_1, s=q_2

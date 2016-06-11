@@ -95,8 +95,9 @@ class CustomClass(mimclib.mimc.custom_obj):
 def mySampleQoI(run, inds, M):
     meshes = (run.params.qoi_T/run.fnHierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
-    # solves = np.empty((M, len(inds)), dtype=object)
-    solves = np.empty((M, len(inds), 2), dtype=float)
+    #solves = np.empty((M, len(inds)), dtype=object)
+    solves = np.empty((M, len(inds)), dtype=float)
+    #solves = np.empty((M, len(inds), 2), dtype=float)
     import time
     tStart = time.time()
     dW = np.random.normal(size=(M, maxN))/np.sqrt(maxN)
@@ -107,11 +108,11 @@ def mySampleQoI(run, inds, M):
         w = np.zeros((dWl.shape[0], dWl.shape[1]+1))
         w[:, 1:] = run.params.qoi_sigma*dWl + 1 + run.params.qoi_mu/mesh
         val = wcumsum(x, w)[:, -1]
-        #solves[:, i] = val
+        solves[:, i] = val
         #solves[:, i] = [CustomClass(d) for d in val]
         #solves[:, i] = [np.array([d, 0.5*d]) for d in val]
-        solves[:, i, 0] = val
-        solves[:, i, 1] = 2.*val
+        # solves[:, i, 0] = val
+        # solves[:, i, 1] = 2.*val
     return solves, time.time()-tStart
 
 def norm_vector(x):
@@ -120,7 +121,7 @@ def norm_vector(x):
 
 def initRun(run):
     #run.setFunctions(fnNorm=CustomClass.norm)
-    run.setFunctions(fnNorm=norm_vector)
+    #run.setFunctions(fnNorm=norm_vector)
     return
 
 
