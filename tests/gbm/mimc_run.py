@@ -88,18 +88,15 @@ class CustomClass(mimclib.mimc.custom_obj):
     def __str__(self):
         return str(self.data)
 
-    def __abs__(self):
-        # return norm (L2, L_infty, etc...)
-        return np.abs(self.data)
-
+    @staticmethod
+    def norm(x):
+        return np.array([np.abs(xx.data) for xx in x])
 
 def mySampleQoI(run, inds, M):
     meshes = (run.params.qoi_T/run.fnHierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
-    # TODO: Figure out a better way to construct the following object
-    solves = np.array([[None]*len(inds)]*M)
-    #solves = np.zeros((M, len(inds)))
-
+    # solves = np.empty((M, len(inds)), dtype=object)
+    solves = np.empty((M, len(inds), 2), dtype=float)
     import time
     tStart = time.time()
     dW = np.random.normal(size=(M, maxN))/np.sqrt(maxN)
@@ -109,8 +106,23 @@ def mySampleQoI(run, inds, M):
         x = np.concatenate(([run.params.qoi_S0], np.zeros(dWl.shape[1])))
         w = np.zeros((dWl.shape[0], dWl.shape[1]+1))
         w[:, 1:] = run.params.qoi_sigma*dWl + 1 + run.params.qoi_mu/mesh
-        solves[:, i] = [CustomClass(d) for d in wcumsum(x, w)[:, -1]]
+        val = wcumsum(x, w)[:, -1]
+        #solves[:, i] = val
+        #solves[:, i] = [CustomClass(d) for d in val]
+        #solves[:, i] = [np.array([d, 0.5*d]) for d in val]
+        solves[:, i, 0] = val
+        solves[:, i, 1] = 2.*val
     return solves, time.time()-tStart
+
+def norm_vector(x):
+    return np.array([np.max(np.abs(xx)) for xx in x])
+
+
+def initRun(run):
+    #run.setFunctions(fnNorm=CustomClass.norm)
+    run.setFunctions(fnNorm=norm_vector)
+    return
+
 
 if __name__ == "__main__":
     import mimclib.test
@@ -119,4 +131,5 @@ if __name__ == "__main__":
     sys.excepthook = mimclib.ipython.excepthook()
 
     mimclib.test.RunStandardTest(fnSampleLvl=mySampleQoI,
-                                 fnAddExtraArgs=addExtraArguments)
+                                 fnAddExtraArgs=addExtraArguments,
+                                 fnInit=initRun)

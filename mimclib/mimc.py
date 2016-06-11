@@ -13,7 +13,10 @@ from . import setutil
 # TODO: Figure out how to create an empty instance given a type
 
 __all__ = []
-
+import argparse
+class Store_as_array(argparse._StoreAction):
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, np.array(values))
 
 def public(sym):
     __all__.append(sym.__name__)
@@ -44,19 +47,8 @@ class custom_obj(object):
         return self + d*-1
 
 class empty_obj(object):
-    def __init__(self, shape):
-        self.resize(shape)
-
     def __add__(self, newarr):
-        assert(newarr.shape == self.shape)
         return newarr  # Forget about this object
-
-    def resize(self, shape, refcheck=False):
-        # TODO: Should handle integer weights better than this
-        if isinstance(shape, tuple):
-            self.shape = shape
-        else:
-            self.shape = (shape, )
 
 
 def compute_raw_moments(psums, M):
@@ -65,8 +57,8 @@ def compute_raw_moments(psums, M):
     '''
     idx = M != 0
     val = np.empty_like(psums)
-    val[idx, :] = psums[idx, :] / np.tile(M[idx].reshape((-1,1)),
-                                          (1, psums.shape[1]))
+    val[idx] = psums[idx] / expand(M[idx], 0, val[idx].shape)
+    #np.tile(M[idx].reshape((-1,1)), (1, psums.shape[1]))
     val[M == 0, :] = None
     return val
 
@@ -79,6 +71,8 @@ def compute_central_moment(psums, M, moment):
         return raw[:, 0]
     n = moment
     pn = np.tile(n, raw.shape[0])
+    from . import ipython
+    ipython.embed()
     val = (raw[:, 0]**pn) * (-1)**n
     # From http://mathworld.wolfram.com/CentralMoment.html
     nfact = np.math.factorial(n)
@@ -87,6 +81,7 @@ def compute_central_moment(psums, M, moment):
         val +=  (raw[:, k-1] * raw[:, 0]**(pn-k)) * nchoosek * (-1)**(n-k)
     if moment % 2 == 1:
         return val
+    return val
     # The moment should be positive
     # TODO: Debug for objects
     if np.min(val)<0.0:
@@ -102,6 +97,13 @@ def compute_central_moment(psums, M, moment):
 Possible problem in computing sums.".format(moment, np.min(val)))
     return val
 
+def expand(b, i, shape):
+    assert(len(b) == shape[i])
+    b_shape = np.ones(len(shape), dtype=np.int)
+    b_shape[i] = len(b)
+    b_reps = list(shape)
+    b_reps[i] = 1
+    return np.tile(b.reshape(b_shape), b_reps)
 
 @public
 class MIMCData(object):
@@ -123,14 +125,14 @@ class MIMCData(object):
         if lvls is not None:
             self.lvls = copy.copy(lvls)
 
-        self.psums_delta = np.empty((len(self.lvls), moments), dtype=object)
-        self.psums_fine = np.empty((len(self.lvls), moments), dtype=object)
+        self.psums_delta = None
+        self.psums_fine = None
         self.t = np.zeros(len(self.lvls))      # Time of lvls
         self.M = np.zeros(len(self.lvls), dtype=np.int)      # Number of samples in each lvl
 
         if psums_delta is not None:
             self.psums_delta = psums_delta.copy()
-        if self.psums_fine is None:
+        if psums_fine is not None:
             self.psums_fine = psums_fine.copy()
 
         if t is not None:
@@ -138,8 +140,10 @@ class MIMCData(object):
         if M is not None:
             self.M = M.copy()
 
-        assert(len(self.lvls) == len(self.psums_fine))
-        assert(len(self.lvls) == len(self.psums_delta))
+        if self.psums_fine is not None:
+            assert(len(self.lvls) == len(self.psums_fine))
+        if self.psums_delta is not None:
+            assert(len(self.lvls) == len(self.psums_delta))
         assert(len(self.lvls) == len(self.M))
         assert(len(self.lvls) == len(self.t))
 
@@ -157,8 +161,8 @@ class MIMCData(object):
         # Reshape everything to allow ind to be a single index or a list
         return MIMCData(self.dim,
                         lvls=np.array(self.lvls, dtype=object)[ind].reshape((-1,self.dim)).tolist(),
-                        psums_delta=self.psums_delta[ind].reshape((-1, self.psums_delta.shape[1])),
-                        psums_fine=self.psums_fine[ind].reshape((-1, self.psums_delta.shape[1])),
+                        psums_delta=self.psums_delta[ind].reshape((-1,) + self.psums_delta.shape[1:]),
+                        psums_fine=self.psums_fine[ind].reshape((-1,) + self.psums_delta.shape[1:]),
                         t=self.t[ind].reshape(-1),
                         M=self.M[ind].reshape(-1))
 
@@ -181,7 +185,8 @@ class MIMCData(object):
         assert(moment > 0)
         idx = self.M != 0
         val = np.empty_like(self.psums_delta[:, moment-1])
-        val[idx] = self.psums_delta[idx, moment-1] / self.M[idx]
+        val[idx] = self.psums_delta[idx, moment-1] / \
+                   expand(self.M[idx], 0 ,self.psums_delta[idx, moment-1].shape)
         val[np.logical_not(idx)] = None
         return val
 
@@ -204,6 +209,14 @@ class MIMCData(object):
         assert psums_delta.shape == psums_fine.shape and \
             psums_fine.shape[0] == self.computedMoments(), "Inconsistent arguments "
         if self.M[lvl_idx] == 0:
+            if self.psums_delta is None:
+                self.psums_delta = np.zeros((len(self.lvls),)
+                                            + psums_delta.shape, dtype=psums_delta.dtype)
+
+            if self.psums_fine is None:
+                self.psums_fine = np.zeros((len(self.lvls),)
+                                            + psums_fine.shape, dtype=psums_fine.dtype)
+
             self.psums_delta[lvl_idx] = psums_delta
             self.psums_fine[lvl_idx] = psums_fine
             self.M[lvl_idx] = M
@@ -229,8 +242,11 @@ class MIMCData(object):
         prev = len(self.lvls)
         self.lvls.extend(new_lvls)
         s = len(self.lvls)
-        self.psums_delta.resize((s, self.computedMoments()), refcheck=False)
-        self.psums_fine.resize((s, self.computedMoments()), refcheck=False)
+        if self.psums_delta is not None:
+            self.psums_delta.resize((s, ) + self.psums_delta.shape[1:], refcheck=False)
+        if self.psums_fine is not None:
+            self.psums_fine.resize((s, ) + self.psums_fine.shape[1:], refcheck=False)
+
         self.t.resize(s, refcheck=False)
         self.M.resize(s, refcheck=False)
         return prev
@@ -260,6 +276,7 @@ class MIMCRun(object):
     """
 
     def __init__(self, old_data=None, **kwargs):
+        self.fnNorm = np.abs
         self.params = MyDefaultDict(**kwargs)
         self.fnHierarchy = None
         self.fnWorkModel = None
@@ -296,10 +313,6 @@ supported in one dimensional problem")
             self.Q = MyDefaultDict(theta=np.nan)
 
     def _checkFunctions(self):
-        self.params.gamma = np.array(self.params.gamma)
-        self.params.beta = np.array(self.params.beta)
-        self.params.w = np.array(self.params.w)
-        self.params.s = np.array(self.params.s)
         # If self.params.reuse_samples is True then
         # all_data will always equal data
         if self.fnWorkModel is None and hasattr(self.params, "gamma"):
@@ -356,7 +369,7 @@ are the same as the argument ones")
         for k in kwargs.keys():
             if k not in ["fnExtendLvls", "fnSampleLvl",
                          "fnItrDone", "fnWorkModel",
-                         "fnHierarchy", "fnSampleQoI"]:
+                         "fnHierarchy", "fnSampleQoI", "fnNorm"]:
                 raise KeyError("Invalid function name")
             setattr(self, k, kwargs[k])
 
@@ -368,11 +381,11 @@ are the same as the argument ones")
         mimcgrp = parser.add_argument_group('MIMC', 'Arguments to control MIMC logic')
         mimcgrp.register('type', 'bool', str2bool)
 
-        def add_store(name, **kwargs):
+        def add_store(name, action="store", **kwargs):
             if "default" in kwargs and "help" in kwargs:
                 kwargs["help"] += " (default: {})".format(kwargs["default"])
             mimcgrp.add_argument(pre + name, dest=name,
-                                 action="store",
+                                 action=action,
                                  **kwargs)
 
         add_store('verbose', type='bool', default=False,
@@ -396,18 +409,18 @@ estimating bias (sometimes that's too conservative).")
         add_store('incL', type=int, default=2,
                   help="Maximum increment of number of levels \
 between iterations")
-        add_store('w', nargs='+', type=float,
+        add_store('w', nargs='+', type=float, action=Store_as_array,
                   help="Weak convergence rates. Must be scalar or of size -dim. \
 Not needed if fnExtendLvls is specified and -bayesian is False.")
-        add_store('s', nargs='+', type=float,
+        add_store('s', nargs='+', type=float, action=Store_as_array,
                   help="Strong convergence rates. Must be a scalar or of size -dim. \
 Not needed if fnExtendLvls is specified and -bayesian is False.")
         add_store('TOL', type=float,
                   help="The required tolerance for the MIMC run")
-        add_store('beta', type=float, nargs='+',
+        add_store('beta', type=float, nargs='+', action=Store_as_array,
                   help="Level separation parameter. to be used \
 with get_geometric_hl. Not needed if fnHierarchy is provided.")
-        add_store('gamma', type=float, nargs='+',
+        add_store('gamma', type=float, nargs='+', action=Store_as_array,
                   help="Work exponent to be used with work_estimate.\
 Not needed if fnWorkModel and fnExtendLvls are provided.")
 
@@ -437,7 +450,8 @@ Not needed if -bayesian is False.")
             add_store('max_TOL', type=float, default=0.1,
                       help="The (approximate) tolerance for \
 the first iteration. Not needed if TOLs is provided to doRun.")
-            add_store('M0', nargs='+', type=int, default=[10],
+            add_store('M0', nargs='+', type=int, default=np.array([10]),
+                      action=Store_as_array,
                       help="Initial number of samples used to estimate the \
 sample variance on levels when not using the Bayesian estimators. \
 Not needed if fnExtendLvls is provided.")
@@ -456,7 +470,8 @@ for tolerance larger than TOL. Not needed if TOLs is provided to doRun.")
             add_store('r2', type=float, default=1.1,
                       help="A parameters to control to tolerance sequence \
 for tolerance smaller than TOL. Not needed if TOLs is provided to doRun.")
-            add_store('h0inv', type=float, nargs='+', default=2,
+            add_store('h0inv', type=float, nargs='+', action=Store_as_array,
+                      default=2,
                       help="Minimum element size get_geometric_hl. \
 Not needed if fnHierarchy is provided.")
         return mimcgrp
@@ -468,16 +483,16 @@ Not needed if fnHierarchy is provided.")
         return self.bias + self.stat_error
 
     def __str__(self):
-        output = "Time={:.12e}\nEg={:.12e}\n\
+        output = "Time={:.12e}\nEg={}\n\
 Bias={:.12e}\nStatErr={:.12e}\
 \nTotalErrEst={:.12e}\n".format(self.data.calcTotalTime(),
-                                np.abs(self.data.calcEg()),
+                                str(self.data.calcEg()),
                                 self.bias,
                                 self.stat_error,
                                 self.totalErrorEst())
         V = self.Vl_estimate
-        Vl = self.data.calcDeltaVl()
-        E = self.data.calcDeltaEl()
+        Vl = self.fnNorm(self.data.calcDeltaVl())
+        E = self.fnNorm(self.data.calcDeltaEl())
         T = self.data.calcTl()
 
         output += ("{:<8}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
@@ -486,9 +501,13 @@ Bias={:.12e}\nStatErr={:.12e}\
             assert(V[i]>=0)
             #,100 * np.sqrt(V[i]) / np.abs(E[i])
             output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
-                str(self.data.lvls[i]), np.abs(E[i]), V[i], np.abs(Vl[i]),
-                self.data.M[i], T[i]))
+                str(self.data.lvls[i]), E[i], V[i], Vl[i], self.data.M[i], T[i]))
         return output
+
+    def fnNorm1(self, x):
+        """ Helper function to return norm of a single element
+        """
+        return self.fnNorm(np.array([x]))[0]
 
     ################## Bayesian specific functions
     def _estimateBias(self):
@@ -498,8 +517,8 @@ Bias={:.12e}\nStatErr={:.12e}\
                 return np.inf
             bnd_val = self.data[bnd].calcDeltaEl()
             if self.params.abs_bnd:
-                return np.sum(np.abs(bnd_val))
-            return np.abs(np.sum(bnd_val))
+                return np.sum(self.fnNorm(bnd_val))
+            return self.fnNorm1(np.sum(bnd_val))
         return self._estimateBayesianBias()
 
     def _estimateBayesianBias(self, L=None):
@@ -511,7 +530,7 @@ Bias={:.12e}\nStatErr={:.12e}\
 
     def _estimateBayesianVl(self, L=None):
         if np.sum(self.all_data.M) == 0:
-            return np.abs(self.all_data.calcDeltaVl()).astype(np.float)
+            return self.fnNorm(self.all_data.calcDeltaVl())
         oL = len(self.all_data.lvls)-1
         L = L or oL
         if L <= 1:
@@ -533,12 +552,12 @@ Bias={:.12e}\nStatErr={:.12e}\
         tmpM = np.concatenate((self.all_data.M[1:], np.zeros(L-oL)))
         G_3 = self.params.bayes_k1 * Lambda + tmpM/2.0
         G_4 = self.params.bayes_k1*np.ones(L+1)
-        G_4[included] += 0.5*(np.abs(s2 - s1*m1*2 + s1*m1).astype(np.float) + \
+        G_4[included] += 0.5*(self.fnNorm(s2 - s1*m1*2 + s1*m1) + \
                               M*self.params.bayes_k0*(
-                                  np.abs(m1).astype(np.float)-mu)**2/
+                                  self.fnNorm(m1)-mu)**2/
                               (self.params.bayes_k0+M) )
 
-        Vl_estimate = np.concatenate((np.abs(self.all_data[0].calcDeltaVl()).astype(np.float),
+        Vl_estimate = np.concatenate((self.fnNorm(self.all_data[0].calcDeltaVl()),
                                       G_4[1:] / G_3))
         # Vl_sample = self.all_data.calcDeltaVl()
         # Vl_estimate[:len(Vl_sample)] = Vl_sample
@@ -556,20 +575,12 @@ Bias={:.12e}\nStatErr={:.12e}\
         included = np.nonzero(np.logical_and(self.all_data.M > 0,
                                   np.arange(0, len(self.all_data.lvls)) >= np.maximum(1, L-self.params.bayes_fit_lvls)))[0]
         M = self.all_data[included].M
-        # m1 = self.all_data[begin:].calcDeltaEl()
-        # m2 = self.all_data[begin:].calcDeltaEl(moment=2)
-        # wl = hl[begin:]**self.Q.w[0] - hl[(begin-1):-1]**self.Q.w[0]
-        # sl = (hl[begin:]**(self.Q.s[0]/2.) - hl[(begin-1):-1]**(self.Q.s[0]/2.))**-2
-        # self.Q.W = np.abs(np.sum(wl * sl * M * m1) / np.sum(M * wl**2 * sl))
-        # self.Q.S = np.sum(sl * (m2 - 2*m1*self.Q.W*wl + self.Q.W**2*wl**2)) / np.sum(M)
-
         s1 = self.all_data.psums_delta[included, 0]
         s2 = self.all_data.psums_delta[included, 1]
         t1 = hl[included-1]**self.Q.w[0] - hl[included]**self.Q.w[0]
         t2 = (hl[included-1]**(self.Q.s[0]/2.) - hl[included]**(self.Q.s[0]/2.))**-2
-        self.Q.W = np.abs(np.sum(s1 * t1 * t2) / np.sum(M * t1**2 * t2))
-        #self.Q.S = np.sum((s2 - s1*self.Q.W*t1*2 + self.Q.W*M**2*t1**2)*t2) / np.sum(M)
-        self.Q.S = (np.sum(np.abs(s2*t2) - np.abs(s1*self.Q.W*t1*2*t2)) \
+        self.Q.W = self.fnNorm1(np.sum(s1 * t1 * t2) / np.sum(M * t1**2 * t2))
+        self.Q.S = (np.sum(self.fnNorm(s2*t2) - self.fnNorm(s1*self.Q.W*t1*2*t2)) \
                     + np.sum(M*self.Q.W**2*t1**2*t2)) / np.sum(M)
         if self.params.bayes_w_sig > 0 or self.params.bayes_s_sig > 0:
             # TODO: Estimate w=q_1, s=q_2
@@ -620,8 +631,8 @@ estimate optimal number of levels"
         calcM = 0
         total_time = 0
         p = np.arange(1, self.data.computedMoments()+1)
-        psums_delta = empty_obj(len(p))
-        psums_fine = empty_obj(len(p))
+        psums_delta = empty_obj()
+        psums_fine = empty_obj()
         while calcM < M:
             curM = np.minimum(M-calcM, self.params.maxM)
             values, time = self.fnSampleLvl(inds=inds, M=curM)
@@ -629,9 +640,12 @@ estimate optimal number of levels"
             # TODO: Consider moving to C/C++
             # psums_delta_j = \sum_{i} (\sum_{k} mod_k values_{i,k})**p_j
 
-            A1 = np.tile(np.sum(values*np.tile(mods, (values.shape[0], 1)), axis=1), (len(p), 1))
-            A2 = np.tile(values[:, 0], (len(p), 1))
-            B = np.tile(p, (len(values),1)).transpose()
+            delta = np.sum(values * \
+                           expand(mods, 1, values.shape),
+                           axis=1)
+            A1 = np.tile(delta, (len(p),) + (1,)*len(delta.shape) )
+            A2 = np.tile(values[:, 0], (len(p),) + (1,)*len(delta.shape) )
+            B = expand(p, 0, A1.shape)
             psums_delta += np.sum(A1**B , axis=1)
             psums_fine += np.sum(A2**B, axis=1)
             calcM += values.shape[0]
