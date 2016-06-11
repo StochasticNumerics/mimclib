@@ -11,7 +11,6 @@ from . import setutil
 # TODO: Somehow we need to access psums using both a single and double elements
 # TODO: Figure out how to do Obj+i and i+Obj
 # TODO: Figure out how to create an empty instance given a type
-# TODO: Figure out a way to install Python docs (numpy and matplotlib locally)
 
 __all__ = []
 
@@ -517,25 +516,34 @@ Bias={:.12e}\nStatErr={:.12e}\
         L = L or oL
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        hl = self.fnHierarchy(lvls=np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
-        M = np.concatenate((self.all_data[1:].M, np.zeros(L-oL)))
-        s1 = np.concatenate((self.all_data.psums_delta[1:, 0], np.zeros(L-oL)))
-        m1 = np.concatenate((self.all_data[1:].calcDeltaEl(), np.zeros(L-oL)))
-        s2 = np.concatenate((self.all_data.psums_delta[1:, 1],
-                             np.zeros(L-oL)))
-        mu = self.Q.W*(hl[:-1]**self.Q.w[0] - hl[1:]**self.Q.w[0])
+        included = np.nonzero(np.logical_and(self.all_data.M > 0,
+                                             np.arange(0,
+                                                       len(self.all_data.lvls))
+                                             >= 1))[0]
+        hl = self.fnHierarchy(lvls=np.arange(0, L+1).reshape((-1,
+                                                              1))).reshape(1, -1)[0]
+        M = self.all_data.M[included]
+        s1 = self.all_data.psums_delta[included, 0]
+        m1 = self.all_data[included].calcDeltaEl()
+        s2 = self.all_data.psums_delta[included, 1]
+        mu = self.Q.W*(hl[included-1]**self.Q.w[0] - hl[included]**self.Q.w[0])
+
         Lambda = 1./(self.Q.S*(hl[:-1]**(self.Q.s[0]/2.) - hl[1:]**(self.Q.s[0]/2.))**2)
-        G_3 = self.params.bayes_k1 * Lambda + M/2.0
-        # G_4 = self.params.bayes_k1 + \
-        #       0.5*M*(s2 + self.params.bayes_k0 * (m1 - mu)**2 /
-        #              (self.params.bayes_k0 + M)) - 0.5*m1**2
-        G_4 = self.params.bayes_k1 + \
-              0.5*(np.abs(s2 - s1*m1*2 + s1*m1).astype(np.float) +
-                   M*self.params.bayes_k0*(np.abs(m1).astype(np.float)-mu)**2 / (self.params.bayes_k0+M) )
+
+        tmpM = np.concatenate((self.all_data.M[1:], np.zeros(L-oL)))
+        G_3 = self.params.bayes_k1 * Lambda + tmpM/2.0
+        G_4 = self.params.bayes_k1*np.ones(L+1)
+        G_4[included] += 0.5*(np.abs(s2 - s1*m1*2 + s1*m1).astype(np.float) + \
+                              M*self.params.bayes_k0*(
+                                  np.abs(m1).astype(np.float)-mu)**2/
+                              (self.params.bayes_k0+M) )
+
         Vl_estimate = np.concatenate((np.abs(self.all_data[0].calcDeltaVl()).astype(np.float),
-                                      G_4 / G_3))
+                                      G_4[1:] / G_3))
         # Vl_sample = self.all_data.calcDeltaVl()
         # Vl_estimate[:len(Vl_sample)] = Vl_sample
+        from . import ipython
+        ipython.embed()
         return Vl_estimate
 
     def _estimateQParams(self):
