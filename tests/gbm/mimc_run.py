@@ -64,6 +64,8 @@ def addExtraArguments(parser):
                         action="store", help="Final time in GBM")
     parser.add_argument("-qoi_S0", type=float, default=1.,
                         action="store", help="Initial condition in GBM")
+    parser.add_argument("-qoi_type", type=str, default="real",
+                        action="store", help="Type of QoI. real, arr or obj")
 
 import mimclib
 class CustomClass(mimclib.mimc.custom_obj):
@@ -95,9 +97,14 @@ class CustomClass(mimclib.mimc.custom_obj):
 def mySampleQoI(run, inds, M):
     meshes = (run.params.qoi_T/run.fnHierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
-    #solves = np.empty((M, len(inds)), dtype=object)
-    solves = np.empty((M, len(inds)), dtype=float)
-    #solves = np.empty((M, len(inds), 2), dtype=float)
+
+    if run.params.qoi_type == "real":
+        solves = np.empty((M, len(inds)), dtype=float)
+    elif run.params.qoi_type == "obj":
+        solves = np.empty((M, len(inds)), dtype=object)
+    elif run.params.qoi_type == "arr":
+        solves = np.empty((M, len(inds), 2), dtype=float)
+
     import time
     tStart = time.time()
     dW = np.random.normal(size=(M, maxN))/np.sqrt(maxN)
@@ -108,20 +115,23 @@ def mySampleQoI(run, inds, M):
         w = np.zeros((dWl.shape[0], dWl.shape[1]+1))
         w[:, 1:] = run.params.qoi_sigma*dWl + 1 + run.params.qoi_mu/mesh
         val = wcumsum(x, w)[:, -1]
-        solves[:, i] = val
-        #solves[:, i] = [CustomClass(d) for d in val]
-        #solves[:, i] = [np.array([d, 0.5*d]) for d in val]
-        # solves[:, i, 0] = val
-        # solves[:, i, 1] = 2.*val
+        if run.params.qoi_type == "real":
+            solves[:, i] = val
+        elif run.params.qoi_type == "obj":
+            solves[:, i] = [CustomClass(d) for d in val]
+        elif run.params.qoi_type == "arr":
+            solves[:, i, 0] = val
+            solves[:, i, 1] = 2*val
     return solves, time.time()-tStart
 
-def norm_vector(x):
-    return np.array([np.max(np.abs(xx)) for xx in x])
-
-
 def initRun(run):
-    #run.setFunctions(fnNorm=CustomClass.norm)
-    #run.setFunctions(fnNorm=norm_vector)
+    def norm_vector(x):
+        return np.array([np.max(np.abs(xx)) for xx in x])
+
+    if run.params.qoi_type == "obj":
+        run.setFunctions(fnNorm=CustomClass.norm)
+    elif run.params.qoi_type == "arr":
+        run.setFunctions(fnNorm=norm_vector)
     return
 
 
