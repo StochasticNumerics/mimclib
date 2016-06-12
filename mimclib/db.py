@@ -362,6 +362,8 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
                                iteration_idx=iteration_idx)
 
     def deleteRuns(self, run_ids):
+        if len(run_ids) == 0:
+            return 0
         with DBConn(**self.connArgs) as cur:
             cur.execute("DELETE from {runTable} where run_id in ?".format(runTable=self.runTable),
                         [np.array(run_ids).astype(np.int).reshape(-1).tolist()])
