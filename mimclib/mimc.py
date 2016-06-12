@@ -72,7 +72,7 @@ def compute_central_moment(psums, M, moment):
 
     n = moment
     pn = np.array([n])
-    val = (raw[:, 0]**pn[:, np.newaxis]) * (-1)**n
+    val = (raw[:, 0]**pn) * (-1)**n
     # From http://mathworld.wolfram.com/CentralMoment.html
     nfact = np.math.factorial(n)
     for k in range(1, moment+1):
@@ -335,11 +335,6 @@ supported with a given work model")
             raise NotImplemented("Need to check that the lvls \
 are the same as the argument ones")
             self.fnWorkModel = lambda lvls: self.Tl()
-        # self.fnExtendLvls = self.fnExtendLvls or \
-        #                     (lambda: extend_lvls_tensor(self.data.dim,
-        #                                                 self.data.lvls,
-        #                                                 self.params.M0,
-        #                                                 self.params.min_lvls/self.params.dim))
         if self.fnExtendLvls is None:
             weights = self.params.beta * (self.params.w +
                                           (self.params.s -
@@ -525,7 +520,8 @@ Bias={:.12e}\nStatErr={:.12e}\
         L = L or len(self.all_data.lvls)-1
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        hl = self.fnHierarchy(lvls=np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
+        hl = self.fnHierarchy(lvls=np.arange(0, L+1).
+                              reshape((-1, 1))).reshape(1, -1)[0]
         return self.Q.W * hl[-1]**self.Q.w[0]
 
     def _estimateBayesianVl(self, L=None):
@@ -539,15 +535,16 @@ Bias={:.12e}\nStatErr={:.12e}\
                                              np.arange(0,
                                                        len(self.all_data.lvls))
                                              >= 1))[0]
-        hl = self.fnHierarchy(lvls=np.arange(0, L+1).reshape((-1,
-                                                              1))).reshape(1, -1)[0]
+        hl = self.fnHierarchy(lvls=np.arange(0, L+1).
+                              reshape((-1, 1))).reshape(1, -1)[0]
         M = self.all_data.M[included]
         s1 = self.all_data.psums_delta[included, 0]
         m1 = self.all_data[included].calcDeltaEl()
         s2 = self.all_data.psums_delta[included, 1]
         mu = self.Q.W*(hl[included-1]**self.Q.w[0] - hl[included]**self.Q.w[0])
 
-        Lambda = 1./(self.Q.S*(hl[:-1]**(self.Q.s[0]/2.) - hl[1:]**(self.Q.s[0]/2.))**2)
+        Lambda = 1./(self.Q.S*(hl[:-1]**(self.Q.s[0]/2.) -
+                               hl[1:]**(self.Q.s[0]/2.))**2)
 
         tmpM = np.concatenate((self.all_data.M[1:], np.zeros(L-oL)))
         G_3 = self.params.bayes_k1 * Lambda + tmpM/2.0
@@ -557,8 +554,8 @@ Bias={:.12e}\nStatErr={:.12e}\
                                   self.fnNorm(m1)-mu)**2/
                               (self.params.bayes_k0+M) )
 
-        Vl_estimate = np.concatenate((self.fnNorm(self.all_data[0].calcDeltaVl()),
-                                      G_4[1:] / G_3))
+        Vl_estimate = np.concatenate((
+            self.fnNorm(self.all_data[0].calcDeltaVl()),G_4[1:] / G_3))
         # Vl_sample = self.all_data.calcDeltaVl()
         # Vl_estimate[:len(Vl_sample)] = Vl_sample
         return Vl_estimate
@@ -571,17 +568,25 @@ Bias={:.12e}\nStatErr={:.12e}\
         L = len(self.all_data.lvls)-1
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        hl = self.fnHierarchy(lvls=np.arange(0, L+1).reshape((-1, 1))).reshape(1, -1)[0]
-        included = np.nonzero(np.logical_and(self.all_data.M > 0,
-                                  np.arange(0, len(self.all_data.lvls)) >= np.maximum(1, L-self.params.bayes_fit_lvls)))[0]
+        hl = self.fnHierarchy(lvls=np.arange(0, L+1).
+                              reshape((-1, 1))).reshape(1, -1)[0]
+        included = np.nonzero(\
+                np.logical_and(self.all_data.M > 0,
+                               np.arange(0, len(self.all_data.lvls))
+                               >= np.maximum(1, L-self.params.bayes_fit_lvls)))[0]
         M = self.all_data[included].M
         s1 = self.all_data.psums_delta[included, 0]
         s2 = self.all_data.psums_delta[included, 1]
         t1 = hl[included-1]**self.Q.w[0] - hl[included]**self.Q.w[0]
         t2 = (hl[included-1]**(self.Q.s[0]/2.) - hl[included]**(self.Q.s[0]/2.))**-2
-        self.Q.W = self.fnNorm1(np.sum(s1 * t1[:, np.newaxis] * t2[:, np.newaxis], axis=0) / np.sum(M * t1**2 * t2, axis=0))
-        self.Q.S = (np.sum(self.fnNorm(s2*t2[:, np.newaxis]) - self.fnNorm(s1*self.Q.W*t1[:, np.newaxis]*2*t2[:, np.newaxis]), axis=0) \
-                    + np.sum(M*self.Q.W**2*t1**2*t2)) / np.sum(M)
+
+        self.Q.W = self.fnNorm1(np.sum(s1 * expand(t1, 0, s1.shape) *
+                                       expand(t2, 0, s1.shape), axis=0) /
+                                np.sum(M * t1**2 * t2, axis=0) )
+        self.Q.S = (np.sum(self.fnNorm(s2* expand(t2, 0, s2.shape)) -
+                           self.fnNorm(s1*expand(self.Q.W*t1*2*t2,
+                                                 0, s1.shape)), axis=0) +
+                    np.sum(M*self.Q.W**2*t1**2*t2)) / np.sum(M)
         if self.params.bayes_w_sig > 0 or self.params.bayes_s_sig > 0:
             # TODO: Estimate w=q_1, s=q_2
             raise NotImplemented("TODO, estimate w and s")
@@ -591,7 +596,8 @@ Bias={:.12e}\nStatErr={:.12e}\
 estimate optimal number of levels"
         minL = len(self.data)
         minWork = np.inf
-        LsRange = range(len(self.data.lvls), len(self.data.lvls)+1+self.params.incL)
+        LsRange = range(len(self.data.lvls),
+                        len(self.data.lvls)+1+self.params.incL)
         for L in LsRange:
             bias_est = self._estimateBayesianBias(L)
             if bias_est >= TOL and L < LsRange[-1]:
@@ -731,7 +737,8 @@ estimate optimal number of levels"
                 self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
                                           self.params.theta)
                 if len(self.data.lvls) == 0 or \
-                   (not self.params.bayesian and self.bias > (1 - self.Q.theta) * TOL):
+                   (not self.params.bayesian and
+                    self.bias > (1 - self.Q.theta) * TOL):
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
                     newlvls, newTodoM = self.fnExtendLvls()
@@ -793,7 +800,8 @@ def extend_lvls_tensor(dim, lvls, M0, min_deg=1):
         seeds = newlvls
     if len(M0) < len(lvls): # Exhausted
         return out_lvls, M0[-1]*np.ones(len(out_lvls), dtype=np.int)
-    M = np.pad(M0, (0,len(lvls) + len(out_lvls)), 'constant', constant_values=M[-1])
+    M = np.pad(M0, (0,len(lvls) + len(out_lvls)), 'constant',
+               constant_values=M[-1])
     return out_lvls, M[len(lvls):]
 
 @public
@@ -812,7 +820,8 @@ def extend_lvls_td(w, lvls, M0, min_deg=2):
         if len(newlvls) > 0:
             if len(M0) < len(lvls): # Exhausted
                 return newlvls, M0[-1]*np.ones(len(newlvls), dtype=np.int)
-            M = np.pad(M0, (0,len(lvls) + len(newlvls)), 'constant', constant_values=M0[-1])
+            M = np.pad(M0, (0,len(lvls) + len(newlvls)), 'constant',
+                       constant_values=M0[-1])
             return newlvls, M[len(lvls):]
 
 
@@ -828,7 +837,8 @@ def is_boundary(d, lvls):
     for i in range(0, d):
         x = np.zeros(d)
         x[i] = 1
-        bnd += np.array([1 if l[i] == 0 or (np.array(l)+x).tolist() in lvls else 0 for l in lvls])
+        bnd += np.array([1 if l[i] == 0 or (np.array(l)+x).tolist()
+                         in lvls else 0 for l in lvls])
     return bnd < d
 
 
