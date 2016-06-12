@@ -90,10 +90,6 @@ class CustomClass(mimclib.mimc.custom_obj):
     def __str__(self):
         return str(self.data)
 
-    @staticmethod
-    def norm(x):
-        return np.array([np.abs(xx.data) for xx in x])
-
 def mySampleQoI(run, inds, M):
     meshes = (run.params.qoi_T/run.fnHierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
@@ -125,13 +121,10 @@ def mySampleQoI(run, inds, M):
     return solves, time.time()-tStart
 
 def initRun(run):
-    def norm_vector(x):
-        return np.array([np.max(np.abs(xx)) for xx in x])
-
     if run.params.qoi_type == "obj":
-        run.setFunctions(fnNorm=CustomClass.norm)
+        run.setFunctions(fnNorm=lambda x: np.array([np.abs(xx.data) for xx in x]))
     elif run.params.qoi_type == "arr":
-        run.setFunctions(fnNorm=norm_vector)
+        run.setFunctions(fnNorm=lambda x: np.array([np.max(np.abs(xx)) for xx in x]))
     return
 
 

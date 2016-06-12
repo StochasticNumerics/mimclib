@@ -79,9 +79,6 @@ def compute_central_moment(psums, M, moment):
         nchoosek = nfact / (np.math.factorial(k) * np.math.factorial(n-k))
         val +=  (raw[:, k-1] * raw[:, 0]**(pn-k)) * nchoosek * (-1)**(n-k)
 
-    from . import ipython
-    ipython.embed()
-
     if moment % 2 == 1:
         return val
     return val
