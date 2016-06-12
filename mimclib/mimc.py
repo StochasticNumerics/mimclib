@@ -7,16 +7,8 @@ import itertools
 import warnings
 from . import setutil
 
-# TODO: Figure out a way to add_store an np.array
-# TODO: Somehow we need to access psums using both a single and double elements
-# TODO: Figure out how to do Obj+i and i+Obj
-# TODO: Figure out how to create an empty instance given a type
-
 __all__ = []
 import argparse
-class Store_as_array(argparse._StoreAction):
-    def __call__(self, parser, namespace, values, option_string=None):
-        setattr(namespace, self.dest, np.array(values))
 
 def public(sym):
     __all__.append(sym.__name__)
@@ -46,22 +38,23 @@ class custom_obj(object):
     def __sub__(self, d):
         return self + d*-1
 
-class empty_obj(object):
+class _empty_obj(object):
     def __add__(self, newarr):
         return newarr  # Forget about this object
 
-
+@public
 def compute_raw_moments(psums, M):
     '''
     Returns the raw moments or None when M=0.
     '''
     idx = M != 0
     val = np.empty_like(psums)
-    val[idx] = psums[idx] / expand(M[idx], 0, val[idx].shape)
+    val[idx] = psums[idx] / _expand(M[idx], 0, val[idx].shape)
     #np.tile(M[idx].reshape((-1,1)), (1, psums.shape[1]))
     val[M == 0, :] = None
     return val
 
+@public
 def compute_central_moment(psums, M, moment):
     '''
     Returns the centralized moments or None when M=0.
@@ -97,7 +90,7 @@ def compute_central_moment(psums, M, moment):
 Possible problem in computing sums.".format(moment, np.min(val)))
     return val
 
-def expand(b, i, shape):
+def _expand(b, i, shape):
     assert(len(b) == shape[i])
     b_shape = np.ones(len(shape), dtype=np.int)
     b_shape[i] = len(b)
@@ -186,7 +179,7 @@ class MIMCData(object):
         idx = self.M != 0
         val = np.empty_like(self.psums_delta[:, moment-1])
         val[idx] = self.psums_delta[idx, moment-1] / \
-                   expand(self.M[idx], 0 ,self.psums_delta[idx, moment-1].shape)
+                   _expand(self.M[idx], 0 ,self.psums_delta[idx, moment-1].shape)
         val[np.logical_not(idx)] = None
         return val
 
@@ -375,6 +368,10 @@ are the same as the argument ones")
             return v.lower() in ("yes", "true", "t", "1")
         mimcgrp = parser.add_argument_group('MIMC', 'Arguments to control MIMC logic')
         mimcgrp.register('type', 'bool', str2bool)
+
+        class Store_as_array(argparse._StoreAction):
+            def __call__(self, parser, namespace, values, option_string=None):
+                setattr(namespace, self.dest, np.array(values))
 
         def add_store(name, action="store", **kwargs):
             if "default" in kwargs and "help" in kwargs:
@@ -580,11 +577,11 @@ Bias={:.12e}\nStatErr={:.12e}\
         t1 = hl[included-1]**self.Q.w[0] - hl[included]**self.Q.w[0]
         t2 = (hl[included-1]**(self.Q.s[0]/2.) - hl[included]**(self.Q.s[0]/2.))**-2
 
-        self.Q.W = self.fnNorm1(np.sum(s1 * expand(t1, 0, s1.shape) *
-                                       expand(t2, 0, s1.shape), axis=0) /
+        self.Q.W = self.fnNorm1(np.sum(s1 * _expand(t1, 0, s1.shape) *
+                                       _expand(t2, 0, s1.shape), axis=0) /
                                 np.sum(M * t1**2 * t2, axis=0) )
-        self.Q.S = (np.sum(self.fnNorm(s2* expand(t2, 0, s2.shape)) -
-                           self.fnNorm(s1*expand(self.Q.W*t1*2*t2,
+        self.Q.S = (np.sum(self.fnNorm(s2* _expand(t2, 0, s2.shape)) -
+                           self.fnNorm(s1*_expand(self.Q.W*t1*2*t2,
                                                  0, s1.shape)), axis=0) +
                     np.sum(M*self.Q.W**2*t1**2*t2)) / np.sum(M)
         if self.params.bayes_w_sig > 0 or self.params.bayes_s_sig > 0:
@@ -615,7 +612,8 @@ estimate optimal number of levels"
     ################## END: Bayesian specific function
     def _estimateAll(self):
         self._estimateQParams()
-        self.Vl_estimate = self.all_data.calcDeltaVl() if not self.params.bayesian \
+        self.Vl_estimate = self.fnNorm(self.all_data.calcDeltaVl()) \
+                           if not self.params.bayesian \
                            else self._estimateBayesianVl()
         self.Wl_estimate = self.fnWorkModel(lvls=self.data.lvls)
         self.bias = self._estimateBias()
@@ -637,21 +635,20 @@ estimate optimal number of levels"
         calcM = 0
         total_time = 0
         p = np.arange(1, self.data.computedMoments()+1)
-        psums_delta = empty_obj()
-        psums_fine = empty_obj()
+        psums_delta = _empty_obj()
+        psums_fine = _empty_obj()
         while calcM < M:
             curM = np.minimum(M-calcM, self.params.maxM)
             values, time = self.fnSampleLvl(inds=inds, M=curM)
             total_time += time
-            # TODO: Consider moving to C/C++
             # psums_delta_j = \sum_{i} (\sum_{k} mod_k values_{i,k})**p_j
 
             delta = np.sum(values * \
-                           expand(mods, 1, values.shape),
+                           _expand(mods, 1, values.shape),
                            axis=1)
             A1 = np.tile(delta, (len(p),) + (1,)*len(delta.shape) )
             A2 = np.tile(values[:, 0], (len(p),) + (1,)*len(delta.shape) )
-            B = expand(p, 0, A1.shape)
+            B = _expand(p, 0, A1.shape)
             psums_delta += np.sum(A1**B , axis=1)
             psums_fine += np.sum(A2**B, axis=1)
             calcM += values.shape[0]
