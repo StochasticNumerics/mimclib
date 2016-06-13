@@ -125,6 +125,8 @@ def initRun(run):
         run.setFunctions(fnNorm=lambda x: np.array([np.abs(xx.data) for xx in x]))
     elif run.params.qoi_type == "arr":
         run.setFunctions(fnNorm=lambda x: np.array([np.max(np.abs(xx)) for xx in x]))
+    elif run.params.qoi_type != "real":
+        raise Exception("qoi_type option is not recognized")
     return
 
 

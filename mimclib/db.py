@@ -165,7 +165,7 @@ VALUES(datetime(), ?, ?, ?, ?, -1, ?)'''.format(runTable=self.runTable),
     def writeRunData(self, run_id, mimc_run, iteration_idx, TOL,
                      totalTime, userdata=None):
         base = 0
-        El = mimc_run.data.calcDeltaEl()
+        El = mimc_run.fnNorm(mimc_run.data.calcDeltaEl())
         Vl = mimc_run.Vl_estimate
         Tl = mimc_run.data.calcTl()
         Wl = mimc_run.Wl_estimate
