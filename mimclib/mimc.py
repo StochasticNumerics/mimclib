@@ -269,13 +269,11 @@ class MIMCRun(object):
     """
 
     def __init__(self, old_data=None, **kwargs):
-        self.fnNorm = np.abs
+        self.fn = MyDefaultDict(# Hierarchy=None,
+                                # WorkModel=None, SampleLvl=None,
+                                # ItrDone=None, ExtendLvls=None,
+                                Norm=np.abs)
         self.params = MyDefaultDict(**kwargs)
-        self.fnHierarchy = None
-        self.fnWorkModel = None
-        self.fnSampleLvl = None
-        self.fnItrDone = None
-        self.fnExtendLvls = None
         self.Vl_estimate = None
         self.Wl_estimate = None
         self.bias = np.inf           # Approximation of the discretization error
@@ -308,27 +306,27 @@ supported in one dimensional problem")
     def _checkFunctions(self):
         # If self.params.reuse_samples is True then
         # all_data will always equal data
-        if self.fnWorkModel is None and hasattr(self.params, "gamma"):
-            self.fnWorkModel = lambda lvls: work_estimate(lvls,
+        if not hasattr(self.fn, "WorkModel") and hasattr(self.params, "gamma"):
+            self.fn.WorkModel = lambda lvls: work_estimate(lvls,
                                                           np.log(self.params.beta) *
                                                           self.params.gamma)
 
-        if self.fnHierarchy is None:
-            self.fnHierarchy = lambda lvls: get_geometric_hl(lvls,
+        if not hasattr(self.fn, "Hierarchy"):
+            self.fn.Hierarchy = lambda lvls: get_geometric_hl(lvls,
                                                              self.params.h0inv,
                                                              self.params.beta)
 
-        if self.params.bayesian and self.fnWorkModel is None:
+        if self.params.bayesian and not hasattr(self.fn, "WorkModel"):
             raise NotImplementedError("Bayesian parameter fitting is only \
 supported with a given work model")
 
-        if self.fnWorkModel is None:
+        if not hasattr(self.fn, "WorkModel"):
             # ADDING WORK MODEL B
             warnings.warn("fnWorkModel is not provided, using run-time estimates.")
             raise NotImplemented("Need to check that the lvls \
 are the same as the argument ones")
-            self.fnWorkModel = lambda lvls: self.Tl()
-        if self.fnExtendLvls is None:
+            self.fn.WorkModel = lambda lvls: self.Tl()
+        if not hasattr(self.fn, "ExtendLvls"):
             weights = self.params.beta * (self.params.w +
                                           (self.params.s -
                                            self.params.gamma)/2.)
@@ -336,12 +334,12 @@ are the same as the argument ones")
             if len(weights) == 1:
                 weights = weights[0]*np.ones(self.params.dim)
 
-            self.fnExtendLvls = lambda w=weights: extend_lvls_td(w,
+            self.fn.ExtendLvls = lambda w=weights: extend_lvls_td(w,
                                                                  self.data.lvls,
                                                                  self.params.M0,
                                                                  self.params.min_lvls/self.params.dim)
 
-        if self.fnSampleLvl is None:
+        if self.fn.SampleLvl is None:
             raise ValueError("Must set the sampling functions fnSampleLvl")
 
     def setFunctions(self, **kwargs):
@@ -355,11 +353,12 @@ are the same as the argument ones")
         # fnWorkModel(lvls): Returns work estimate of lvls
         # fnHierarchy(lvls): Returns associated hierarchy of lvls
         for k in kwargs.keys():
-            if k not in ["fnExtendLvls", "fnSampleLvl",
-                         "fnItrDone", "fnWorkModel",
-                         "fnHierarchy", "fnSampleQoI", "fnNorm"]:
+            kk = k[2:] if k.startswith('fn') else k
+            if kk not in ["ExtendLvls", "SampleLvl",
+                         "ItrDone", "WorkModel",
+                         "Hierarchy", "SampleQoI", "Norm"]:
                 raise KeyError("Invalid function name")
-            setattr(self, k, kwargs[k])
+            setattr(self.fn, kk, kwargs[k])
 
     @staticmethod
     def addOptionsToParser(parser, pre='-mimc_', additional=True, default_bayes=True):
@@ -483,8 +482,8 @@ Bias={:.12e}\nStatErr={:.12e}\
                                 self.stat_error,
                                 self.totalErrorEst())
         V = self.Vl_estimate
-        Vl = self.fnNorm(self.data.calcDeltaVl())
-        E = self.fnNorm(self.data.calcDeltaEl())
+        Vl = self.fn.Norm(self.data.calcDeltaVl())
+        E = self.fn.Norm(self.data.calcDeltaEl())
         T = self.data.calcTl()
 
         output += ("{:<8}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
@@ -499,7 +498,7 @@ Bias={:.12e}\nStatErr={:.12e}\
     def fnNorm1(self, x):
         """ Helper function to return norm of a single element
         """
-        return self.fnNorm(np.array([x]))[0]
+        return self.fn.Norm(np.array([x]))[0]
 
     ################## Bayesian specific functions
     def _estimateBias(self):
@@ -509,7 +508,7 @@ Bias={:.12e}\nStatErr={:.12e}\
                 return np.inf
             bnd_val = self.data[bnd].calcDeltaEl()
             if self.params.abs_bnd:
-                return np.sum(self.fnNorm(bnd_val))
+                return np.sum(self.fn.Norm(bnd_val))
             return self.fnNorm1(np.sum(bnd_val))
         return self._estimateBayesianBias()
 
@@ -517,13 +516,13 @@ Bias={:.12e}\nStatErr={:.12e}\
         L = L or len(self.all_data.lvls)-1
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        hl = self.fnHierarchy(lvls=np.arange(0, L+1).
+        hl = self.fn.Hierarchy(lvls=np.arange(0, L+1).
                               reshape((-1, 1))).reshape(1, -1)[0]
         return self.Q.W * hl[-1]**self.Q.w[0]
 
     def _estimateBayesianVl(self, L=None):
         if np.sum(self.all_data.M, axis=0) == 0:
-            return self.fnNorm(self.all_data.calcDeltaVl())
+            return self.fn.Norm(self.all_data.calcDeltaVl())
         oL = len(self.all_data.lvls)-1
         L = L or oL
         if L <= 1:
@@ -532,7 +531,7 @@ Bias={:.12e}\nStatErr={:.12e}\
                                              np.arange(0,
                                                        len(self.all_data.lvls))
                                              >= 1))[0]
-        hl = self.fnHierarchy(lvls=np.arange(0, L+1).
+        hl = self.fn.Hierarchy(lvls=np.arange(0, L+1).
                               reshape((-1, 1))).reshape(1, -1)[0]
         M = self.all_data.M[included]
         s1 = self.all_data.psums_delta[included, 0]
@@ -546,13 +545,13 @@ Bias={:.12e}\nStatErr={:.12e}\
         tmpM = np.concatenate((self.all_data.M[1:], np.zeros(L-oL)))
         G_3 = self.params.bayes_k1 * Lambda + tmpM/2.0
         G_4 = self.params.bayes_k1*np.ones(L+1)
-        G_4[included] += 0.5*(self.fnNorm(s2 - s1*m1*2 + s1*m1) + \
+        G_4[included] += 0.5*(self.fn.Norm(s2 - s1*m1*2 + s1*m1) + \
                               M*self.params.bayes_k0*(
-                                  self.fnNorm(m1)-mu)**2/
+                                  self.fn.Norm(m1)-mu)**2/
                               (self.params.bayes_k0+M) )
 
         Vl_estimate = np.concatenate((
-            self.fnNorm(self.all_data[0].calcDeltaVl()),G_4[1:] / G_3))
+            self.fn.Norm(self.all_data[0].calcDeltaVl()),G_4[1:] / G_3))
         # Vl_sample = self.all_data.calcDeltaVl()
         # Vl_estimate[:len(Vl_sample)] = Vl_sample
         return Vl_estimate
@@ -565,7 +564,7 @@ Bias={:.12e}\nStatErr={:.12e}\
         L = len(self.all_data.lvls)-1
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        hl = self.fnHierarchy(lvls=np.arange(0, L+1).
+        hl = self.fn.Hierarchy(lvls=np.arange(0, L+1).
                               reshape((-1, 1))).reshape(1, -1)[0]
         included = np.nonzero(\
                 np.logical_and(self.all_data.M > 0,
@@ -580,8 +579,8 @@ Bias={:.12e}\nStatErr={:.12e}\
         self.Q.W = self.fnNorm1(np.sum(s1 * _expand(t1, 0, s1.shape) *
                                        _expand(t2, 0, s1.shape), axis=0) /
                                 np.sum(M * t1**2 * t2, axis=0) )
-        self.Q.S = (np.sum(self.fnNorm(s2* _expand(t2, 0, s2.shape)) -
-                           self.fnNorm(s1*_expand(self.Q.W*t1*2*t2,
+        self.Q.S = (np.sum(self.fn.Norm(s2* _expand(t2, 0, s2.shape)) -
+                           self.fn.Norm(s1*_expand(self.Q.W*t1*2*t2,
                                                  0, s1.shape)), axis=0) +
                     np.sum(M*self.Q.W**2*t1**2*t2)) / np.sum(M)
         if self.params.bayes_w_sig > 0 or self.params.bayes_s_sig > 0:
@@ -599,7 +598,7 @@ estimate optimal number of levels"
             bias_est = self._estimateBayesianBias(L)
             if bias_est >= TOL and L < LsRange[-1]:
                 continue
-            Wl = self.fnWorkModel(lvls=np.arange(0, L+1).reshape((-1, 1)))
+            Wl = self.fn.WorkModel(lvls=np.arange(0, L+1).reshape((-1, 1)))
             M = self._calcTheoryM(TOL,
                                   theta=self._calcTheta(TOL, bias_est),
                                   Vl=self._estimateBayesianVl(L), Wl=Wl)
@@ -612,10 +611,10 @@ estimate optimal number of levels"
     ################## END: Bayesian specific function
     def _estimateAll(self):
         self._estimateQParams()
-        self.Vl_estimate = self.fnNorm(self.all_data.calcDeltaVl()) \
+        self.Vl_estimate = self.fn.Norm(self.all_data.calcDeltaVl()) \
                            if not self.params.bayesian \
                            else self._estimateBayesianVl()
-        self.Wl_estimate = self.fnWorkModel(lvls=self.data.lvls)
+        self.Wl_estimate = self.fn.WorkModel(lvls=self.data.lvls)
         self.bias = self._estimateBias()
         from scipy.stats import norm
         Ca = norm.ppf(self.params.confidence)
@@ -639,7 +638,7 @@ estimate optimal number of levels"
         psums_fine = _empty_obj()
         while calcM < M:
             curM = np.minimum(M-calcM, self.params.maxM)
-            values, time = self.fnSampleLvl(inds=inds, M=curM)
+            values, time = self.fn.SampleLvl(inds=inds, M=curM)
             total_time += time
             # psums_delta_j = \sum_{i} (\sum_{k} mod_k values_{i,k})**p_j
 
@@ -738,7 +737,7 @@ estimate optimal number of levels"
                     self.bias > (1 - self.Q.theta) * TOL):
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
-                    newlvls, newTodoM = self.fnExtendLvls()
+                    newlvls, newTodoM = self.fn.ExtendLvls()
                     prev = len(self.data.lvls)
                     self._addLevels(newlvls)
                     self._genSamples(np.concatenate((self.data.M[:prev],
@@ -767,8 +766,8 @@ estimate optimal number of levels"
             if verbose:
                 print("{} took {}".format(TOL, totalTime))
                 print("################################################")
-            if self.fnItrDone:
-                self.fnItrDone(iteration_idx=itrIndex, TOL=TOL, totalTime=totalTime)
+            if self.fn.ItrDone:
+                self.fn.ItrDone(iteration_idx=itrIndex, TOL=TOL, totalTime=totalTime)
             if less(TOL, finalTOL) and self.totalErrorEst() <= finalTOL:
                 break
 

@@ -71,6 +71,9 @@ def RunStandardTest(fnSampleLvl=None,
         fnSeed(mimcRun.params.qoi_seed)
 
     fnItrDone = None
+    fnSampleLvl = lambda inds, M, fn=fnSampleLvl: fn(mimcRun, inds, M)
+    mimcRun.setFunctions(fnSampleLvl=fnSampleLvl)
+
     if mimcRun.params.db:
         db_args = {}
         if hasattr(mimcRun.params, "db_user"):
@@ -84,9 +87,7 @@ def RunStandardTest(fnSampleLvl=None,
                               tag=mimcRun.params.db_tag)
         fnItrDone = lambda **kwargs: db.writeRunData(run_id, mimcRun, **kwargs)
 
-    fnSampleLvl = lambda inds, M, fn=fnSampleLvl: fn(mimcRun, inds, M)
-
-    mimcRun.setFunctions(fnSampleLvl=fnSampleLvl, fnItrDone=fnItrDone)
+    mimcRun.setFunctions(fnItrDone=fnItrDone)
 
     try:
         mimcRun.doRun()

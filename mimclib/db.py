@@ -14,19 +14,19 @@ def public(sym):
 
 def _pickle(obj):
     import io
-    import cPickle
+    from dill import dump
     import MySQLdb
     with io.BytesIO() as f:
-        cPickle.dump(obj, f, protocol=2)
+        dump(obj, f, protocol=2)
         f.seek(0)
         return MySQLdb.Binary(f.read())
 
 
 def _unpickle(obj):
     import io
-    import cPickle
+    from dill import load
     with io.BytesIO(obj) as f:
-        return cPickle.load(f)
+        return load(f)
 
 
 class DBConn(object):
@@ -80,11 +80,12 @@ USE {DBName};
 CREATE TABLE IF NOT EXISTS {runTable} (
     run_id                INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
     creation_date           DATETIME NOT NULL,
-    TOL                   REAL,
+    TOL                   REAL NOT NULL,
     done_flag            INTEGER NOT NULL,
     dim                   INTEGER,
-    tag                   VARCHAR(128),
+    tag                   VARCHAR(128) NOT NULL,
     params                mediumblob,
+    fn                    mediumblob,
     comment               TEXT
 );
 CREATE VIEW vw_runs AS SELECT run_id, creation_date, TOL, done_flag, dim, tag, comment FROM {runTable};
@@ -93,8 +94,8 @@ CREATE TABLE IF NOT EXISTS {dataTable} (
     data_id                 INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
     run_id                  INTEGER NOT NULL,
     TOL                     REAL NOT NULL,
-    bias                    REAL,
-    stat_error              REAL,
+    bias                    REAL NOT NULL,
+    stat_error              REAL NOT NULL,
     creation_date           DATETIME NOT NULL,
     totalTime               REAL NOT NULL,
     Qparams                 mediumblob,
@@ -110,11 +111,11 @@ CREATE TABLE IF NOT EXISTS {lvlTable} (
     data_id       INTEGER NOT NULL,
     lvl           text NOT NULL,
     lvl_hash      varchar(35) NOT NULL,
-    El            REAL,
-    Vl            REAL,
-    Wl            REAL,
-    Tl            REAL,
-    Ml            INTEGER,
+    El            REAL NOT NULL,
+    Vl            REAL NOT NULL,
+    Wl            REAL NOT NULL,
+    Tl            REAL NOT NULL,
+    Ml            INTEGER NOT NULL,
     psums_delta   mediumblob,
     psums_fine    mediumblob,
     FOREIGN KEY (data_id) REFERENCES {dataTable}(data_id) ON DELETE CASCADE,
@@ -124,23 +125,24 @@ CREATE TABLE IF NOT EXISTS {lvlTable} (
 CREATE VIEW vw_lvls AS SELECT data_id, lvl,
 El, Vl, Wl, Tl, Ml FROM {lvlTable};
 
--- CREATE USER 'abdo'@'%';
--- GRANT ALL PRIVILEGES ON *.* TO 'abdo'@'%' WITH GRANT OPTION;
+-- CREATE USER 'USER'@'%';
+-- GRANT ALL PRIVILEGES ON *.* TO 'USER'@'%' WITH GRANT OPTION;
 '''.format(DBName=self.DBName, runTable=self.runTable,
            dataTable=self.dataTable, lvlTable=self.lvlTable)
 
         return script
 
-    def createRun(self, tag, TOL=None, dim=None, params=None,
+    def createRun(self, tag, TOL=None, dim=None, params=None, fn=None,
                   mimc_run=None, comment=""):
         TOL = TOL or mimc_run.params.TOL
         params = params or mimc_run.params
+        fn = fn or mimc_run.fn
         dim = dim or mimc_run.data.dim
         with DBConn(**self.connArgs) as cur:
             cur.execute('''
-INSERT INTO {runTable}(creation_date, TOL, tag, dim, params, done_flag, comment)
-VALUES(datetime(), ?, ?, ?, ?, -1, ?)'''.format(runTable=self.runTable),
-                        [TOL, tag, dim, _pickle(params), comment])
+            INSERT INTO {runTable}(creation_date, TOL, tag, dim, params, fn, done_flag, comment)
+            VALUES(datetime(), ?, ?, ?, ?, ?, -1, ?)'''.format(runTable=self.runTable),
+                        [TOL, tag, dim, _pickle(params), _pickle(fn), comment])
             return cur.getLastRowID()
 
     def markRunDone(self, run_id, flag, comment=''):
@@ -165,7 +167,7 @@ VALUES(datetime(), ?, ?, ?, ?, -1, ?)'''.format(runTable=self.runTable),
     def writeRunData(self, run_id, mimc_run, iteration_idx, TOL,
                      totalTime, userdata=None):
         base = 0
-        El = mimc_run.fnNorm(mimc_run.data.calcDeltaEl())
+        El = mimc_run.fn.Norm(mimc_run.data.calcDeltaEl())
         Vl = mimc_run.Vl_estimate
         Tl = mimc_run.data.calcTl()
         Wl = mimc_run.Wl_estimate
@@ -201,10 +203,10 @@ VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?, ?)
 
         with DBConn(**self.connArgs) as cur:
             runAll = cur.execute(
-                        '''SELECT r.run_id, r.params, r.TOL, r.comment, count(*)
+                        '''SELECT r.run_id, r.params, r.TOL, r.comment, count(*), r.fn
                         FROM {runTable} r INNER JOIN {dataTable} dr ON
                         r.run_id = dr.run_id WHERE r.run_id in ? GROUP BY
-                        r.run_id, r.params, r.TOL, r.comment'''.
+                        r.run_id, r.params, r.TOL, r.comment, r.fn'''.
                         format(runTable=self.runTable,
                                dataTable=self.dataTable), [run_ids]).fetchall()
 
@@ -229,7 +231,7 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
         dictRuns = dict()
         for run in runAll:
             dictRuns[run[0]] = [_unpickle(run[1]), run[2], run[3],
-                                run[4]]
+                                run[4], _unpickle(run[5])]
 
         dictLvls = dict()
         import itertools
@@ -277,6 +279,7 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
                                      t=np.array(Ml)[ind] * np.array(Tl)[ind])
             run = mimc.MIMCRun(old_data=old_data,
                                **run_params[0].getDict())
+            run.setFunctions(**run_params[4].getDict())
             run.bias = data[5]
             run.stat_error = data[6]
             run.Q = _unpickle(data[7])

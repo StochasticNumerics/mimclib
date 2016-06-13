@@ -91,7 +91,7 @@ class CustomClass(mimclib.mimc.custom_obj):
         return str(self.data)
 
 def mySampleQoI(run, inds, M):
-    meshes = (run.params.qoi_T/run.fnHierarchy(inds)).reshape(-1).astype(np.int)
+    meshes = (run.params.qoi_T/run.fn.Hierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
 
     if run.params.qoi_type == "real":
