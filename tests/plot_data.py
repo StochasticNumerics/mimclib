@@ -37,6 +37,8 @@ def addExtraArguments(parser):
                         action="store", help="Output file")
     parser.add_argument("-cmd", type=str, action="store",
                         help="Command to execute after plotting")
+    parser.add_argument("-verbose", type='bool', action="store",
+                        default=False)
 
 
 def main():
@@ -51,17 +53,22 @@ def main():
     if args.db_user is not None:
         db_args["user"] = args.db_user
     if args.db_host is not None:
-        db_args["host"] = args.db_host
+        db_args["host"] = args.db_hostcp
     if args.o is None:
         args.o = args.db_tag + ".pdf"
     db = mimcdb.MIMCDatabase(**db_args)
     if args.db_tag is None:
         warnings.warn("You did not select a database tag!!")
+    if args.verbose:
+        print("Reading data")
     run_data = db.readRuns(tag=args.db_tag, done_flag=1,
                            iteration_idx=-1 if args.only_final else None)
     if len(run_data) == 0:
         raise Exception("No runs!!!")
-    miplot.genPDFBooklet(run_data, fileName=args.o, exact=args.qoi_exact)
+    if args.verbose:
+        print("Plotting data")
+    miplot.genPDFBooklet(run_data, fileName=args.o,
+                         exact=args.qoi_exact, verbose=args.verbose)
 
     if args.cmd is not None:
         import os

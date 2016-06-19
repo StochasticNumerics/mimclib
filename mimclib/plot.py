@@ -276,8 +276,8 @@ def __calc_moments(runs_data, seed=None, direction=None):
     seed = np.array(seed) if seed is not None else np.zeros(dim, dtype=np.uint32)
     direction = np.array(direction) if direction is not None else np.ones(dim, dtype=np.uint32)
     moments = runs_data[0].run.data.psums_delta.shape[1]
-    psums_delta = np.zeros((0, moments))
-    psums_fine = np.zeros((0, moments))
+    psums_delta = np.zeros((0,) + runs_data[0].run.data.psums_delta.shape[1:])
+    psums_fine = np.zeros((0,) + runs_data[0].run.data.psums_fine.shape[1:])
     Tl = np.zeros(0)
     Vl_estimate = np.zeros(0)
     M = np.zeros(0)
@@ -300,22 +300,20 @@ def __calc_moments(runs_data, seed=None, direction=None):
             old = Vl_estimate.shape[0]
             Vl_estimate.resize((L, len(runs_data)), refcheck=False)
             Vl_estimate[old:] = np.nan
-        psums_delta[:L, :] += curRun.run.data.psums_delta[inds, :]
-        psums_fine[:L, :] += curRun.run.data.psums_fine[inds, :]
+        psums_delta[:L] += curRun.run.data.psums_delta[inds]
+        psums_fine[:L] += curRun.run.data.psums_fine[inds]
         M[:L] += curRun.run.data.M[inds]
         Tl[:L] += curRun.run.data.t[inds]
         Vl_estimate[:L, i] = curRun.run.Vl_estimate[inds]
         Vl_estimate[(L+1):, i] = np.nan
 
-    central_delta_moments = np.empty_like(psums_delta)
-    central_fine_moments = np.empty_like(psums_fine)
+    central_delta_moments = np.empty(psums_delta, dtype=object)
+    central_fine_moments = np.empty(psums_fine, dtype=object)
     for m in range(1, psums_delta.shape[1]+1):
-        central_delta_moments[:, m-1] = mimc.compute_central_moment(psums_delta,
-                                                                    M, m,
-                                                                    empty_value=np.inf)
-        central_fine_moments[:, m-1] = mimc.compute_central_moment(psums_fine,
-                                                                   M, m,
-                                                                   empty_value=np.inf)
+        central_delta_moments[m-1] = mimc.compute_central_moment(psums_delta,
+                                                                    M, m)
+        central_fine_moments[m-1] = mimc.compute_central_moment(psums_fine,
+                                                                   M, m)
     Tl /= M
     return central_delta_moments, central_fine_moments, Tl, M, Vl_estimate
 
@@ -403,15 +401,15 @@ def plotExpectVsLvls(ax, runs_data, *args, **kwargs):
 
     fine_kwargs = kwargs.pop('fine_kwargs', None)
     plotObj = []
-    El = central_delta_moments[:, 0]
-    Vl = central_delta_moments[:, 1]
+    El = central_delta_moments[0]
+    Vl = central_delta_moments[1]
     plotObj.append(ax.errorbar(np.arange(0, len(El)), np.abs(El), *args,
                                yerr=3*np.sqrt(np.abs(Vl/M)), **kwargs))
 
 
     if fine_kwargs is not None:
-        El = central_fine_moments[:, 0]
-        Vl = central_fine_moments[:, 1]
+        El = central_fine_moments[0]
+        Vl = central_fine_moments[1]
         plotObj.append(ax.errorbar(np.arange(0, len(El)), np.abs(El),
                                    yerr=3*np.sqrt(np.abs(Vl/M)), **fine_kwargs))
 
@@ -439,10 +437,10 @@ def plotVarVsLvls(ax, runs_data, *args, **kwargs):
     fine_kwargs = kwargs.pop('fine_kwargs', None)
     estimate_kwargs = kwargs.pop('estimate_kwargs', None)
     plotObj = []
-    Vl = central_delta_moments[:, 1]
+    Vl = central_delta_moments[1]
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     if central_delta_moments.shape[1] >= 4:
-        El4 = central_delta_moments[:, 3]
+        El4 = central_delta_moments[3]
         plotObj.append(ax.errorbar(np.arange(0, len(Vl)), Vl,
                                    yerr=3*np.sqrt(np.abs(El4/M)),
                                    *args, **kwargs))
@@ -451,9 +449,9 @@ def plotVarVsLvls(ax, runs_data, *args, **kwargs):
         plotObj.append(ax.plot(np.arange(0, len(Vl)), Vl, *args, **kwargs))
 
     if fine_kwargs is not None:
-        Vl = central_fine_moments[:, 1]
-        if central_fine_moments.shape[1] >= 4:
-            El4 = central_fine_moments[:, 3]
+        Vl = central_fine_moments[1]
+        if len(central_fine_moments) >= 4:
+            El4 = central_fine_moments[3]
             plotObj.append(ax.errorbar(np.arange(0, len(Vl)), Vl,
                                    yerr=3*np.sqrt(np.abs(El4/M)),
                                    **fine_kwargs))
@@ -493,8 +491,8 @@ def plotKurtosisVsLvls(ax, runs_data, *args, **kwargs):
                                                         seed=kwargs.pop('seed', None),
                                                         direction=kwargs.pop('direction',
                                                                              None))
-    Vl = central_delta_moments[:, 1]
-    E4l = central_delta_moments[:, 3]
+    Vl = central_delta_moments[1]
+    E4l = central_delta_moments[3]
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     line = ax.plot(np.arange(0, len(Vl)), E4l/Vl**2, *args, **kwargs)
     return line[0].get_xydata(), [line]
@@ -517,8 +515,8 @@ def plotSkewnessVsLvls(ax, runs_data, *args, **kwargs):
                                                         seed=kwargs.pop('seed', None),
                                                         direction=kwargs.pop('direction',
                                                                              None))
-    Vl = central_delta_moments[:, 1]
-    E3l = np.abs(central_delta_moments[:, 2])
+    Vl = central_delta_moments[1]
+    E3l = np.abs(central_delta_moments[2])
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     line = ax.plot(np.arange(0, len(Vl)), E3l/Vl**1.5, *args, **kwargs)
     return line[0].get_xydata(), [line]
@@ -636,7 +634,7 @@ def plotThetaRefVsTOL(ax, runs_data, eta, chi, *args, **kwargs):
     ax is in instance of matplotlib.axes
     """
     central_delta_moments, _, _, _, _ = __calc_moments(runs_data)
-    El = np.abs(central_delta_moments[:, 0])
+    El = np.abs(central_delta_moments[:])
     L = lambda r: np.max([np.sum(l) for l in r.run.data.lvls])
     if chi == 1:
         summary = np.array([[r.finalTOL,
@@ -745,6 +743,7 @@ def __plot_failed(ax):
 def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     import matplotlib.pyplot as plt
 
+    verbose = kwargs.pop('verbose')
     if "params" in kwargs:
         params = kwargs.pop("params")
     else:
@@ -766,6 +765,8 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
 
     figures = []
     def add_fig():
+        if verbose:
+            print("Adding figure", len(figures))
         figures.append(plt.figure())
         return figures[-1].gca()
 
