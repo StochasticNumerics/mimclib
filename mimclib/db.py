@@ -201,7 +201,6 @@ VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?, ?)
             return lstvalues
 
         with DBConn(**self.connArgs) as cur:
-            print ("Getting run data")
             runAll = cur.execute(
                         '''SELECT r.run_id, r.params, r.TOL, r.comment, count(*), r.fn
                         FROM {runTable} r INNER JOIN {dataTable} dr ON
@@ -210,14 +209,12 @@ VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?, ?)
                         format(runTable=self.runTable,
                                dataTable=self.dataTable), [run_ids]).fetchall()
 
-            print ("Getting run_ids data")
             dataAll = cur.execute('''
 SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
         dr.totalTime, dr.bias, dr.stat_error, dr.Qparams, dr.userdata,
         dr.iteration_idx FROM {dataTable} dr WHERE dr.run_id in ?
 '''.format(dataTable=self.dataTable), [run_ids]).fetchall()
 
-            print ("Getting lvls data")
             lvlsAll = cur.execute('''
             SELECT dr.data_id, l.lvl, l.psums_delta, l.psums_fine, l.Ml,
                      l.Tl, l.Wl, l.Vl, r.dim
@@ -230,14 +227,12 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
                                          runTable=self.runTable),
                                   [run_ids]).fetchall()
 
-        print("Unpickelling runs", len(runAll))
         dictRuns = dict()
         import dill
         for run in runAll:
             dictRuns[run[0]] = [_unpickle(run[1]), run[2], run[3],
                                 run[4], _unpickle(run[5], load=dill.load)]
 
-        print("Unpickelling lvls", len(lvlsAll))
         dictLvls = dict()
         import itertools
         for run_id, itr in itertools.groupby(lvlsAll, key=lambda x:x[0]):
@@ -248,8 +243,6 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
                 ind = np.zeros(r[-1], dtype=np.uint)
                 ind[t[::2]] = t[1::2]
                 lvls.append(ind.tolist())
-                from . import ipython
-                ipython.embed()
                 psums_delta.append(_unpickle(r[2]))
                 psums_fine.append(_unpickle(r[3]))
                 Ml.append(r[4])
@@ -258,7 +251,6 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
                 Vl.append(r[7])
             dictLvls[run_id] = [psums_delta, psums_fine, lvls, Ml, Tl, Wl, Vl]
 
-        print("Creating final runs")
         for data in dataAll:
             val = dict()
             run_id = data[1]
