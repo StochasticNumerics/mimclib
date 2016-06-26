@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-
+import cPickle
 
 __all__ = []
 
@@ -12,9 +12,8 @@ def public(sym):
     return sym
 
 
-def _pickle(obj):
+def _pickle(obj, dump=cPickle.dump):
     import io
-    from dill import dump
     import MySQLdb
     with io.BytesIO() as f:
         dump(obj, f, protocol=2)
@@ -22,9 +21,8 @@ def _pickle(obj):
         return MySQLdb.Binary(f.read())
 
 
-def _unpickle(obj):
+def _unpickle(obj, load=cPickle.load):
     import io
-    from dill import load
     with io.BytesIO(obj) as f:
         return load(f)
 
@@ -138,11 +136,12 @@ El, Vl, Wl, Tl, Ml FROM {lvlTable};
         params = params or mimc_run.params
         fn = fn or mimc_run.fn
         dim = dim or mimc_run.data.dim
+        import dill
         with DBConn(**self.connArgs) as cur:
             cur.execute('''
             INSERT INTO {runTable}(creation_date, TOL, tag, dim, params, fn, done_flag, comment)
             VALUES(datetime(), ?, ?, ?, ?, ?, -1, ?)'''.format(runTable=self.runTable),
-                        [TOL, tag, dim, _pickle(params), _pickle(fn), comment])
+                        [TOL, tag, dim, _pickle(params), _pickle(fn, dump=dill.dump), comment])
             return cur.getLastRowID()
 
     def markRunDone(self, run_id, flag, comment=''):
@@ -229,9 +228,10 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
                                   [run_ids]).fetchall()
 
         dictRuns = dict()
+        import dill
         for run in runAll:
             dictRuns[run[0]] = [_unpickle(run[1]), run[2], run[3],
-                                run[4], _unpickle(run[5])]
+                                run[4], _unpickle(run[5], load=dill.load)]
 
         dictLvls = dict()
         import itertools

@@ -204,6 +204,7 @@ def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
     run_data[i].run.data is an instance of mimc.MIMCData
     """
 
+    fnNorm = kwargs.pop('fnNorm')
     num_kwargs = kwargs.pop('num_kwargs', None)
     exact = kwargs.pop('exact', None)
     relative_error = kwargs.pop('relative', True)
@@ -223,10 +224,11 @@ def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
                          r.finalTOL == minfinalTOL])
         print("Computed exact value is:", exact)
 
-    modifier = (1./exact) if relative_error else 1.
-    xy = np.array([[r.finalTOL, np.abs(exact - r.run.data.calcEg()),
-                    r.run.totalErrorEst()] for r in runs_data])
-    xy[:, 1:] = xy[:, 1:] * modifier
+    modifier = (1./fnNorm(np.array([exact]))[0]) if relative_error else 1.
+    val = np.array([r.run.data.calcEg() for r in runs_data])
+    xy = np.array([[r.finalTOL, 0, r.run.totalErrorEst()] for r in runs_data])
+    xy[:, 1] = fnNorm(val-exact)
+    xy[:, 1:3] = xy[:, 1:3] * modifier
 
     TOLs, error_est = __get_stats(xy, staton=2)
     plotObj = []
@@ -271,16 +273,12 @@ def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
     return xy[sel, :2], plotObj
 
 
-def __calc_moments(runs_data, seed=None, direction=None):
+def __calc_moments(runs_data, seed=None, direction=None, fnNorm=None):
     dim = runs_data[0].run.data.dim
     seed = np.array(seed) if seed is not None else np.zeros(dim, dtype=np.uint32)
     direction = np.array(direction) if direction is not None else np.ones(dim, dtype=np.uint32)
     moments = runs_data[0].run.data.psums_delta.shape[1]
-    psums_delta = np.zeros((0, moments))
-    psums_fine = np.zeros((0, moments))
-    Tl = np.zeros(0)
-    Vl_estimate = np.zeros(0)
-    M = np.zeros(0)
+    psums_delta, psums_fine, Tl, Vl_estimate, M = [None]*5
     for i, curRun in enumerate(runs_data):
         cur = seed
         inds = []
@@ -291,31 +289,42 @@ def __calc_moments(runs_data, seed=None, direction=None):
                 break
             inds.append(ii)
             cur = cur + direction
+
         L = len(inds)
-        if L > len(M):
-            psums_delta.resize((L, moments), refcheck=False)
-            psums_fine.resize((L, moments), refcheck=False)
-            M.resize(L, refcheck=False)
-            Tl.resize(L, refcheck=False)
-            old = Vl_estimate.shape[0]
+        if psums_delta is None:
+            psums_delta = curRun.run.data.psums_delta[inds]
+            psums_fine = curRun.run.data.psums_fine[inds]
+            M = curRun.run.data.M[inds]
+            Tl = curRun.run.data.t[inds]
+            Vl_estimate = np.zeros((L, len(runs_data)))
+            Vl_estimate[:, i] = curRun.run.Vl_estimate[inds]
+            continue
+
+        oldL = np.minimum(L, len(M))
+        psums_delta[:oldL] += curRun.run.data.psums_delta[inds[:oldL]]
+        psums_fine[:oldL] += curRun.run.data.psums_fine[inds[:oldL]]
+        M[:oldL] += curRun.run.data.M[inds[:oldL]]
+        Tl[:oldL] += curRun.run.data.t[inds[:oldL]]
+
+        if L > oldL:
+            psums_delta = np.append(psums_delta,
+                                    curRun.run.data.psums_delta[inds[oldL:]], axis=0)
+            psums_fine = np.append(psums_fine,
+                                   curRun.run.data.psums_fine[inds[oldL:]], axis=0)
+            M = np.append(M, curRun.run.data.M[inds[oldL:]], axis=0)
+            Tl = np.append(Tl, curRun.run.data.t[inds[oldL:]], axis=0)
+            tmp = Vl_estimate.shape[0]
             Vl_estimate.resize((L, len(runs_data)), refcheck=False)
-            Vl_estimate[old:] = np.nan
-        psums_delta[:L, :] += curRun.run.data.psums_delta[inds, :]
-        psums_fine[:L, :] += curRun.run.data.psums_fine[inds, :]
-        M[:L] += curRun.run.data.M[inds]
-        Tl[:L] += curRun.run.data.t[inds]
+            Vl_estimate[tmp:] = np.nan
+
         Vl_estimate[:L, i] = curRun.run.Vl_estimate[inds]
         Vl_estimate[(L+1):, i] = np.nan
 
-    central_delta_moments = np.empty_like(psums_delta)
-    central_fine_moments = np.empty_like(psums_fine)
+    central_delta_moments = np.empty_like(psums_delta, dtype=float)
+    central_fine_moments = np.empty_like(psums_fine, dtype=float)
     for m in range(1, psums_delta.shape[1]+1):
-        central_delta_moments[:, m-1] = mimc.compute_central_moment(psums_delta,
-                                                                    M, m,
-                                                                    empty_value=np.inf)
-        central_fine_moments[:, m-1] = mimc.compute_central_moment(psums_fine,
-                                                                   M, m,
-                                                                   empty_value=np.inf)
+        central_delta_moments[:, m-1] = fnNorm(mimc.compute_central_moment(psums_delta, M, m))
+        central_fine_moments[:, m-1] = fnNorm(mimc.compute_central_moment(psums_fine, M, m))
     Tl /= M
     return central_delta_moments, central_fine_moments, Tl, M, Vl_estimate
 
@@ -394,12 +403,14 @@ def plotExpectVsLvls(ax, runs_data, *args, **kwargs):
     ax.set_ylabel(r'$E_\ell$')
     ax.set_yscale('log')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    fnNorm = kwargs.pop("fnNorm")
     if "__calc_moments" in kwargs:
         central_delta_moments, central_fine_moments, _, M, _ = kwargs.pop("__calc_moments")
     else:
         central_delta_moments, central_fine_moments, _, M, _ = __calc_moments(runs_data,
-                                                                           seed=kwargs.pop('seed', None),
-                                                                           direction=kwargs.pop('direction', None))
+                                                                              seed=kwargs.pop('seed', None),
+                                                                              direction=kwargs.pop('direction', None),
+                                                                              fnNorm=fnNorm)
 
     fine_kwargs = kwargs.pop('fine_kwargs', None)
     plotObj = []
@@ -427,6 +438,7 @@ def plotVarVsLvls(ax, runs_data, *args, **kwargs):
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
+    fnNorm = kwargs.pop("fnNorm")
     if "__calc_moments" in kwargs:
         central_delta_moments, central_fine_moments, \
             _, M, Vl_estimate = kwargs.pop("__calc_moments")
@@ -435,13 +447,14 @@ def plotVarVsLvls(ax, runs_data, *args, **kwargs):
             _, M, Vl_estimate = __calc_moments(runs_data,
                                                seed=kwargs.pop('seed', None),
                                                direction=kwargs.pop('direction',
-                                                                    None))
+                                                                    None),
+                                               fnNorm=fnNorm)
     fine_kwargs = kwargs.pop('fine_kwargs', None)
     estimate_kwargs = kwargs.pop('estimate_kwargs', None)
     plotObj = []
     Vl = central_delta_moments[:, 1]
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    if central_delta_moments.shape[1] >= 4:
+    if central_delta_moments.shape[-1] >= 4:
         El4 = central_delta_moments[:, 3]
         plotObj.append(ax.errorbar(np.arange(0, len(Vl)), Vl,
                                    yerr=3*np.sqrt(np.abs(El4/M)),
@@ -452,7 +465,7 @@ def plotVarVsLvls(ax, runs_data, *args, **kwargs):
 
     if fine_kwargs is not None:
         Vl = central_fine_moments[:, 1]
-        if central_fine_moments.shape[1] >= 4:
+        if central_fine_moments.shape[-1] >= 4:
             El4 = central_fine_moments[:, 3]
             plotObj.append(ax.errorbar(np.arange(0, len(Vl)), Vl,
                                    yerr=3*np.sqrt(np.abs(El4/M)),
@@ -486,13 +499,15 @@ def plotKurtosisVsLvls(ax, runs_data, *args, **kwargs):
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$\textnormal{Kurt}_\ell$')
     ax.set_yscale('log')
+    fnNorm = kwargs.pop("fnNorm")
     if "__calc_moments" in kwargs:
         central_delta_moments, _,  _, _, _ = kwargs.pop("__calc_moments")
     else:
         central_delta_moments, _, _, _, _ = __calc_moments(runs_data,
                                                         seed=kwargs.pop('seed', None),
                                                         direction=kwargs.pop('direction',
-                                                                             None))
+                                                                             None),
+                                                           fnNorm=fnNorm)
     Vl = central_delta_moments[:, 1]
     E4l = central_delta_moments[:, 3]
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
@@ -510,13 +525,15 @@ def plotSkewnessVsLvls(ax, runs_data, *args, **kwargs):
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$\textnormal{Skew}_\ell$')
     ax.set_yscale('log')
+    fnNorm = kwargs.pop("fnNorm")
     if "__calc_moments" in kwargs:
         central_delta_moments, _, _, _, _ = kwargs.pop("__calc_moments")
     else:
         central_delta_moments, _, _, _, _ = __calc_moments(runs_data,
-                                                        seed=kwargs.pop('seed', None),
-                                                        direction=kwargs.pop('direction',
-                                                                             None))
+                                                           seed=kwargs.pop('seed', None),
+                                                           direction=kwargs.pop('direction',
+                                                                                None),
+                                                           fnNorm=fnNorm)
     Vl = central_delta_moments[:, 1]
     E3l = np.abs(central_delta_moments[:, 2])
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
@@ -535,12 +552,13 @@ def plotTimeVsLvls(ax, runs_data, *args, **kwargs):
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel('Time (s)')
     ax.set_yscale('log')
+    fnNorm = kwargs.pop("fnNorm")
     if "__calc_moments" in kwargs:
         _, _, Tl, M, _ = kwargs.pop("__calc_moments")
     else:
         _, _, Tl, M, _ = __calc_moments(runs_data,
-                                     seed=kwargs.pop('seed', None),
-                                     direction=kwargs.pop('direction', None))
+                                        seed=kwargs.pop('seed', None),
+                                        direction=kwargs.pop('direction', None), fnNorm=fnNorm)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     line = ax.plot(np.arange(0, len(Tl)), Tl, *args, **kwargs)
     #line2 = ax.plot(np.arange(0, len(Tl)), M, *args, **kwargs)
@@ -635,18 +653,13 @@ def plotThetaRefVsTOL(ax, runs_data, eta, chi, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
-    central_delta_moments, _, _, _, _ = __calc_moments(runs_data)
-    El = np.abs(central_delta_moments[:, 0])
     L = lambda r: np.max([np.sum(l) for l in r.run.data.lvls])
     if chi == 1:
-        summary = np.array([[r.finalTOL,
-                             (1. + (1./(2.*eta))*1./(L(r)+1.))**-1,
-                             1-El[L(r)]/r.finalTOL]
+        summary = np.array([[r.finalTOL, (1. + (1./(2.*eta))*1./(L(r)+1.))**-1]
                             for r in runs_data])
     else:
         summary = np.array([[r.finalTOL,
-                             (1. + (1./(2.*eta))*(1.-chi)/(1.-chi**(L(r)+1.)))**-1,
-                             1-El[L(r)]/r.finalTOL]
+                             (1. + (1./(2.*eta))*(1.-chi)/(1.-chi**(L(r)+1.)))**-1]
                             for r in runs_data])
     TOL, thetaRef = __get_stats(summary, staton=1)
 
@@ -676,10 +689,11 @@ def plotErrorsQQ(ax, runs_data, *args, **kwargs):
         tol = unTOLs[np.argmax(np.bincount(np.digitize(TOLs, unTOLs)))-1]
     else:
         tol = kwargs.pop("tol")
+    fnNorm = kwargs.pop('fnNorm')
     from scipy.stats import norm
-    x = [r.run.data.calcEg() for r in runs_data if r.TOL == tol]
-    x = np.array(x)
-    x = (x - np.mean(x)) / np.std(x)
+    x_data = np.array([r.run.data.calcEg() for r in runs_data if r.TOL == tol])
+    x = fnNorm(x_data - np.mean(x_data))
+    x /= np.std(x)
     ec = ECDF(x)
     ax.set_xlabel(r'Empirical CDF')
     ax.set_ylabel("Normal CDF")
@@ -741,15 +755,19 @@ def __plot_failed(ax):
     traceback.print_exc(limit=None)
     print('-----------------------------------------------------')
 
+    raise
 @public
 def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     import matplotlib.pyplot as plt
 
+    verbose = kwargs.pop('verbose')
     if "params" in kwargs:
         params = kwargs.pop("params")
+        fn = kwargs.pop("fn")
     else:
         maxTOL = np.max([r.finalTOL for r in runs_data])
         params = next(r.run.params for r in runs_data if r.finalTOL == maxTOL)
+        fn = next(r.run.fn for r in runs_data if r.finalTOL == maxTOL)
 
     dim = params.dim
     legend_outside = kwargs.pop("legend_outside", 5)
@@ -766,13 +784,15 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
 
     figures = []
     def add_fig():
+        if verbose:
+            print("Adding figure", len(figures))
         figures.append(plt.figure())
         return figures[-1].gca()
 
     ax = add_fig()
     try:
         plotErrorsVsTOL(ax, runs_data, exact=exact,
-                        relative=True,
+                        relative=True, fnNorm=fn.Norm,
                         ErrEst_kwargs={'label': 'Error Estimate'},
                         TOLRef_kwargs={'linestyle': '--', 'c': 'k', 'label': 'TOL'},
                         num_kwargs={'color': 'r'})
@@ -781,7 +801,8 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
 
     ax = add_fig()
     try:
-        plotErrorsQQ(ax, runs_data, Ref_kwargs={'linestyle': '--', 'c': 'k'})
+        plotErrorsQQ(ax, runs_data, fnNorm=fn.Norm,
+                     Ref_kwargs={'linestyle': '--', 'c': 'k'})
     except:
         __plot_failed(ax)
 
@@ -881,7 +902,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                                                      'marker' : mrk,
                                                      'label' : 'Corrected estimate'}
 
-                line_data, _ = plotFunc(**cur_kwargs)
+                line_data, _ = plotFunc(fnNorm=fn.Norm, **cur_kwargs)
                 if rate is None:
                     continue
                 add_rates[np.sum(rate[np.array(direction) != 0])] = line_data
@@ -938,3 +959,73 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                 __add_legend(fig.gca(), outside=legend_outside)
                 pdf.savefig(fig)
     return figures
+
+
+def run_program():
+    from . import db as mimcdb
+    from . import plot as miplot
+    from . import test
+
+    import argparse
+    import warnings
+    import os
+    warnings.formatwarning = lambda msg, cat, filename, lineno, line: \
+                             "{}:{}: ({}) {}\n".format(os.path.basename(filename),
+                                                       lineno, cat.__name__, msg)
+    try:
+        from matplotlib.cbook import MatplotlibDeprecationWarning
+        warnings.simplefilter('ignore', MatplotlibDeprecationWarning)
+    except:
+        pass   # Ignore
+
+    def addExtraArguments(parser):
+        parser.register('type', 'bool', lambda v: v.lower() in ("yes",
+                                                                "true",
+                                                                "t", "1"))
+        parser.add_argument("-db_name", type=str, action="store",
+                            help="Database Name")
+        parser.add_argument("-db_user", type=str, action="store",
+                            help="Database User")
+        parser.add_argument("-db_host", type=str, action="store",
+                            help="Database Host")
+        parser.add_argument("-db_tag", type=str, action="store",
+                            help="Database Tag")
+        parser.add_argument("-qoi_exact", type=float, action="store",
+                            help="Exact value")
+        parser.add_argument("-only_final", type='bool', action="store",
+                            default=True, help="Plot only final iterations")
+        parser.add_argument("-o", type=str,
+                            action="store", help="Output file")
+        parser.add_argument("-cmd", type=str, action="store",
+                            help="Command to execute after plotting")
+        parser.add_argument("-verbose", type='bool', action="store",
+                            default=False)
+
+    parser = argparse.ArgumentParser(add_help=True)
+    addExtraArguments(parser)
+    args = test.parse_known_args(parser)
+    db_args = dict()
+    if args.db_name is not None:
+        db_args["db"] = args.db_name
+    if args.db_user is not None:
+        db_args["user"] = args.db_user
+    if args.db_host is not None:
+        db_args["host"] = args.db_hostcp
+    if args.o is None:
+        args.o = args.db_tag + ".pdf"
+    db = mimcdb.MIMCDatabase(**db_args)
+    if args.db_tag is None:
+        warnings.warn("You did not select a database tag!!")
+    if args.verbose:
+        print("Reading data")
+    run_data = db.readRuns(tag=args.db_tag, done_flag=1,
+                           iteration_idx=-1 if args.only_final else None)
+    if len(run_data) == 0:
+        raise Exception("No runs!!!")
+    if args.verbose:
+        print("Plotting data")
+    miplot.genPDFBooklet(run_data, fileName=args.o,
+                         exact=args.qoi_exact, verbose=args.verbose)
+
+    if args.cmd is not None:
+        os.system(args.cmd.format(args.o))

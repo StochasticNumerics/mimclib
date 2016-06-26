@@ -21,8 +21,8 @@ if __name__ == "__main__":
     base += " ".join(unknowns)
 
     if args.tries == 0:
-        cmd_single = "python " + base + " -mimc_verbose True -db False "
-        print(cmd_single.format(seed=0, TOL=0.001))
+        cmd_single = "python " + base + " -mimc_verbose True -db False -db_tag {tag} "
+        print(cmd_single.format(seed=0, TOL=0.001, tag=args.db_tag))
     else:
         cmd_multi = "python " + base + \
                     " -mimc_verbose False -db True -db_tag {tag} "

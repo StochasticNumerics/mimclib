@@ -25,4 +25,4 @@ do so by typincg ctrl+c repeatedly in terminal or through a killsignal.
 We wish you a pleasant day of simulations.\
 "
 
-make && ./echo_test_cmd.py -multi 1  $@ | parallel -j 11
+make && ./echo_test_cmd.py -tries 50  $@ | parallel -j 11
