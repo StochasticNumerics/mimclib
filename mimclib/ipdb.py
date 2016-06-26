@@ -65,14 +65,7 @@ class MyInteractiveShellEmbed(InteractiveShellEmbed):
         self.cur_frame = None
         self.verbose_tb = ultratb.VerboseTB(color_scheme='Linux',
                                             include_vars=True)
-
-        from IPython.core.excolors import exception_colors
-        self.color_scheme_table = exception_colors()
-        self.color_scheme_table.set_active_scheme('Linux')
-        # for convenience, set Colors to the active scheme
-        self.Colors = self.color_scheme_table.active_colors
-        from IPython.utils import io
-        self.ostream = io.stdout
+        self.list_tb = ultratb.ListTB(color_scheme='Linux')
 
     def init_magics(self):
         super(MyInteractiveShellEmbed, self).init_magics()
@@ -91,19 +84,19 @@ class MyInteractiveShellEmbed(InteractiveShellEmbed):
         import traceback
         elist = traceback.extract_tb(tb)
         hightlight = hightlight or self.cur_frame
-        Colors = self.Colors
+        Colors = self.list_tb.Colors
         out_list = []
         if elist:
             out_list.append('Traceback %s(most recent call last)%s:' %
                                 (Colors.normalEm, Colors.Normal) + '\n')
             out_list.extend(self._format_list(elist, hightlight))
         # The exception info should be a single entry in the list.
-        lines = ''.join(self._format_exception_only(etype, value))
+        lines = ''.join(self.list_tb._format_exception_only(etype, value))
         out_list.append(lines)
 
-        self.ostream.flush()
-        self.ostream.write(''.join(out_list))
-        self.ostream.flush()
+        self.list_tb.ostream.flush()
+        self.list_tb.ostream.write(''.join(out_list))
+        self.list_tb.ostream.flush()
         return ''.join(out_list)
 
     def _format_list(self, extracted_list, hightlight):
@@ -118,7 +111,7 @@ class MyInteractiveShellEmbed(InteractiveShellEmbed):
 
         Lifted almost verbatim from traceback.py
         """
-        Colors = self.Colors
+        Colors = self.list_tb.Colors
         list = []
         for i, dd in enumerate(extracted_list):
             filename, lineno, name, line = dd
@@ -141,87 +134,6 @@ class MyInteractiveShellEmbed(InteractiveShellEmbed):
                     item += '    %s\n' % line.strip()
             list.append(item)
         return list
-
-    def _format_exception_only(self, etype, value):
-        """Format the exception part of a traceback.
-
-        The arguments are the exception type and value such as given by
-        sys.exc_info()[:2]. The return value is a list of strings, each ending
-        in a newline.  Normally, the list contains a single string; however,
-        for SyntaxError exceptions, it contains several lines that (when
-        printed) display detailed information about where the syntax error
-        occurred.  The message indicating which exception occurred is the
-        always last string in the list.
-
-        Also lifted nearly verbatim from traceback.py
-        """
-        have_filedata = False
-        Colors = self.Colors
-        list = []
-        stype = Colors.excName + etype.__name__ + Colors.Normal
-        if value is None:
-            # Not sure if this can still happen in Python 2.6 and above
-            list.append( py3compat.cast_unicode(stype) + '\n')
-        else:
-            if issubclass(etype, SyntaxError):
-                have_filedata = True
-                #print 'filename is',filename  # dbg
-                if not value.filename: value.filename = "<string>"
-                if value.lineno:
-                    lineno = value.lineno
-                    textline = ulinecache.getline(value.filename, value.lineno)
-                else:
-                    lineno = 'unknown'
-                    textline = ''
-                list.append('%s  File %s"%s"%s, line %s%s%s\n' % \
-                        (Colors.normalEm,
-                         Colors.filenameEm, py3compat.cast_unicode(value.filename), Colors.normalEm,
-                         Colors.linenoEm, lineno, Colors.Normal  ))
-                if textline == '':
-                    textline = py3compat.cast_unicode(value.text, "utf-8")
-
-                if textline is not None:
-                    i = 0
-                    while i < len(textline) and textline[i].isspace():
-                        i += 1
-                    list.append('%s    %s%s\n' % (Colors.line,
-                                                  textline.strip(),
-                                                  Colors.Normal))
-                    if value.offset is not None:
-                        s = '    '
-                        for c in textline[i:value.offset-1]:
-                            if c.isspace():
-                                s += c
-                            else:
-                                s += ' '
-                        list.append('%s%s^%s\n' % (Colors.caret, s,
-                                                   Colors.Normal) )
-
-            try:
-                s = value.msg
-            except Exception:
-                s = self._some_str(value)
-            if s:
-                list.append('%s%s:%s %s\n' % (str(stype), Colors.excName,
-                                              Colors.Normal, s))
-            else:
-                list.append('%s\n' % str(stype))
-
-        # sync with user hooks
-        if have_filedata:
-            ipinst = get_ipython()
-            if ipinst is not None:
-                ipinst.hooks.synchronize_with_editor(value.filename, value.lineno, 0)
-
-        return list
-
-    def _some_str(self, value):
-        # Lifted from traceback.py
-        try:
-            return str(value)
-        except:
-            return '<unprintable %s object>' % type(value).__name__
-
 
 @public
 def embed(**kwargs):
