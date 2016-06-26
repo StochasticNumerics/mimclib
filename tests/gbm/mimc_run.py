@@ -132,9 +132,9 @@ def initRun(run):
 
 if __name__ == "__main__":
     import mimclib.test
-    import mimclib.ipython
+    import mimclib.ipdb
     import sys
-    sys.excepthook = mimclib.ipython.excepthook()
+    sys.excepthook = mimclib.ipdb.excepthook()
 
     mimclib.test.RunStandardTest(fnSampleLvl=mySampleQoI,
                                  fnAddExtraArgs=addExtraArguments,
