@@ -27,29 +27,32 @@ class StackEmbeddedMagics(Magics):
             self.shell.print_verbose_stack()
             return
 
+        cur_frame = self.shell.cur_frame
         if parameter_s.startswith("u"):
-            self.shell.cur_frame -= 1
+            cur_frame -= 1
         elif parameter_s.startswith("d"):
-            self.shell.cur_frame += 1
+            cur_frame += 1
         else:
             try:
-                self.shell.cur_frame = int(parameter_s)
+                cur_frame = int(parameter_s)
+                if cur_frame < 0:
+                    cur_frame += len(self.shell.frames)
             except ValueError:
-                print("Must pass 'u' or 'd' or a number.")
+                print("ERROR: Must pass 'v', 'u', 'd' or a number. Nothing changed.")
                 return
 
-        self.shell.cur_frame = min(self.shell.cur_frame,
-                                   len(self.shell.frames)-1)
-        self.shell.cur_frame = max(self.shell.cur_frame, 0)
-
-        # TODO: Copy old stuff that was saved
-        import sys
-        cur_frame = self.shell.frames[self.shell.cur_frame]
-        self.shell.user_module = sys.modules[cur_frame.f_globals['__name__']]
-        self.shell.user_ns = cur_frame.f_locals
-        self.shell.init_user_ns()
-        self.shell.set_completer_frame()
-
+        if cur_frame < 0 or cur_frame >= len(self.shell.frames):
+            print("ERROR: Frame out of bounds. Nothing changed")
+            return
+        if cur_frame != self.shell.cur_frame:
+            self.shell.cur_frame = cur_frame
+            # TODO: Copy old stuff that was saved
+            import sys
+            cur_frame = self.shell.frames[self.shell.cur_frame]
+            self.shell.user_module = sys.modules[cur_frame.f_globals['__name__']]
+            self.shell.user_ns = cur_frame.f_locals
+            self.shell.init_user_ns()
+            self.shell.set_completer_frame()
         self.shell.print_stack()
 
 
