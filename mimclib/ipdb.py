@@ -50,7 +50,7 @@ class StackEmbeddedMagics(Magics):
         self.shell.init_user_ns()
         self.shell.set_completer_frame()
 
-        self.print_stack(self.cur_frame)
+        self.shell.print_stack()
 
 
 class MyInteractiveShellEmbed(InteractiveShellEmbed):
@@ -71,6 +71,8 @@ class MyInteractiveShellEmbed(InteractiveShellEmbed):
         self.color_scheme_table.set_active_scheme('Linux')
         # for convenience, set Colors to the active scheme
         self.Colors = self.color_scheme_table.active_colors
+        from IPython.utils import io
+        self.ostream = io.stdout
 
     def init_magics(self):
         super(MyInteractiveShellEmbed, self).init_magics()
@@ -81,12 +83,14 @@ class MyInteractiveShellEmbed(InteractiveShellEmbed):
             self.print_stack(self.cur_frame)
         super(MyInteractiveShellEmbed, self).__call__(**kwargs)
 
-    def print_verbose_stack():
-        self.verbose_tb(**self.ex_data)
+    def print_verbose_stack(self):
+        self.verbose_tb(*self.ex_data)
 
     def print_stack(self, hightlight=None):
-        etype, value, elist = self.ex_data
-        hightlight = hightlight or len(self.frames)-1
+        etype, value, tb = self.ex_data
+        import traceback
+        elist = traceback.extract_tb(tb)
+        hightlight = hightlight or self.cur_frame
         Colors = self.Colors
         out_list = []
         if elist:
@@ -96,7 +100,11 @@ class MyInteractiveShellEmbed(InteractiveShellEmbed):
         # The exception info should be a single entry in the list.
         lines = ''.join(self._format_exception_only(etype, value))
         out_list.append(lines)
-        return out_list
+
+        self.ostream.flush()
+        self.ostream.write(''.join(out_list))
+        self.ostream.flush()
+        return ''.join(out_list)
 
     def _format_list(self, extracted_list, hightlight):
         """Format a list of traceback entry tuples for printing.
@@ -112,7 +120,8 @@ class MyInteractiveShellEmbed(InteractiveShellEmbed):
         """
         Colors = self.Colors
         list = []
-        for i, filename, lineno, name, line in enumerate(extracted_list):
+        for i, dd in enumerate(extracted_list):
+            filename, lineno, name, line = dd
             if i == hightlight:
                 item = '%s  File %s"%s"%s, line %s%d%s, in %s%s%s%s\n' % \
                 (Colors.normalEm,
