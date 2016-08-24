@@ -25,4 +25,8 @@ do so by typincg ctrl+c repeatedly in terminal or through a killsignal.
 We wish you a pleasant day of simulations.\
 "
 
-make && ./echo_test_cmd.py -tries 50  $@ | parallel -j 11
+make
+
+./echo_test_cmd.py -db_tag GBM_real -qoi_type real -tries 50 | parallel -j4 &
+./echo_test_cmd.py -db_tag GBM_arr -qoi_type arr -tries 50 | parallel -j4 &
+./echo_test_cmd.py -db_tag GBM_obj -qoi_type obj -tries 50 | parallel -j4 &

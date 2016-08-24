@@ -134,7 +134,7 @@ if __name__ == "__main__":
     import mimclib.test
     import mimclib.ipdb
     import sys
-    sys.excepthook = mimclib.ipdb.excepthook()
+    mimclib.ipdb.set_excepthook()
 
     mimclib.test.RunStandardTest(fnSampleLvl=mySampleQoI,
                                  fnAddExtraArgs=addExtraArguments,

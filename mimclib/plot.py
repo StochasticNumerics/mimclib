@@ -221,7 +221,7 @@ def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
         #                  r.TOL == minfinalTOL])
         minfinalTOL = np.min([r.finalTOL for r in runs_data])
         exact = np.mean([r.run.data.calcEg() for r in runs_data if
-                         r.finalTOL == minfinalTOL])
+                         r.finalTOL == minfinalTOL], axis=0)
         print("Computed exact value is:", exact)
 
     modifier = (1./fnNorm(np.array([exact]))[0]) if relative_error else 1.
@@ -320,8 +320,10 @@ def __calc_moments(runs_data, seed=None, direction=None, fnNorm=None):
         Vl_estimate[:L, i] = curRun.run.Vl_estimate[inds]
         Vl_estimate[(L+1):, i] = np.nan
 
-    central_delta_moments = np.empty_like(psums_delta, dtype=float)
-    central_fine_moments = np.empty_like(psums_fine, dtype=float)
+    central_delta_moments = np.empty((psums_delta.shape[0],
+                                      psums_delta.shape[1]), dtype=float)
+    central_fine_moments = np.empty((psums_fine.shape[0],
+                                     psums_fine.shape[1]), dtype=float)
     for m in range(1, psums_delta.shape[1]+1):
         central_delta_moments[:, m-1] = fnNorm(mimc.compute_central_moment(psums_delta, M, m))
         central_fine_moments[:, m-1] = fnNorm(mimc.compute_central_moment(psums_fine, M, m))

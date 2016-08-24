@@ -1,7 +1,25 @@
 #!/bin/bash
 
-#cat .plot_example.txt
 echo "If all goes well, this script should plot the relevant plots of the
-parallel mimc run. Output will be produced to 'GBM_testcase.pdf'"
+parallel mimc run. Output will be produced to 'GBM_*.pdf'"
 
-../plot_data.py -db_tag "GBM_testcase" -o GBM_testcase.pdf $*
+echo "Plotting real run"
+python -c "import sys; import mimclib.ipython; \
+sys.excepthook = mimclib.ipython.excepthook(); \
+from mimclib.plot import run_program; \
+run_program()" -db_tag 'GBM_real'
+
+echo "Plotting array run"
+python -c "import sys; import mimclib.ipython; \
+sys.excepthook = mimclib.ipython.excepthook(); \
+from mimclib.plot import run_program; \
+import numpy as np; \
+run_program()" -db_tag 'GBM_arr'
+
+echo "Plotting obj run"
+python -c "import sys; import mimclib.ipython; \
+sys.excepthook = mimclib.ipython.excepthook(); \
+from mimc_run import CustomClass; \
+from mimclib.plot import run_program; \
+import numpy as np; \
+run_program()" -db_tag 'GBM_obj'
