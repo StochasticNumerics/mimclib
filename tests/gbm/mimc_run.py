@@ -90,6 +90,9 @@ class CustomClass(mimclib.mimc.custom_obj):
     def __str__(self):
         return str(self.data)
 
+    def __float__(self):
+        return self.data
+
 def mySampleQoI(run, inds, M):
     meshes = (run.params.qoi_T/run.fn.Hierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)

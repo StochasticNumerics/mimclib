@@ -694,7 +694,17 @@ def plotErrorsQQ(ax, runs_data, *args, **kwargs):
     fnNorm = kwargs.pop('fnNorm')
     from scipy.stats import norm
     x_data = np.array([r.run.data.calcEg() for r in runs_data if r.TOL == tol])
-    x = fnNorm(x_data - np.mean(x_data))
+    x = x_data - np.mean(x_data, axis=0)
+    try:
+        x = x.astype(np.float)
+        if len(x.shape) != 1:
+            raise Exception("Not correct size")
+    except:
+        __plot_failed(ax)
+        import warnings
+        warnings.warn("QQ plots require the object to implement __float__")
+        return
+
     x /= np.std(x)
     ec = ECDF(x)
     ax.set_xlabel(r'Empirical CDF')
@@ -752,12 +762,16 @@ def __plot_failed(ax):
             rotation=45, fontsize=60, color='red', alpha=0.5,
             transform=ax.transAxes)
 
+def __plot_except(ax):
+    __plot_failed(ax)
+
     import traceback
     print('-----------------------------------------------------')
     traceback.print_exc(limit=None)
     print('-----------------------------------------------------')
 
     raise
+
 @public
 def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     import matplotlib.pyplot as plt
@@ -799,14 +813,14 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                         TOLRef_kwargs={'linestyle': '--', 'c': 'k', 'label': 'TOL'},
                         num_kwargs={'color': 'r'})
     except:
-        __plot_failed(ax)
+        __plot_except(ax)
 
     ax = add_fig()
     try:
         plotErrorsQQ(ax, runs_data, fnNorm=fn.Norm,
                      Ref_kwargs={'linestyle': '--', 'c': 'k'})
     except:
-        __plot_failed(ax)
+        __plot_except(ax)
 
     ax_time = add_fig()
     try:
@@ -814,7 +828,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                                      MC_kwargs=None if dim > 1
                                      else {"label": "MC Estimate", "fmt": "--r"})
     except:
-        __plot_failed(ax_time)
+        __plot_except(ax_time)
 
     ax_est = add_fig()
     try:
@@ -840,7 +854,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                                            linestyle='--', c='k',
                                            label=label))
     except:
-        __plot_failed(ax_est)
+        __plot_except(ax_est)
 
     def formatPower(rate):
         rate = "{:.2g}".format(rate)
@@ -916,7 +930,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                                            linestyle=next(linestyles),
                                            c='k', label=label))
         except:
-            __plot_failed(ax)
+            __plot_except(ax)
 
     ax = add_fig()
     try:
@@ -925,7 +939,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                             label_fmt="${:.2g}$",
                             max_TOLs=5)
     except:
-        __plot_failed(ax)
+        __plot_except(ax)
 
     ax = add_fig()
     try:
@@ -942,7 +956,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                                        linestyle='--', c='k',
                                        label=label))
     except:
-        __plot_failed(ax)
+        __plot_except(ax)
 
     ax = add_fig()
     try:
@@ -952,7 +966,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
             eta = params.w[0]/params.gamma[0]
             plotThetaRefVsTOL(ax, runs_data, eta=eta, chi=chi, fmt='--k')
     except:
-        __plot_failed(ax)
+        __plot_except(ax)
 
     if fileName is not None:
         from matplotlib.backends.backend_pdf import PdfPages

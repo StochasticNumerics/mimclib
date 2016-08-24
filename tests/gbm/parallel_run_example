@@ -27,6 +27,11 @@ We wish you a pleasant day of simulations.\
 
 make
 
-./echo_test_cmd.py -db_tag GBM_real -qoi_type real -tries 50 | parallel -j4 &
-./echo_test_cmd.py -db_tag GBM_arr -qoi_type arr -tries 50 | parallel -j4 &
-./echo_test_cmd.py -db_tag GBM_obj -qoi_type obj -tries 50 | parallel -j4 &
+# ./echo_test_cmd.py -db_tag GBM_real -qoi_type real -tries 50 | parallel -j4 &
+# ./echo_test_cmd.py -db_tag GBM_arr -qoi_type arr -tries 50 | parallel -j4 &
+# ./echo_test_cmd.py -db_tag GBM_obj -qoi_type obj -tries 50 | parallel -j4 &
+
+
+./echo_test_cmd.py -mimc_bayesian False -db_tag GBM_std_real -qoi_type real -tries 50 | parallel -j4 &
+./echo_test_cmd.py -mimc_bayesian False -db_tag GBM_std_arr -qoi_type arr -tries 50 | parallel -j4 &
+./echo_test_cmd.py -mimc_bayesian False -db_tag GBM_std_obj -qoi_type obj -tries 50 | parallel -j4 &

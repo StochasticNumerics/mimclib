@@ -3,23 +3,23 @@
 echo "If all goes well, this script should plot the relevant plots of the
 parallel mimc run. Output will be produced to 'GBM_*.pdf'"
 
-echo "Plotting real run"
+echo "Plotting GBM_real"
 python -c "import sys; import mimclib.ipython; \
 sys.excepthook = mimclib.ipython.excepthook(); \
 from mimclib.plot import run_program; \
-run_program()" -db_tag 'GBM_real'
+run_program()" -db_tag 'GBM_std_real'
 
-echo "Plotting array run"
+echo "Plotting GBM_arr"
 python -c "import sys; import mimclib.ipython; \
 sys.excepthook = mimclib.ipython.excepthook(); \
 from mimclib.plot import run_program; \
 import numpy as np; \
-run_program()" -db_tag 'GBM_arr'
+run_program()" -db_tag 'GBM_std_arr'
 
-echo "Plotting obj run"
+echo "Plotting GBM_obj"
 python -c "import sys; import mimclib.ipython; \
 sys.excepthook = mimclib.ipython.excepthook(); \
 from mimc_run import CustomClass; \
 from mimclib.plot import run_program; \
 import numpy as np; \
-run_program()" -db_tag 'GBM_obj'
+run_program()" -db_tag 'GBM_std_obj'
