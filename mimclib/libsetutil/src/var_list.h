@@ -12,7 +12,7 @@ typedef unsigned short ind_t;
 
 class SparseMIndex {
 public:
-    static const int SET_BASE = 1;
+    static const int SET_BASE = 0;
     struct Index
     {
     Index() : ind(0), value(SET_BASE) {}
@@ -187,9 +187,13 @@ typedef SparseMIndex mul_ind_t;
 class ProfitCalculator {
 public:
     virtual ~ProfitCalculator(){}
-    virtual void calc_log_EW(const mul_ind_t &ind, double& lE, double& lW)=0;
-    virtual double calc_log_prof(const mul_ind_t &ind) { double lE, lW; calc_log_EW(ind, lE, lW); return lW-lE;};
+    virtual double calc_log_prof(const mul_ind_t &ind)=0;
     virtual ind_t max_dim()=0;
+
+    void check_ind(const mul_ind_t &ind){
+        if (ind.size() > max_dim())
+            throw std::runtime_error("Index too large for profit calculator");
+    }
 };
 
 typedef ProfitCalculator* PProfitCalculator;
@@ -288,7 +292,8 @@ public:
 
     void push_back(const mul_ind_t& ind){
         // WARNING: Does not check uniqueness
-        assert(!has_ind(ind));
+        if (this->has_ind(ind))
+            throw std::runtime_error("Index already in set");
         m_ind_set.push_back(ind);
         m_ind_map[ind] = m_ind_set.size()-1;
         m_max_dim = std::max(m_max_dim, ind.size());
@@ -308,8 +313,7 @@ public:
     void make_profits_admissible(ind_t d_start, ind_t d_end,
                                double *pProfits, uint32 count) const;
     void calc_set_profit(const PProfitCalculator profCalc,
-                            double *log_error,
-                            double *log_work, uint32 count) const;
+                         double *log_prof, uint32 count) const;
     void get_level_boundaries(const uint32 *levels, uint32 levels_count,
                               int32 *inner_bnd, bool *inner_real_lvls) const;
 

@@ -49,7 +49,7 @@ class StackEmbeddedMagics(Magics):
         if parameter_s.startswith("h") or parameter_s.startswith("?"):
             print('''u(p):       Stack up.
 d(own):     Stack down.
-v(verbose): Verbose output of stack.
+v(erbose): Verbose output of stack.
 2:          Jump to stack number 2 (or any other number)''')
             return
         if parameter_s.startswith("v"):
@@ -160,6 +160,7 @@ def embed(**kwargs):
                 break
         #frames = frames[-2::-1]
         frames = frames[:-1]
+        frames = frames[::-1]
 
     tb = kwargs.pop("tb", None)
     old_excepthool = sys.excepthook
@@ -296,7 +297,7 @@ class MyTB(ultratb.ListTB):
         list = []
         for i, frm in enumerate(frames):
             filename, lineno, name, lines, linei = inspect.getframeinfo(frm)
-            line = lines[linei]
+            line = lines[linei] if lines is not None else None
             if i == hightlight:
                 item = '%s  File %s"%s"%s, line %s%d%s, in %s%s%s%s\n' % \
                 (Colors.normalEm,

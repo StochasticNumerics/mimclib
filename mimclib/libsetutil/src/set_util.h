@@ -14,16 +14,18 @@ extern "C"{
     typedef unsigned int bool;
 #endif
 
+    ind_t GetDefaultSetBase();
     void VarSizeList_check_errors(const PVarSizeList, const double *errors, bool* strange, uint32 count);
 
-    PProfitCalculator GetMISCProfit(ind_t d, ind_t maxN,
-                         const double *d_err_rates, const double *d_work_rates,
-                         const double *s_g_rates, const double *s_g_bar_rates);
-    PProfitCalculator GetAnisoProfit(ind_t d, const double *wE, const double *wW);
+    PProfitCalculator CreateMISCProfCalc(ind_t d, ind_t s,
+                                         const double *d_rates, const double *s_err_rates);
+    PProfitCalculator CreateTDProfCalc(ind_t d, const double *w);
+    PProfitCalculator CreateFTProfCalc(ind_t d, const double *w);
 
     double GetMinOuterProfit(const PVarSizeList, const PProfitCalculator profCalc);
-    void CalculateSetProfit(const PVarSizeList, const PProfitCalculator profCalc,
-                            double *log_error, double *log_work);
+    void CalculateSetProfit(const PVarSizeList,
+                            const PProfitCalculator profCalc,
+                            double *log_prof, uint32 size);
     void CheckAdmissibility(const PVarSizeList, ind_t d_start, ind_t d_end,
                             bool *admissible);
     void MakeProfitsAdmissible(const PVarSizeList, ind_t d_start, ind_t d_end,
@@ -48,8 +50,10 @@ extern "C"{
     /*                     int32* sel, int32* inner_bnd, bool* bnd_ind); */
 
 
-    PVarSizeList GetIndexSet(const PProfitCalculator profCalc,
-                             double max_prof, double **p_profits);
+    PVarSizeList GetIndexSet(PVarSizeList,
+                             const PProfitCalculator profCalc,
+                             double max_prof,
+                             double **p_profits);
 
     void GetAdaptiveOrder(const PVarSizeList,
                           double *log_profits,
@@ -63,6 +67,7 @@ extern "C"{
     ind_t VarSizeList_get(const PVarSizeList, uint32 i, ind_t* data, ind_t max_dim);
     ind_t VarSizeList_get_dim(const PVarSizeList, uint32 i);
     ind_t VarSizeList_get_active_dim(const PVarSizeList, uint32 i);
+    uint32 VarSizeList_count_neighbors(const PVarSizeList, ind_t *out_neighbors, uint32 count);
 
     uint32 VarSizeList_count(const PVarSizeList);
     PVarSizeList VarSizeList_sublist(const PVarSizeList, uint32* idx, uint32 _count);
@@ -73,7 +78,8 @@ extern "C"{
                                ind_t *data, uint32 data_size);
     int VarSizeList_find(const PVarSizeList, ind_t *j, ind_t *data,
                          ind_t size);
-    PVarSizeList VarSizeList_from_matrix(const ind_t *sizes, uint32 count,
+    PVarSizeList VarSizeList_from_matrix(PVarSizeList,
+                                         const ind_t *sizes, uint32 sizes_size,
                                          const ind_t *j, uint32 j_size,
                                          const ind_t *data, uint32 data_size);
 

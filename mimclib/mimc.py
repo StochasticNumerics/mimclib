@@ -113,10 +113,11 @@ class MIMCData(object):
                  psums_fine=None, t=None, M=None, moments=2):
         self.moments = moments
         self.dim = dim
-        self.lvls = []            # MIMC lvls
         import copy
         if lvls is not None:
-            self.lvls = copy.copy(lvls)
+            self.lvls = lvls
+        else:
+            self.lvls = setutil.VarSizeList(min_dim=dim)
 
         self.psums_delta = None
         self.psums_fine = None
@@ -153,7 +154,7 @@ class MIMCData(object):
     def __getitem__(self, ind):
         # Reshape everything to allow ind to be a single index or a list
         return MIMCData(self.dim,
-                        lvls=np.array(self.lvls, dtype=object)[ind].reshape((-1,self.dim)).tolist(),
+                        lvls=self.lvls.sublist(ind),
                         psums_delta=self.psums_delta[ind].reshape((-1,) + self.psums_delta.shape[1:]),
                         psums_fine=self.psums_fine[ind].reshape((-1,) + self.psums_delta.shape[1:]),
                         t=self.t[ind].reshape(-1),
@@ -230,11 +231,11 @@ class MIMCData(object):
         self.psums_delta = np.empty((len(lvls), moments), dtype=object)
         self.psums_fine = np.empty((len(lvls), moments), dtype=object)
 
-    def addLevels(self, new_lvls):
-        assert(len(new_lvls) > 0)
-        prev = len(self.lvls)
-        self.lvls.extend(new_lvls)
+    def _levels_added(self):
+        prev = len(self.M)
         s = len(self.lvls)
+        if s == prev:
+            return
         if self.psums_delta is not None:
             self.psums_delta.resize((s, ) + self.psums_delta.shape[1:], refcheck=False)
         if self.psums_fine is not None:
@@ -271,7 +272,7 @@ class MIMCRun(object):
     def __init__(self, old_data=None, **kwargs):
         self.fn = MyDefaultDict(# Hierarchy=None,
                                 # WorkModel=None, SampleLvl=None,
-                                # ItrDone=None, ExtendLvls=None,
+                                # ItrDone=None,
                                 Norm=np.abs)
         self.params = MyDefaultDict(**kwargs)
         self.Vl_estimate = None
@@ -284,7 +285,8 @@ class MIMCRun(object):
         else:
             self.all_data = self.data = MIMCData(dim=self.params.dim, moments=self.params.moments)
             if not self.params.reuse_samples:
-                self.all_data = MIMCData(dim=self.params.dim, moments=self.params.moments)
+                self.all_data = MIMCData(lvls=self.data.lvls,
+                                         dim=self.params.dim, moments=self.params.moments)
 
         if (hasattr(self.params, "w") and len(self.params.w) != self.data.dim) or \
            (hasattr(self.params, "s") and len(self.params.s) != self.data.dim) or \
@@ -326,25 +328,11 @@ supported with a given work model")
             raise NotImplemented("Need to check that the lvls \
 are the same as the argument ones")
             self.fn.WorkModel = lambda lvls: self.Tl()
-        if not hasattr(self.fn, "ExtendLvls"):
-            weights = self.params.beta * (self.params.w +
-                                          (self.params.s -
-                                           self.params.gamma)/2.)
-            weights /= np.sum(weights, axis=0)
-            if len(weights) == 1:
-                weights = weights[0]*np.ones(self.params.dim)
-
-            self.fn.ExtendLvls = lambda w=weights: extend_lvls_td(w,
-                                                                 self.data.lvls,
-                                                                 self.params.M0,
-                                                                 self.params.min_lvls/self.params.dim)
 
         if self.fn.SampleLvl is None:
             raise ValueError("Must set the sampling functions fnSampleLvl")
 
     def setFunctions(self, **kwargs):
-        # fnExtendLvls(): Returns new lvls and number of samples on each.
-        #    called only once if the Bayesian method is used
         # fnSampleLvl(moments, mods, inds, M):
         #    Returns M, array: M sums of mods*inds, and total
         #    (linear) time it took to compute them
@@ -354,7 +342,7 @@ are the same as the argument ones")
         # fnHierarchy(lvls): Returns associated hierarchy of lvls
         for k in kwargs.keys():
             kk = k[2:] if k.startswith('fn') else k
-            if kk not in ["ExtendLvls", "SampleLvl",
+            if kk not in ["SampleLvl",
                          "ItrDone", "WorkModel",
                          "Hierarchy", "SampleQoI", "Norm"]:
                 raise KeyError("Invalid function name")
@@ -402,10 +390,10 @@ estimating bias (sometimes that's too conservative).")
 between iterations")
         add_store('w', nargs='+', type=float, action=Store_as_array,
                   help="Weak convergence rates. Must be scalar or of size -dim. \
-Not needed if fnExtendLvls is specified and -bayesian is False.")
+Not needed if a profit calculator is specified and -bayesian is False.")
         add_store('s', nargs='+', type=float, action=Store_as_array,
                   help="Strong convergence rates. Must be a scalar or of size -dim. \
-Not needed if fnExtendLvls is specified and -bayesian is False.")
+Not needed if a profit calculator is specified and -bayesian is False.")
         add_store('TOL', type=float,
                   help="The required tolerance for the MIMC run")
         add_store('beta', type=float, nargs='+', action=Store_as_array,
@@ -413,7 +401,7 @@ Not needed if fnExtendLvls is specified and -bayesian is False.")
 with get_geometric_hl. Not needed if fnHierarchy is provided.")
         add_store('gamma', type=float, nargs='+', action=Store_as_array,
                   help="Work exponent to be used with work_estimate.\
-Not needed if fnWorkModel and fnExtendLvls are provided.")
+Not needed if fnWorkModel and profit calculator are provided.")
 
         # The following arguments are not needed if bayes is False
         if default_bayes:
@@ -445,12 +433,12 @@ the first iteration. Not needed if TOLs is provided to doRun.")
                       action=Store_as_array,
                       help="Initial number of samples used to estimate the \
 sample variance on levels when not using the Bayesian estimators. \
-Not needed if fnExtendLvls is provided.")
+Not needed if a profit calculator is provided.")
             add_store('maxM', type=int, default=1000, help="Maximum number of \
 samples to compute per call to user function")
-            add_store('min_lvls', type=int, default=2,
+            add_store('min_lvls', type=int, default=3,
                       help="The initial number of levels to run \
-the first iteration. Not needed if fnExtendLvls is provided.")
+the first iteration. Not needed if a profit calculator is provided.")
             add_store('max_add_itr', type=int, default=2,
                       help="Maximum number of additonal iterations\
 to run when the MIMC is expected to but is not converging.\
@@ -503,7 +491,7 @@ Bias={:.12e}\nStatErr={:.12e}\
     ################## Bayesian specific functions
     def _estimateBias(self):
         if not self.params.bayesian:
-            bnd = is_boundary(self.data.dim, self.data.lvls)
+            bnd = self.data.lvls.is_boundary()
             if np.sum(bnd) == len(self.data.lvls):
                 return np.inf
             bnd_val = self.data[bnd].calcDeltaEl()
@@ -516,9 +504,11 @@ Bias={:.12e}\nStatErr={:.12e}\
         L = L or len(self.all_data.lvls)-1
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        hl = self.fn.Hierarchy(lvls=np.arange(0, L+1).
-                              reshape((-1, 1))).reshape(1, -1)[0]
-        return self.Q.W * hl[-1]**self.Q.w[0]
+        return self.Q.W * self._get_hl(L)[-1]**self.Q.w[0]
+
+    def _get_hl(self, L):
+        lvls = np.arange(0, L+1).reshape((-1, 1))
+        return  self.fn.Hierarchy(lvls).reshape(1, -1)[0]
 
     def _estimateBayesianVl(self, L=None):
         if np.sum(self.all_data.M, axis=0) == 0:
@@ -531,8 +521,7 @@ Bias={:.12e}\nStatErr={:.12e}\
                                              np.arange(0,
                                                        len(self.all_data.lvls))
                                              >= 1))[0]
-        hl = self.fn.Hierarchy(lvls=np.arange(0, L+1).
-                              reshape((-1, 1))).reshape(1, -1)[0]
+        hl = self._get_hl(L)
         M = self.all_data.M[included]
         s1 = self.all_data.psums_delta[included, 0]
         m1 = self.all_data[included].calcDeltaEl()
@@ -564,8 +553,7 @@ Bias={:.12e}\nStatErr={:.12e}\
         L = len(self.all_data.lvls)-1
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        hl = self.fn.Hierarchy(lvls=np.arange(0, L+1).
-                              reshape((-1, 1))).reshape(1, -1)[0]
+        hl = self._get_hl(L)
         included = np.nonzero(\
                 np.logical_and(self.all_data.M > 0,
                                np.arange(0, len(self.all_data.lvls))
@@ -598,7 +586,8 @@ estimate optimal number of levels"
             bias_est = self._estimateBayesianBias(L)
             if bias_est >= TOL and L < LsRange[-1]:
                 continue
-            Wl = self.fn.WorkModel(lvls=np.arange(0, L+1).reshape((-1, 1)))
+            lvls = setutil.VarSizeList(np.arange(0, L+1).reshape((-1, 1)), min_dim=1)
+            Wl = self.fn.WorkModel(lvls)
             M = self._calcTheoryM(TOL,
                                   theta=self._calcTheta(TOL, bias_est),
                                   Vl=self._estimateBayesianVl(L), Wl=Wl)
@@ -614,7 +603,7 @@ estimate optimal number of levels"
         self.Vl_estimate = self.fn.Norm(self.all_data.calcDeltaVl()) \
                            if not self.params.bayesian \
                            else self._estimateBayesianVl()
-        self.Wl_estimate = self.fn.WorkModel(lvls=self.data.lvls)
+        self.Wl_estimate = self.fn.WorkModel(self.data.lvls)
         self.bias = self._estimateBias()
         from scipy.stats import norm
         Ca = norm.ppf(self.params.confidence)
@@ -622,11 +611,28 @@ estimate optimal number of levels"
                           else Ca * \
                                np.sqrt(np.sum(self.Vl_estimate / self.data.M))
 
-    def _addLevels(self, lvls):
-        self.data.addLevels(lvls)
-        if self.all_data != self.data:
-            self.all_data.addLevels(lvls)
-
+    def _extendLevels(self, lvls=None, profCalc=None):
+        prev = len(self.data.lvls)
+        if lvls is not None:
+            self.data.lvls.add_from_list(lvls)
+        elif profCalc is not None:
+            added = False
+            if prev == 0:
+                # add seed
+                self.data.lvls.add_from_list([[]])
+                added = True
+            while not added or (len(self.data.lvls) < self.params.min_lvls):
+                self.data.lvls.expand_set(profCalc)
+                added = True
+        else:
+            assert False
+        assert(prev != len(self.data.lvls))
+        self.data._levels_added()
+        self.all_data._levels_added()
+        newTodoM = np.pad(self.params.M0,
+                          (0,len(self.data.lvls)), 'constant',
+                          constant_values=self.params.M0[-1])
+        return np.concatenate((self.data.M[:prev], newTodoM[prev:]))
 
     def SampleLvl(self, mods, inds, M):
         # fnSampleLvl(inds, M) -> Returns a matrix of size (M, len(ind)) and
@@ -694,7 +700,17 @@ estimate optimal number of levels"
         return np.maximum(np.reshape(self.params.M0, (1,))[-1],
                           int(np.ceil((theta * TOL / Ca)**-2 * self.Vl_estimate[0])))
 
-    def doRun(self, finalTOL=None, TOLs=None, verbose=None):
+    def doRun(self, profCalc=None, finalTOL=None, TOLs=None, verbose=None):
+        if profCalc is None:
+            weights = self.params.beta * (self.params.w +
+                                          (self.params.s -
+                                           self.params.gamma)/2.)
+            if len(weights) == 1:
+                # Repeat weight all dimension
+                weights = weights[0]*np.ones(self.params.dim)
+            weights /= np.sum(weights, axis=0)
+            profCalc = setutil.TDProfCalculator(weights)
+
         self._checkFunctions()
         finalTOL = finalTOL or self.params.TOL
         TOLs = TOLs or get_tol_sequence(finalTOL, self.params.max_TOL,
@@ -726,8 +742,8 @@ estimate optimal number of levels"
                 if self.params.bayesian and len(self.data.lvls) > 0:
                     L = self._estimateOptimalL(TOL)
                     if L > len(self.data.lvls):
-                        self._addLevels(np.arange(len(self.data.lvls),
-                                                  L+1).reshape((-1, 1)))
+                        self._extendLevels(lvls=np.arange(
+                            len(self.data.lvls), L+1).reshape((-1, 1)))
                         self._estimateAll()
 
                 self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
@@ -737,11 +753,8 @@ estimate optimal number of levels"
                     self.bias > (1 - self.params.theta) * TOL):
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
-                    newlvls, newTodoM = self.fn.ExtendLvls()
-                    prev = len(self.data.lvls)
-                    self._addLevels(newlvls)
-                    self._genSamples(np.concatenate((self.data.M[:prev],
-                                                     newTodoM)), verbose)
+                    newTodoM = self._extendLevels(profCalc=profCalc)
+                    self._genSamples(newTodoM, verbose)
                     self._estimateAll()
                     self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
                                               self.params.theta)
@@ -767,79 +780,15 @@ estimate optimal number of levels"
                 print("{} took {}".format(TOL, totalTime))
                 print("################################################")
             if self.fn.ItrDone:
-                self.fn.ItrDone(iteration_idx=itrIndex, TOL=TOL, totalTime=totalTime)
+                self.fn.ItrDone(itrIndex, TOL, totalTime)
             if less(TOL, finalTOL) and self.totalErrorEst() <= finalTOL:
                 break
 
 @public
-def extend_lvls_tensor(dim, lvls, M0, min_deg=1):
-    if len(lvls) <= 0:
-        out_lvls = [[0] * dim]
-        seeds = lvls = out_lvls
-        deg = 0
-    else:
-        out_lvls = list()
-        deg = np.max([np.max(ll) for ll in lvls])
-        seeds = [ll for ll in lvls if np.max(ll) == deg]
-
-    additions = [f for f in itertools.product([0, 1], repeat=dim) if max(f) > 0]
-    while True:
-        newlvls = list()
-        for l in seeds:
-            newlvls.extend([(np.array(l) + a).tolist() for a in
-                            additions if (np.array(l) + a).tolist()
-                            not in newlvls])
-        out_lvls.extend(newlvls)
-        deg += 1
-        if deg >= min_deg:
-            break
-        seeds = newlvls
-    if len(M0) < len(lvls): # Exhausted
-        return out_lvls, M0[-1]*np.ones(len(out_lvls), dtype=np.int)
-    M = np.pad(M0, (0,len(lvls) + len(out_lvls)), 'constant',
-               constant_values=M[-1])
-    return out_lvls, M[len(lvls):]
-
-@public
-def extend_lvls_td(w, lvls, M0, min_deg=2):
-    # w specifies the dimension
-    prev_deg = np.max(np.sum(np.array(
-        [w*np.array(l) for l in lvls]), axis=1)) if lvls else 0
-    max_deg = prev_deg
-    while True:
-        max_deg += np.min(w)
-        max_deg = np.maximum(max_deg, min_deg)
-        C, _ = setutil.AnisoProfCalculator(w*0, w).GetIndexSet(max_deg)
-        all_lvls = C.to_dense_matrix() - 1
-        newlvls = [lvl.tolist() for lvl in all_lvls if lvl.tolist()
-                   not in lvls]
-        if len(newlvls) > 0:
-            if len(M0) < len(lvls): # Exhausted
-                return newlvls, M0[-1]*np.ones(len(newlvls), dtype=np.int)
-            M = np.pad(M0, (0,len(lvls) + len(newlvls)), 'constant',
-                       constant_values=M0[-1])
-            return newlvls, M[len(lvls):]
-
-
-@public
 def work_estimate(lvls, gamma):
-    return np.prod(np.exp(np.array(lvls)*gamma), axis=1)
-
-
-def is_boundary(d, lvls):
-    if len(lvls) == 1:
-        return [True]   # Special case for zero element
-    bnd = np.zeros(len(lvls), dtype=int)
-    for i in range(0, d):
-        x = np.zeros(d)
-        x[i] = 1
-        bnd += np.array([1 if l[i] == 0 or (np.array(l)+x).tolist()
-                         in lvls else 0 for l in lvls])
-    return bnd < d
-
+    return np.prod(np.exp(lvls.to_dense_matrix(base=0)*gamma), axis=1)
 
 def lvl_to_inds_general(lvl):
-
     """
     This routine takes a multi-index level and produces
     a list of levels and weights that are needed to evaluate
@@ -852,7 +801,6 @@ def lvl_to_inds_general(lvl):
     and x to an array of 1 and -1.
 
     """
-
     lvl = np.array(lvl, dtype=np.int)
     seeds = list()
     for i in range(0, lvl.shape[0]):

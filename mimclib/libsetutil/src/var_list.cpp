@@ -81,6 +81,7 @@ void VarSizeList::make_profits_admissible(ind_t d_start,
 }
 
 
+// Returns the minimum profit on the outer set
 double VarSizeList::get_min_outer_profit(const PProfitCalculator profCalc) const {
     ind_t max_d = profCalc->max_dim();//set.max_dim();
     std::vector<ind_t> bnd_neigh = this->count_neighbors();
@@ -113,12 +114,10 @@ double VarSizeList::get_min_outer_profit(const PProfitCalculator profCalc) const
 }
 
 void VarSizeList::calc_set_profit(const PProfitCalculator profCalc,
-                                  double *log_error, double *log_work,
-                                  uint32 size) const {
-    assert(size >= this->count());
-    for (size_t i=0;i<this->count();i++){
-        profCalc->calc_log_EW(this->get(i), log_error[i], log_work[i]);
-    }
+                                    double *log_prof,
+                                    uint32 size) const {
+    for (size_t i=0;i<this->count() && i < size;i++)
+        log_prof[i] = profCalc->calc_log_prof(this->get(i));
 }
 
 
@@ -343,7 +342,7 @@ void VarSizeList::get_adaptive_order(const double *error,
     // Start with an empty index
     // TODO: Can be heavily optimized
     for (uint32 i=0;i<count;i++)
-        adaptive_order[i] = std::numeric_limits<double>::infinity();
+        adaptive_order[i] = std::numeric_limits<uint32>::max();
 
     VarSizeList curList;
     uint32 cur_order = 1;
