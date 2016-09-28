@@ -16,7 +16,7 @@ def public(sym):
 
 __arr_int32__ = npct.ndpointer(dtype=np.int32, flags='C_CONTIGUOUS')
 __arr_uint32__ = npct.ndpointer(dtype=np.uint32, flags='C_CONTIGUOUS')
-__arr_bool__ = npct.ndpointer(dtype=np.bool, flags='C_CONTIGUOUS')
+__arr_bool__ = npct.ndpointer(dtype=np.int8, flags='C_CONTIGUOUS')
 __arr_double__ = npct.ndpointer(dtype=np.double, flags='C_CONTIGUOUS')
 
 ind_t = np.uint16
@@ -97,8 +97,17 @@ __lib__.TensorGrid.argtypes = [__ct_ind_t__, __ct_ind_t__,
 
 
 
-__lib__.VarSizeList_count_neighbors.restype = ct.c_uint32
+__lib__.VarSizeList_count_neighbors.restype = None
 __lib__.VarSizeList_count_neighbors.argtypes = [ct.c_voidp, __arr_ind_t__, ct.c_uint32]
+
+__lib__.VarSizeList_is_parent_of_admissible.restype = None
+__lib__.VarSizeList_is_parent_of_admissible.argtypes = [ct.c_voidp,
+                                                        __arr_bool__, ct.c_uint32]
+
+__lib__.VarSizeList_estimate_bias.restype = ct.c_double
+__lib__.VarSizeList_estimate_bias.argtypes = [ct.c_voidp,
+                                              __arr_double__, ct.c_uint32,
+                                              __arr_double__, ct.c_uint32]
 
 __lib__.VarSizeList_max_dim.restype = __ct_ind_t__
 __lib__.VarSizeList_max_dim.argtypes = [ct.c_voidp]
@@ -164,6 +173,22 @@ __lib__.VarSizeList_get_adaptive_order.argtypes = [ct.c_voidp,
                                                    ct.c_uint32,
                                                    __ct_ind_t__]
 
+__lib__.Tree_new.restype = ct.c_voidp
+__lib__.Tree_new.argtypes = []
+__lib__.Tree_free.restype = None
+__lib__.Tree_free.argtypes = [ct.c_voidp]
+
+__lib__.Tree_add_node.restype = np.int8
+__lib__.Tree_add_node.argtypes = [ct.c_voidp, __arr_double__,
+                                  ct.c_uint32, ct.c_double,
+                                  ct.c_double]
+
+__lib__.Tree_find.restype = np.int8
+__lib__.Tree_find.argtypes = [ct.c_voidp, __arr_double__,
+                              ct.c_uint32, ct.POINTER(ct.c_double),
+                              ct.c_uint32, ct.c_double]
+
+
 
 __lib__.VarSizeList_check_errors.restype = None
 __lib__.VarSizeList_check_errors.argtypes = [ct.c_voidp,
@@ -201,7 +226,7 @@ class VarSizeList(object):
     #                                         dtype=ind.dtype)))
 
     def sublist(self, sel):
-        sel = np.array(sel)
+        sel = np.array(sel).reshape((-1,))
         if sel.dtype == np.bool:
             sel = np.nonzero(sel)[0]
         new = __lib__.VarSizeList_sublist(self._handle,
@@ -270,10 +295,10 @@ class VarSizeList(object):
     def CheckAdmissibility(self, d_start=0, d_end=-1):
         if d_end < 0:
             d_end = self.max_dim()
-        admissible = np.empty(len(self), dtype=np.bool)
+        admissible = np.empty(len(self), dtype=np.int8)
         __lib__.CheckAdmissibility(self._handle, d_start, d_end,
                                    admissible)
-        return admissible
+        return admissible.astype(np.bool)
 
     def MakeProfitsAdmissible(self, profits, d_start=0, d_end=-1):
         assert(len(profits) == len(self))
@@ -358,18 +383,23 @@ class VarSizeList(object):
 
     def check_errors(self, errors):
         assert(len(errors) == len(self))
-        strange = np.empty(len(self), dtype=np.bool)
+        strange = np.empty(len(self), dtype=np.int8)
         __lib__.VarSizeList_check_errors(self._handle,
                                          errors,
                                          strange,
                                          len(errors))
-        return strange
+        return strange.astype(np.bool)
 
     def count_neighbors(self):
         neigh = np.empty(len(self), dtype=ind_t)
         __lib__.VarSizeList_count_neighbors(self._handle,
                                             neigh, len(neigh))
         return neigh
+
+    def is_parent_of_admissible(self):
+        out = np.empty(len(self), dtype=np.int8)
+        __lib__.VarSizeList_is_parent_of_admissible(self._handle, out, len(out))
+        return out.astype(np.bool)
 
     def is_boundary(self):
         return self.count_neighbors() < self.max_dim()
@@ -382,34 +412,39 @@ class VarSizeList(object):
     def get_min_outer_prof(self, profCalc):
         return __lib__.GetMinOuterProfit(self._handle, profCalc._handle)
 
+    def estimate_bias(self, err_contributions, rates=None):
+        if rates is None:
+            rates = np.ones(self.max_dim())
+        return __lib__.VarSizeList_estimate_bias(self._handle,
+                                                 err_contributions, len(err_contributions),
+                                                 rates, len(rates))
 
 class ProfCalculator(object):
-    def GetIndexSet(self, max_prof):
-        import ctypes as ct
-        mem_prof = ct.POINTER(ct.c_double)()
-        new = __lib__.GetIndexSet(None, self._handle,
-                                  np.float(max_prof), ct.byref(mem_prof))
-        indSet = VarSizeList(_handle=new, min_dim=self.d)
-        try:
-            count = len(indSet)
-            profits = np.ctypeslib.as_array(mem_prof,
-                                            (count,)).copy().reshape(count)
-        finally:
-            __lib__.FreeMemory(ct.byref(ct.cast(mem_prof, ct.c_void_p)))
+    # def GetIndexSet(self, max_prof):
+    #     import ctypes as ct
+    #     mem_prof = ct.POINTER(ct.c_double)()
+    #     new = __lib__.GetIndexSet(None, self._handle,
+    #                               np.float(max_prof), ct.byref(mem_prof))
+    #     indSet = VarSizeList(_handle=new, min_dim=self.d)
+    #     try:
+    #         count = len(indSet)
+    #         profits = np.ctypeslib.as_array(mem_prof,
+    #                                         (count,)).copy().reshape(count)
+    #     finally:
+    #         __lib__.FreeMemory(ct.byref(ct.cast(mem_prof, ct.c_void_p)))
 
-        return indSet, profits
-
+    #     return indSet, profits
     def __del__(self):
         __lib__.FreeProfitCalculator(self._handle)
 
 
 class MISCProfCalculator(ProfCalculator):
     def __init__(self, d_rates, s_err_rates):
-        self.d = len(d_err_rates)
+        self.d = len(d_rates)
         self._handle = __lib__.CreateMISCProfCalc(len(d_rates),
                                                   len(s_err_rates),
-                                                  d_rates,
-                                                  s_err_rates)
+                                                  np.array(d_rates, dtype=np.float),
+                                                  np.array(s_err_rates, dtype=np.float))
 
 class TDProfCalculator(ProfCalculator):
     def __init__(self, w):
@@ -424,7 +459,7 @@ def TensorGrid(m, base=1, count=None):
     m = np.array(m, dtype=ind_t)
     assert np.all(m >= base), "m has to be larger than base"
     count = count or np.prod(m-base+1)
-    output = np.empty(count*len(m), dtype=ind_t)
+    output = np.empty(int(count)*len(m), dtype=ind_t)
     __lib__.TensorGrid(len(m), base, m, output, count)
     return output.reshape((count, len(m)), order='C')
 
@@ -443,3 +478,31 @@ def GenTDSet(d, count, base=1):
 #     __lib__.GetBoundaryInd(len(inner_bnd), l, i, sel, inner_bnd,
 #                            bnd_ind)
 #     return bnd_ind
+
+
+class Tree(object):
+    def __init__(self, _handle=None):
+        if _handle is None:
+            self._handle = __lib__.Tree_new()
+        else:
+            self._handle = _handle
+
+    def __del__(self):
+        __lib__.Tree_free(self._handle)
+
+    def add_node(self, value, data, eps=1e-14):
+        value = np.array(value, dtype=np.float)
+        prev_added = __lib__.Tree_add_node(self._handle, value, len(value), data, eps)
+        assert(not prev_added)
+
+    def find(self, value, eps=1e-14, remove=False):
+        data = ct.c_double()
+        value = np.array(value, dtype=np.float)
+        found = __lib__.Tree_find(self._handle, value, len(value), ct.byref(data), remove, eps)
+        if found:
+            return data.value
+        else:
+            return None
+
+    def output(self):
+        __lib__.Tree_print(self._handle)

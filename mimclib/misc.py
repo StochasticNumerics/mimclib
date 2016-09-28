@@ -3,31 +3,27 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-from collections import defaultdict
-import itertools
-from myutil import padldim
-import set_util
+from . import setutil
 
 
-class MISCData(object):
-    def __init__(self, d, prevData=None, points_tol=1e-14, pooled=True):
+class MISCSampler(object):
+    def __init__(self, d, fnKnots, prevData=None, points_tol=1e-14):
         self.d = d
-        self.pooled = pooled
         self.points_tol = points_tol
+        self.fnKnots = fnKnots
         if prevData is not None:
             assert(self.d == prevData.d)
             self.sample_pool = prevData.sample_pool
             self.knots_pool = prevData.knots_pool
         else:
-            self.sample_pool = defaultdict(lambda: set_util.Tree())
+            from collections import defaultdict
+            self.sample_pool = defaultdict(lambda: setutil.Tree())
             self.knots_pool = dict()
 
-    def __solveAtPoints(self, sf, alpha, pts):
+    def _solveAtPoints(self, sf, alpha, pts):
         # Samples (Y) points from the stochastic field (sf) using the mesh size
         # determined by (alpha). Assumes all Ys have the same size
         # Returns a vector of samples
-        if not self.pooled:
-            return sf(alpha, pts)
         if len(pts) == 0:
             return np.array([])
         N = len(pts[0])
@@ -46,7 +42,6 @@ class MISCData(object):
             output[needsample] = new_values
             for i, pt in enumerate(new_points):
                 pdict.add_node(pt, new_values[i], eps=self.points_tol)
-
         return output#, points
 
     def collapsePoints(self, pts):
@@ -61,8 +56,7 @@ class MISCData(object):
                 pass
         return pts
 
-    @staticmethod
-    def tensor_from_pool(beta, knots_pool):
+    def tensor_from_pool(self, beta):
         # generate the pattern that will be used for knots and weights matrices, e.g.
         #
         # pattern = [1 1 1 1 2 2 2 2;
@@ -80,203 +74,50 @@ class MISCData(object):
         N = len(beta)
         if N == 0:
             return [[]], np.array([1.])
-        m = [len(knots_pool[bj][0]) for bj in beta]
+        m = [len(self.knots_pool[bj][0]) for bj in beta]
         sz = np.prod(m)
         knots = np.zeros((sz, N))
         weights = np.ones(sz)
-        pattern = set_util.TensorGrid(m)
+        pattern = setutil.TensorGrid(m)
+
+        def padldim(arr, d):
+            arr = np.array(arr)
+            return arr.reshape((1,)*(d-len(arr.shape)) + arr.shape)
+
         for n in range(0, N):
-            xx, ww = knots_pool[beta[n]]
+            xx, ww = self.knots_pool[beta[n]]
             knots[:, n] = padldim(xx, 1)[pattern[:, n]-1]
             weights *= padldim(ww, 1)[pattern[:, n]-1]
         return knots.tolist(), weights
 
-    def runMISC(self, sf, C, fnKnots, tensor_knots=False):
-        # Assumes all variables have the same knots and lev2knots
+    def update_knots_pool(self, inds):
+        max_ind = [np.max(ind[self.d:]) for ind in inds if len(ind) > self.d]
+        if len(max_ind) == 0:
+            return
+        max_knots_count = int(np.max(max_ind))
+        for i in range(0, max_knots_count+1):
+            if i in self.knots_pool:
+                continue
+            self.knots_pool[i] = self.fnKnots(i)
+
+    def sample(self, inds, M, fnSample):
+        assert M == 1, "MISC is a deterministic sampler, so M must be 1"
+        self.update_knots_pool(inds)
+
+        # TODO: Need to generalize to allow for array or general objects
+        from . import mimc
         import time
-        # First, we pool all knots, we don't want to include this calculation
-        # in the timing.
-        if tensor_knots:
-            max_knots_count = int(np.max([np.max(ind[self.d:])
-                                          if len(ind) > self.d else 0
-                                          for ind in C]))
-            for i in range(1, max_knots_count+1):
-                if i in self.knots_pool:
-                    continue
-                self.knots_pool[i] = fnKnots(i)
-            fnKnots = lambda beta: MISCData.tensor_from_pool(beta, self.knots_pool)
-
-        error = np.zeros(len(C))
-        work = np.zeros(len(C))
-        for i, ind in enumerate(C):
-            coeff, subind = expand_delta(ind)
-            t = time.time()
-            error[i] = 0
-            for c, dind in zip(coeff, subind):
-                alpha = dind[:self.d]
-                beta = dind[self.d:]
-                knots, weights = fnKnots(beta)
-                knots = self.collapsePoints(knots)
-                values = self.__solveAtPoints(sf, alpha, knots)
-                error[i] += c*np.sum(weights * values)
-            work[i] = time.time()-t
-
-        return error, work
-
-
-def run_MISC_indices(sf, sf_d,
-                     C, knots, lev2knots, prev=None,
-                     points_tol=1e-12, pooled=True,
-                     fix_alpha=None, mlsc=False):
-    # Runs MISC based on an index set, not optimization is done to reduce the
-    # number samples, as such no advantage is taken of the nestedness of sample
-    # points, if any.
-    # (sf) is the stochastic field
-    # (C) is the index set of dimension d+N
-    # (knots) N-list of functions that return the knots for each  variable
-    # (lev2knots) N-list of functions that return the number of points for every beta
-    # (prev) Return value from a previous call to run_MISC,
-    #              assumes that the current has been C expanded from the
-    #              previous call
-    # (pooled) if True, does not recompute samples
-    #
-    # Returns the "error" and "work" estimates for each index in C
-
-    # C is the set of indices
-    # knots is the function that returns n-points
-    # lev2knots is what we call m(\beta)
-    if fix_alpha is not None:
-        assert(not mlsc)
-        d = 0
-    elif mlsc:
-        d = 1
-    else:
-        d = sf_d
-
-    miscData = MISCData(d, prev, points_tol, pooled=pooled)
-    error, work = miscData.runMISC(sf, C,
-                                   fnKnots = lambda beta: knots(lev2knots(beta)),
-                                   tensor_knots = True)
-    return error, work, miscData
-
-
-################################################################
-### FUNCTIONS BELOW ARE BETTER MOVED TO SPARSE_GRID SINCE THEY
-### ARE GENERAL FOR ANY SPARSE GRID (EVEN MIMC)
-################################################################
-def get_profit_levels(profits, tol=1e-12):
-    # Get a list of levels to construct a level sets
-    # You can get a list of levels sets of profits by using:
-    # [profits[:lvl] for lvl in get_profit_levels(profits)]
-    # (tol) is the difference between profits such that the profits are equal
-    # This function assumes profits are sorted least to most
-    # Returns a list of indices of profits that define the boundary
-    # of level sets.
-    levels = []
-    if len(profits) == 0:
-        return np.array(levels, dtype=np.uint32)
-    cur_profit = profits[0]
-    for i, p in enumerate(profits[1:]):
-        if np.isfinite(p) and p-cur_profit > tol:
-            levels.append(i+1)
-            cur_profit = p
-    levels.append(profits.shape[0])
-    return np.array(levels, dtype=np.uint32)
-
-
-class MISCLevel:
-    def __init__(self, profit, ind_diff, sel, inner_bnd, i, l, setSize):
-        self.profit = profit
-        self.ind_diff = ind_diff
-        self.sel = sel
-        self.inner_bnd = inner_bnd
-        self.setSize = setSize
-        self.i = i
-        self.l = l
-
-    def isBoundaryCalculated(self):
-        return self.inner_bnd is not None
-    def getBoundInd(self):
-        # bnd_ind = np.zeros(self.setSize, dtype=np.bool)
-        # inds = np.arange(0, self.inner_bnd.shape[0])
-        # bnd_ind_sel = np.zeros(self.inner_bnd.shape[0], dtype=np.bool)
-        # bnd_ind_sel[np.logical_and(self.inner_bnd >= self.i, inds < self.l)] = True
-        # bnd_ind[self.sel] = bnd_ind_sel
-        assert(self.isBoundaryCalculated())
-        return set_util.GetBoundaryInd(self.setSize, self.inner_bnd,
-                                       self.sel, self.l, self.i)
-
-def prepare_set(U, Uprofits, excludeBoundary, realOnly=True,
-                calcProf=None, d_admiss_start=0,
-                computeBoundaries=False):
-    # d_admiss_start: is the first dimension to check admissibility
-    # Get only admissible indices
-    import time
-    sel = np.nonzero(U.CheckAdmissibility(d_start=d_admiss_start))[0]
-    # Make admissible
-    #profits_sel = Uprofits[sel]
-    profits_sel = U.sublist(sel).MakeProfitsAdmissible(Uprofits[sel],
-                                                       d_start=d_admiss_start)
-    with np.errstate(invalid='ignore'):
-        diffCount = np.sum(np.abs(profits_sel - Uprofits[sel]) > 0)
-        if diffCount > 0:
-            import warnings
-            warnings.warn("Had to change {}/{} profits to make sets admissible".format(diffCount, len(sel)), RuntimeWarning)
-
-    if excludeBoundary:
-        if calcProf:
-            min_profit = U.sublist(sel).calcMinOuterProf(calcProf)
-        else:
-            out_bnd, _ = set_util.GetAllBoundaries(U.sublist(sel))
-            min_profit = np.min(profits_sel[out_bnd == 0])
-        tmp = np.nonzero(profits_sel < min_profit)[0]
-        sel, profits_sel = sel[tmp], profits_sel[tmp]
-
-    tmp = np.argsort(profits_sel)
-    sel, profits_sel = sel[tmp], profits_sel[tmp]
-    lvls = get_profit_levels(profits_sel)
-    if lvls.size == 0:
-        return []  # No levels? Test this output
-
-    if computeBoundaries:
-        inner_bnd, real_lvls = set_util.GetAllBoundaries(U.sublist(sel), lvls)
-    else:
-        inner_bnd = None
-        real_lvls = np.ones(len(lvls), dtype=np.bool)
-
-    ll = np.concatenate((np.array([0], np.int), lvls))
-
-    misc_lvls = []
-    iprev = 0
-    for i, l in enumerate(lvls):
-        if realOnly and not real_lvls[i]:
-            continue
-        misc_lvl = MISCLevel(profits_sel[lvls[i]-1],
-                             sel[ll[iprev]:ll[i+1]], sel, inner_bnd,
-                             i, l, len(U))
-        misc_lvls.append(misc_lvl)
-        iprev = i+1
-    return misc_lvls
-
-
-def expand_delta(lvl, base=1):
-     # Returns the indices that are contained in a certain (lvl)
-     # Along with the modifiers the should multiply the value
-     # For example, __expand_delta([2,3]) returns
-     # [1,1,-1,-1], [[2,3], [1,2], [2,2], [1,3]]
-     # or a permutation of these lists
-    import itertools
-    lvl = np.array(lvl, dtype=np.int)
-    seeds = list()
-    for i in range(0, lvl.shape[0]):
-        if lvl[i] == base:
-            seeds.append([0])
-        else:
-            seeds.append([0, 1])
-    inds = np.array(list(itertools.product(*seeds)), dtype=np.int)
-    mods = (2*np.sum(lvl) % 2 - 1) * (2*(np.sum(inds, axis=1) % 2) - 1)
-    return mods, np.tile(lvl, (inds.shape[0], 1)) - inds
-
+        t = time.time()
+        samples = np.empty((M, len(inds)))
+        for i, dind in enumerate(inds):
+            alpha = dind[:self.d]
+            beta = dind[self.d:]
+            knots, weights = self.tensor_from_pool(beta)
+            knots = self.collapsePoints(knots)
+            values = self._solveAtPoints(fnSample, alpha, knots)
+            samples[0, i] = np.sum(weights * values)
+        work = time.time()-t
+        return samples, work
 
 def knots_gaussian(n, mi, sigma):
     # [x,w]=KNOTS_GAUSSIAN(n,mi,sigma)
@@ -405,6 +246,19 @@ def knots_uniform(n, x_a, x_b, whichrho='prob'):
     # See LICENSE.txt for license
     # ----------------------------------------------------
 
+    def coeflege(n):
+        if n <= 1:
+            np.disp(' n must be > 1 ')
+            return None
+
+        a = np.zeros(n)
+        b = np.zeros(n)
+        b[0] = 2.
+        k = np.arange(2, n+1)
+        b[k-1] = 1. / (4. - 1. / (k-1)**2.)
+        return [a, b]
+
+
     if n == 1.:
         x = [(x_a+x_b)/2.]
         wt = [1.]
@@ -436,18 +290,6 @@ def knots_uniform(n, x_a, x_b, whichrho='prob'):
     return x, w
 
 
-def coeflege(n):
-    if n <= 1:
-        np.disp(' n must be > 1 ')
-        return None
-
-    a = np.zeros(n)
-    b = np.zeros(n)
-    b[0] = 2.
-    k = np.arange(2, n+1)
-    b[k-1] = 1. / (4. - 1. / (k-1)**2.)
-    return [a, b]
-
 def lev2knots_doubling(i):
     # m = lev2knots_doubling(i)
     #
@@ -462,7 +304,7 @@ def lev2knots_doubling(i):
     # Copyright (c) 2009-2014 L. Tamellini, F. Nobile
     # See LICENSE.txt for license
     # ----------------------------------------------------
-    i = toarray(i, dtype=np.int);
+    i = np.array([i] if np.isscalar(i) else i, dtype=np.int)
     m = 2 ** (i-1)+1
     m[i==1] = 1
     m[i==0] = 0
@@ -482,3 +324,35 @@ def lev2knots_lin(i):
     # See LICENSE.txt for license
     #----------------------------------------------------
     return i
+
+def estimate_misc_error_rates(d, lvls, errs,
+                              lev2knots,
+                              d_err_rates=None, tol=1e-14):
+    errs = np.abs(errs)
+    if tol is not None:
+        sel = errs > tol
+    else:
+        sel = np.ones(len(lvls), dtype=np.bool)
+
+    # Technically, the inactive dimensions should not be included in the fit
+    if d_err_rates is not None:
+        sel = np.logical_and(sel, lvls.get_dim() > d)
+
+    lvls = lvls.sublist(sel)
+    errs = errs[sel]
+
+    mat = lvls.to_dense_matrix()
+    mat[:, d:] = lev2knots(mat[:, d:]-1)
+
+    log_err = -np.log(errs)
+
+    mat = np.hstack((mat, np.ones((mat.shape[0], 1))))
+    from scipy.sparse import csr_matrix
+    import scipy.sparse.linalg
+
+    if d_err_rates is not None:
+        log_err -= np.sum(mat[:, :d]*np.tile(d_err_rates, (mat.shape[0], 1)), axis=1)
+        s_err_rates = scipy.sparse.linalg.lsqr(csr_matrix(mat[:, d:]), log_err)[0][:-1]
+    else:
+        raise NotImplementedError("This needs to be implemented as a non-linear optimization problem")
+    return d_err_rates, s_err_rates

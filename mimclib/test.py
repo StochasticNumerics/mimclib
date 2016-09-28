@@ -34,7 +34,7 @@ def parse_known_args(parser, return_unknown=False):
 def RunStandardTest(fnSampleLvl=None,
                     fnAddExtraArgs=None,
                     fnInit=None,
-                    fnSeed=np.random.seed):
+                    fnSeed=np.random.seed, profCalc=None):
     import warnings
     import os.path
     import mimclib.mimc as mimc
@@ -63,7 +63,11 @@ def RunStandardTest(fnSampleLvl=None,
         fnAddExtraArgs(parser)
     mimc.MIMCRun.addOptionsToParser(parser)
     mimcRun = mimc.MIMCRun(**vars(parse_known_args(parser)))
+    fnSampleLvl = lambda inds, M, fn=fnSampleLvl: fn(mimcRun, inds, M)
+    mimcRun.setFunctions(fnSampleLvl=fnSampleLvl)
 
+    import time
+    tStart = time.time()
     if fnInit is not None:
         fnInit(mimcRun)
 
@@ -71,8 +75,6 @@ def RunStandardTest(fnSampleLvl=None,
         fnSeed(mimcRun.params.qoi_seed)
 
     fnItrDone = None
-    fnSampleLvl = lambda inds, M, fn=fnSampleLvl: fn(mimcRun, inds, M)
-    mimcRun.setFunctions(fnSampleLvl=fnSampleLvl)
 
     if mimcRun.params.db:
         db_args = {}
@@ -93,9 +95,9 @@ def RunStandardTest(fnSampleLvl=None,
         mimcRun.doRun()
     except:
         if mimcRun.params.db:
-            db.markRunFailed(run_id)
+            db.markRunFailed(run_id, totalTime=time.time()-tStart)
         raise   # If you don't want to raise, make sure the following code is not executed
 
     if mimcRun.params.db:
-        db.markRunSuccessful(run_id)
+        db.markRunSuccessful(run_id, totalTime=time.time()-tStart)
     return mimcRun.data.calcEg()

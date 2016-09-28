@@ -6,8 +6,7 @@
 #include <list>
 #include <assert.h>
 #include <iostream>
-#include "var_list.h"
-#include "set_util.h"
+#include "set_util.hpp"
 
 #define DEBUG_ASSERT(x)
 // static std::ostream& operator<<(std::ostream& out, const std::vector<ind_t>& v) {
@@ -30,8 +29,8 @@
 class MISCProfCalculator : public ProfitCalculator {
 public:
     MISCProfCalculator(ind_t d, ind_t s,
-                         const double *d_rates,
-                         const double *s_err_rates) :
+                       const double *d_rates,
+                       const double *s_err_rates) :
         d_rates(d_rates, d_rates+d),
         s_err_rates(s_err_rates, s_err_rates+s) { }
 
@@ -43,15 +42,15 @@ public:
         auto mfun = [](unsigned int i) { return (i==0)?0:(i==1?1:(1+(1<<(i-1)))); };
         for (auto itr=cur.begin();itr!=cur.end();itr++){
             if (itr->ind < d)
-                d_cont += (itr->value-1)*d_rates[itr->ind];
+                d_cont += (itr->value - SparseMIndex::SET_BASE)*d_rates[itr->ind];
             else{
-                unsigned int M_1 = mfun(itr->value-1);
-                unsigned int M = mfun(itr->value);
+                unsigned int M_1 = mfun(itr->value-SparseMIndex::SET_BASE);
+                unsigned int M = mfun(1+itr->value-SparseMIndex::SET_BASE);
                 double dM_1 = static_cast<double>(M_1);
                 double dM = static_cast<double>(M);
 
                 // log(dM - dM_1) is the work contribution
-                s_cont += log(dM - dM_1) - dM_1*s_err_rates[itr->ind-d];
+                s_cont += log(dM - dM_1) + dM_1*s_err_rates[itr->ind-d];
             }
         }
         return d_cont + s_cont;
@@ -265,7 +264,7 @@ void CalculateSetProfit(const PVarSizeList pset,
 
 
 void CheckAdmissibility(const PVarSizeList pset, ind_t d_start, ind_t d_end,
-                        bool *admissible){
+                        unsigned char *admissible){
     pset->check_admissibility(d_start, d_end, admissible, pset->count());
 }
 
@@ -399,17 +398,46 @@ void VarSizeList_get_adaptive_order(const PVarSizeList pset,
     pset->get_adaptive_order(error, work, adaptive_order, count, seedLookahead);
 }
 
-void VarSizeList_check_errors(const PVarSizeList pset, const double *errors, bool* strange, uint32 count){
+void VarSizeList_check_errors(const PVarSizeList pset, const double *errors, unsigned char* strange, uint32 count){
     pset->check_errors(errors, strange, count);
 }
 
-uint32 VarSizeList_count_neighbors(const PVarSizeList pset, ind_t *out_neighbors, uint32 count){
-    std::vector<ind_t> neigh = pset->count_neighbors();
-    for (uint32 i=0;i<count && i < neigh.size();i++)
-        out_neighbors[i] = neigh[i];
-    return neigh.size();
+void VarSizeList_count_neighbors(const PVarSizeList pset, ind_t *out_neighbors, uint32 count){
+    pset->count_neighbors(out_neighbors, count);
 }
 
+void VarSizeList_is_parent_of_admissible(const PVarSizeList pset, unsigned char *out, uint32 count){
+    pset->is_parent_of_admissible(out, count);
+}
+
+double VarSizeList_estimate_bias(const PVarSizeList pset,
+                                 const double *err_contributions,
+                                 uint32 count,
+                                 const double *rates, uint32 rates_size){
+    return pset->estimate_bias(err_contributions, count,
+                               rates, rates_size);
+}
 ind_t GetDefaultSetBase(){
     return SparseMIndex::SET_BASE;
+}
+
+
+PTree Tree_new(){
+    return new Node(0);
+}
+
+unsigned char Tree_add_node(PTree tree, const double* value, uint32 count, double data, double eps){
+    return tree->add_node(std::vector<double>(value, value+count), data, 0, eps);
+}
+
+unsigned char Tree_find(PTree tree, const double* value, uint32 count, double* data, unsigned char remove, double eps){
+    return tree->find(std::vector<double>(value, value+count), *data, remove, 0, eps);
+}
+
+void Tree_free(PTree tree){
+    delete tree;
+}
+
+void Tree_print(PTree tree){
+    tree->print();
 }

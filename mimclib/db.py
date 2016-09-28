@@ -26,6 +26,8 @@ def _unpickle(obj, load=cPickle.load):
     with io.BytesIO(obj) as f:
         return load(f)
 
+def _nan2none(x):
+    return None if np.isnan(x) else x
 
 class DBConn(object):
     def __init__(self, **kwargs):
@@ -80,22 +82,22 @@ CREATE TABLE IF NOT EXISTS {runTable} (
     creation_date           DATETIME NOT NULL,
     TOL                   REAL NOT NULL,
     done_flag            INTEGER NOT NULL,
-    dim                   INTEGER,
+    totalTime               REAL,
     tag                   VARCHAR(128) NOT NULL,
     params                mediumblob,
-    fn                    mediumblob,
+    fnNorm                    mediumblob,
     comment               TEXT
 );
-CREATE VIEW vw_runs AS SELECT run_id, creation_date, TOL, done_flag, dim, tag, comment FROM {runTable};
+CREATE VIEW vw_runs AS SELECT run_id, creation_date, TOL, done_flag, tag, totalTime, comment FROM {runTable};
 
 CREATE TABLE IF NOT EXISTS {dataTable} (
     data_id                 INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
     run_id                  INTEGER NOT NULL,
-    TOL                     REAL NOT NULL,
-    bias                    REAL NOT NULL,
-    stat_error              REAL NOT NULL,
+    TOL                     REAL,
+    bias                    REAL,
+    stat_error              REAL,
     creation_date           DATETIME NOT NULL,
-    totalTime               REAL NOT NULL,
+    totalTime               REAL,
     Qparams                 mediumblob,
     userdata                mediumblob,
     iteration_idx           INTEGER NOT NULL,
@@ -109,11 +111,11 @@ CREATE TABLE IF NOT EXISTS {lvlTable} (
     data_id       INTEGER NOT NULL,
     lvl           text NOT NULL,
     lvl_hash      varchar(35) NOT NULL,
-    El            REAL NOT NULL,
-    Vl            REAL NOT NULL,
-    Wl            REAL NOT NULL,
-    Tl            REAL NOT NULL,
-    Ml            INTEGER NOT NULL,
+    El            REAL,
+    Vl            REAL,
+    Wl            REAL,
+    Tl            REAL,
+    Ml            INTEGER,
     psums_delta   mediumblob,
     psums_fine    mediumblob,
     FOREIGN KEY (data_id) REFERENCES {dataTable}(data_id) ON DELETE CASCADE,
@@ -130,38 +132,36 @@ El, Vl, Wl, Tl, Ml FROM {lvlTable};
 
         return script
 
-    def createRun(self, tag, TOL=None, dim=None, params=None, fn=None,
+    def createRun(self, tag, TOL=None, params=None, fnNorm=None,
                   mimc_run=None, comment=""):
         TOL = TOL or mimc_run.params.TOL
         params = params or mimc_run.params
-        fn = fn or mimc_run.fn
-        dim = dim or mimc_run.data.dim
+        fnNorm = fnNorm or mimc_run.fn.Norm
         import dill
         with DBConn(**self.connArgs) as cur:
             cur.execute('''
-            INSERT INTO {runTable}(creation_date, TOL, tag, dim, params, fn, done_flag, comment)
-            VALUES(datetime(), ?, ?, ?, ?, ?, -1, ?)'''.format(runTable=self.runTable),
-                        [TOL, tag, dim, _pickle(params), _pickle(fn, dump=dill.dump), comment])
+            INSERT INTO {runTable}(creation_date, TOL, tag, params, fnNorm, done_flag, comment)
+            VALUES(datetime(), ?, ?, ?, ?, -1, ?)'''.format(runTable=self.runTable),
+                        [TOL, tag, _pickle(params), _pickle(fnNorm, dump=dill.dump), comment])
             return cur.getLastRowID()
 
-    def markRunDone(self, run_id, flag, comment=''):
+    def markRunDone(self, run_id, flag, totalTime=None, comment=''):
         with DBConn(**self.connArgs) as cur:
-            cur.execute(''' UPDATE {runTable} SET done_flag=?,
+            cur.execute(''' UPDATE {runTable} SET done_flag=?, totalTime=?,
             comment = CONCAT(comment,  ?)
-            WHERE run_id=?'''.format(runTable=self.runTable,
-                                     flag=flag, run_id=run_id,
-                                     comment=comment), [flag, comment, run_id])
+            WHERE run_id=?'''.format(runTable=self.runTable),
+                        [flag, totalTime, comment, run_id])
 
-    def markRunSuccessful(self, run_id, comment=''):
-        self.markRunDone(run_id, flag=1, comment=comment)
+    def markRunSuccessful(self, run_id, totalTime=None, comment=''):
+        self.markRunDone(run_id, flag=1, comment=comment, totalTime=totalTime)
 
-    def markRunFailed(self, run_id, comment='', add_exception=True):
+    def markRunFailed(self, run_id, totalTime=None, comment='', add_exception=True):
         if add_exception:
             import sys
             exc_type, exc_obj, exc_tb = sys.exc_info()
             if exc_obj is not None:
                 comment += "{}: {}".format(exc_type.__name__, exc_obj)
-        self.markRunDone(run_id, flag=0, comment=comment)
+        self.markRunDone(run_id, flag=0, comment=comment, totalTime=totalTime)
 
     def writeRunData(self, run_id, mimc_run, iteration_idx, TOL,
                      totalTime, userdata=None):
@@ -177,7 +177,10 @@ El, Vl, Wl, Tl, Ml FROM {lvlTable};
 INSERT INTO {dataTable}(creation_date, totalTime, TOL, bias, stat_error,
 Qparams, userdata, iteration_idx, run_id)
 VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?)'''.format(dataTable=self.dataTable),
-                        [totalTime, TOL, mimc_run.bias, mimc_run.stat_error,
+                        [_nan2none(totalTime),
+                         _nan2none(TOL),
+                         _nan2none(mimc_run.bias),
+                         _nan2none(mimc_run.stat_error),
                          _pickle(mimc_run.Q), _pickle(userdata),
                          iteration_idx, run_id])
             data_id = cur.getLastRowID()
@@ -188,7 +191,7 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?)'''.format(dataTable=self.dataTable),
 INSERT INTO {lvlTable}(lvl, lvl_hash, El, Vl, Wl, Tl, Ml, psums_delta, psums_fine, data_id)
 VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?, ?)
 '''.format(lvlTable=self.lvlTable, lvl=lvl),
-                            [lvl, lvl, El[k], Vl[k], Wl[k], Tl[k], Ml[k],
+                            [lvl, lvl, _nan2none(El[k]), _nan2none(Vl[k]), _nan2none(Wl[k]), _nan2none(Tl[k]), _nan2none(Ml[k]),
                              _pickle(mimc_run.data.psums_delta[k, :]),
                              _pickle(mimc_run.data.psums_fine[k, :]), data_id])
 
@@ -202,10 +205,10 @@ VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?, ?)
 
         with DBConn(**self.connArgs) as cur:
             runAll = cur.execute(
-                        '''SELECT r.run_id, r.params, r.TOL, r.comment, count(*), r.fn, r.tag
+                        '''SELECT r.run_id, r.params, r.TOL, r.comment, count(*), r.fnNorm, r.tag
                         FROM {runTable} r INNER JOIN {dataTable} dr ON
                         r.run_id = dr.run_id WHERE r.run_id in ? GROUP BY
-                        r.run_id, r.params, r.TOL, r.comment, r.fn'''.
+                        r.run_id, r.params, r.TOL, r.comment, r.fnNorm'''.
                         format(runTable=self.runTable,
                                dataTable=self.dataTable), [run_ids]).fetchall()
 
@@ -217,7 +220,7 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
 
             lvlsAll = cur.execute('''
             SELECT dr.data_id, l.lvl, l.psums_delta, l.psums_fine, l.Ml,
-                     l.Tl, l.Wl, l.Vl, r.dim
+                     l.Tl, l.Wl, l.Vl
             FROM
             {lvlTable} l INNER JOIN {dataTable} dr ON
             dr.data_id=l.data_id INNER JOIN {runTable} r on r.run_id=dr.run_id
@@ -274,14 +277,15 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
             sort_rows = lambda a: np.argsort(a.view([('',a.dtype)]*a.shape[1]),0).T[0]
             ind = sort_rows(lvls)
 
-            old_data = mimc.MIMCData(run_params[0].dim, lvls=lvls[ind],
+            old_data = mimc.MIMCData(min_dim=run_params[0].dim,
+                                     lvls=lvls[ind],
                                      psums_delta=np.array(psums_delta)[ind],
                                      psums_fine=np.array(psums_fine)[ind],
                                      M=np.array(Ml)[ind],
                                      t=np.array(Ml)[ind] * np.array(Tl)[ind])
             run = mimc.MIMCRun(old_data=old_data,
                                **run_params[0].getDict())
-            run.setFunctions(**run_params[4].getDict())
+            run.setFunctions(Norm=run_params[4].getDict())
             run.bias = data[5]
             run.stat_error = data[6]
             run.Q = _unpickle(data[7])
@@ -296,14 +300,11 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
             dataAll = cur.execute(query, params if params else [])
             return np.array(dataAll.fetchall())
 
-    def getRunsIDs(self, minTOL=None, maxTOL=None, dim=None, tag=None,
+    def getRunsIDs(self, minTOL=None, maxTOL=None, tag=None,
                    TOL=None, from_date=None, to_date=None,
                    done_flag=None):
         qs = []
         params = []
-        if dim is not None:
-            qs.append('dim in ?')
-            params.append(np.array(dim).astype(np.int).reshape(-1).tolist())
         if done_flag is not None:
             qs.append('done_flag in ?')
             params.append(np.array(done_flag).astype(np.int).reshape(-1).tolist())
@@ -326,7 +327,7 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
             qs.append('creation_date <= ?')
             params.append(to_date)
         wherestr = ("WHERE " + " AND ".join(qs)) if len(qs) > 0 else ''
-        query = '''SELECT run_id FROM {runTable} {wherestr} ORDER BY tag, dim,
+        query = '''SELECT run_id FROM {runTable} {wherestr} ORDER BY tag,
         TOL'''.format(runTable=self.runTable, wherestr=wherestr)
 
         ids = self._fetchArray(query, params)
@@ -353,11 +354,11 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
                     d.total_iterations*from_end + ii]
         return runs
 
-    def readRuns(self, minTOL=None, maxTOL=None, dim=None, tag=None,
+    def readRuns(self, minTOL=None, maxTOL=None, tag=None,
                  TOL=None, from_date=None, to_date=None,
                  done_flag=None, iteration_idx=None):
         runs_ids = self.getRunsIDs(minTOL=minTOL, maxTOL=maxTOL,
-                                   dim=dim, tag=tag, TOL=TOL,
+                                   tag=tag, TOL=TOL,
                                    from_date=from_date, to_date=to_date,
                                    done_flag=done_flag)
         if len(runs_ids) == 0:

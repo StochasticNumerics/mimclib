@@ -14,9 +14,9 @@ if __name__ == "__main__":
 
     base = "mimc_run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  \
     -qoi_sigma 0.1 -qoi_mu 1 -qoi_seed {seed} -mimc_moments 4 -mimc_M0 100 \
-    -mimc_dim 1 -mimc_w 1 -mimc_s 1 -mimc_gamma 1 -mimc_beta 2 \
+    -mimc_min_dim 1 -mimc_w 1 -mimc_s 1 -mimc_gamma 1 -mimc_beta 2 \
     -mimc_confidence 0.95 -mimc_theta 0.2 -mimc_bayes_fit_lvls 4 \
-    -mimc_bayes_k1 0.000005 -mimc_reuse_samples True "
+    -mimc_bayes_k1 0.000005 -mimc_bayesian True -mimc_reuse_samples True "
 
     base += " ".join(unknowns)
 

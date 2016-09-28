@@ -6,16 +6,16 @@ typedef unsigned int uint32;
 typedef unsigned short ind_t;
 
 #ifdef __cplusplus
-#include "var_list.h"
+#include "var_list.hpp"
+typedef Node* PTree;
 extern "C"{
 #else
     typedef void* PProfitCalculator;
     typedef void* PVarSizeList;
-    typedef unsigned int bool;
 #endif
 
     ind_t GetDefaultSetBase();
-    void VarSizeList_check_errors(const PVarSizeList, const double *errors, bool* strange, uint32 count);
+    void VarSizeList_check_errors(const PVarSizeList, const double *errors, unsigned char* strange, uint32 count);
 
     PProfitCalculator CreateMISCProfCalc(ind_t d, ind_t s,
                                          const double *d_rates, const double *s_err_rates);
@@ -27,7 +27,7 @@ extern "C"{
                             const PProfitCalculator profCalc,
                             double *log_prof, uint32 size);
     void CheckAdmissibility(const PVarSizeList, ind_t d_start, ind_t d_end,
-                            bool *admissible);
+                            unsigned char *admissible);
     void MakeProfitsAdmissible(const PVarSizeList, ind_t d_start, ind_t d_end,
                                double *pProfits);
 
@@ -45,9 +45,9 @@ extern "C"{
                                         ind_t seedLookahead);
     /* void GetLevelBoundaries(const PVarSizeList, const uint32 *levels, */
     /*                         uint32 levels_count, int32 *inner_bnd, */
-    /*                         bool *inner_real_lvls); */
+    /*                         unsigned char *inner_real_lvls); */
     /* void GetBoundaryInd(uint32 setSize, uint32 l, int32 i, */
-    /*                     int32* sel, int32* inner_bnd, bool* bnd_ind); */
+    /*                     int32* sel, int32* inner_bnd, unsigned char* bnd_ind); */
 
 
     PVarSizeList GetIndexSet(PVarSizeList,
@@ -67,7 +67,12 @@ extern "C"{
     ind_t VarSizeList_get(const PVarSizeList, uint32 i, ind_t* data, ind_t max_dim);
     ind_t VarSizeList_get_dim(const PVarSizeList, uint32 i);
     ind_t VarSizeList_get_active_dim(const PVarSizeList, uint32 i);
-    uint32 VarSizeList_count_neighbors(const PVarSizeList, ind_t *out_neighbors, uint32 count);
+    void VarSizeList_count_neighbors(const PVarSizeList, ind_t *out_neighbors, uint32 count);
+    void VarSizeList_is_parent_of_admissible(const PVarSizeList, unsigned char *out_neighbors, uint32 count);
+    double VarSizeList_estimate_bias(const PVarSizeList,
+                                     const double *err_contributions,
+                                     uint32 count,
+                                     const double *rates, uint32 rates_size);
 
     uint32 VarSizeList_count(const PVarSizeList);
     PVarSizeList VarSizeList_sublist(const PVarSizeList, uint32* idx, uint32 _count);
@@ -86,6 +91,13 @@ extern "C"{
     void FreeProfitCalculator(PProfitCalculator profCalc);
     void FreeIndexSet(PVarSizeList);
     void FreeMemory(void **ind_set);
+
+    PTree Tree_new();
+    unsigned char Tree_add_node(PTree tree, const double* value, uint32 count, double data, double eps);
+    unsigned char Tree_find(PTree tree, const double* value, uint32 count, double* data, unsigned char remove, double eps);
+    void Tree_free(PTree tree);
+
+    void Tree_print(PTree tree);
 #ifdef __cplusplus
 }
 #endif
