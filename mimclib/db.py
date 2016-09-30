@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import numpy as np
 import cPickle
+from . import setutil
 
 __all__ = []
 
@@ -28,6 +29,9 @@ def _unpickle(obj, load=cPickle.load):
 
 def _nan2none(x):
     return None if np.isnan(x) else x
+
+def _none2nan(x):
+    return np.nan if x is None else x
 
 class DBConn(object):
     def __init__(self, **kwargs):
@@ -85,7 +89,7 @@ CREATE TABLE IF NOT EXISTS {runTable} (
     totalTime               REAL,
     tag                   VARCHAR(128) NOT NULL,
     params                mediumblob,
-    fnNorm                    mediumblob,
+    fn                    mediumblob,
     comment               TEXT
 );
 CREATE VIEW vw_runs AS SELECT run_id, creation_date, TOL, done_flag, tag, totalTime, comment FROM {runTable};
@@ -132,17 +136,18 @@ El, Vl, Wl, Tl, Ml FROM {lvlTable};
 
         return script
 
-    def createRun(self, tag, TOL=None, params=None, fnNorm=None,
+    def createRun(self, tag, TOL=None, params=None, fn=None,
                   mimc_run=None, comment=""):
         TOL = TOL or mimc_run.params.TOL
         params = params or mimc_run.params
-        fnNorm = fnNorm or mimc_run.fn.Norm
+        fn = fn or dict(filter(lambda i:i[0] in "Norm",
+                               mimc_run.fn.getDict().iteritems())) # Only save the Norm function
         import dill
         with DBConn(**self.connArgs) as cur:
             cur.execute('''
-            INSERT INTO {runTable}(creation_date, TOL, tag, params, fnNorm, done_flag, comment)
+            INSERT INTO {runTable}(creation_date, TOL, tag, params, fn, done_flag, comment)
             VALUES(datetime(), ?, ?, ?, ?, -1, ?)'''.format(runTable=self.runTable),
-                        [TOL, tag, _pickle(params), _pickle(fnNorm, dump=dill.dump), comment])
+                        [TOL, tag, _pickle(params), _pickle(fn, dump=dill.dump), comment])
             return cur.getLastRowID()
 
     def markRunDone(self, run_id, flag, totalTime=None, comment=''):
@@ -205,10 +210,10 @@ VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?, ?)
 
         with DBConn(**self.connArgs) as cur:
             runAll = cur.execute(
-                        '''SELECT r.run_id, r.params, r.TOL, r.comment, count(*), r.fnNorm, r.tag
+                        '''SELECT r.run_id, r.params, r.TOL, r.comment, count(*), r.fn, r.tag
                         FROM {runTable} r INNER JOIN {dataTable} dr ON
                         r.run_id = dr.run_id WHERE r.run_id in ? GROUP BY
-                        r.run_id, r.params, r.TOL, r.comment, r.fnNorm'''.
+                        r.run_id, r.params, r.TOL, r.comment, r.fn'''.
                         format(runTable=self.runTable,
                                dataTable=self.dataTable), [run_ids]).fetchall()
 
@@ -241,18 +246,21 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
         import itertools
         for run_id, itr in itertools.groupby(lvlsAll, key=lambda x:x[0]):
             psums_delta, psums_fine, lvls, Ml, Tl, Wl, Vl = [], [], [], [], [], [], []
+            lvls_data = []
+            lvls_j = []
             for r in itr:
                 t = np.array(map(int, [p for p in re.split(",|\|", r[1]) if p]),
-                             dtype=np.uint32)
-                ind = np.zeros(r[-1], dtype=np.uint)
-                ind[t[::2]] = t[1::2]
-                lvls.append(ind.tolist())
+                             dtype=setutil.ind_t)
+                lvls_data.append(t[1::2])
+                lvls_j.append(t[::2])
                 psums_delta.append(_unpickle(r[2]))
                 psums_fine.append(_unpickle(r[3]))
-                Ml.append(r[4])
-                Tl.append(r[5])
-                Wl.append(r[6])
-                Vl.append(r[7])
+                Ml.append(_none2nan(r[4]))
+                Tl.append(_none2nan(r[5]))
+                Wl.append(_none2nan(r[6]))
+                Vl.append(_none2nan(r[7]))
+            lvls = setutil.VarSizeList()
+            lvls.add_from_list(j=lvls_j, inds=lvls_data)
             dictLvls[run_id] = [psums_delta, psums_fine, lvls, Ml, Tl, Wl, Vl]
 
         for data in dataAll:
@@ -261,6 +269,7 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
             data_id = data[0]
             run_params = dictRuns[run_id]
             val["data_id"] = data_id
+            val["run_id"] = run_id
             val["finalTOL"] = run_params[1]
             val["comment"] = run_params[2]
             val["total_iterations"] = run_params[3]
@@ -272,27 +281,21 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
             val["iteration_index"] = data[9]
 
             psums_delta, psums_fine, lvls, Ml, Tl, Wl, Vl = dictLvls[data_id]
-
-            lvls = np.array(lvls)
-            sort_rows = lambda a: np.argsort(a.view([('',a.dtype)]*a.shape[1]),0).T[0]
-            ind = sort_rows(lvls)
-
-            old_data = mimc.MIMCData(min_dim=run_params[0].dim,
-                                     lvls=lvls[ind],
-                                     psums_delta=np.array(psums_delta)[ind],
-                                     psums_fine=np.array(psums_fine)[ind],
-                                     M=np.array(Ml)[ind],
-                                     t=np.array(Ml)[ind] * np.array(Tl)[ind])
-            run = mimc.MIMCRun(old_data=old_data,
-                               **run_params[0].getDict())
-            run.setFunctions(Norm=run_params[4].getDict())
-            run.bias = data[5]
-            run.stat_error = data[6]
+            old_data = mimc.MIMCData(min_dim=run_params[0].min_dim,
+                                     lvls=lvls,
+                                     psums_delta=np.array(psums_delta),
+                                     psums_fine=np.array(psums_fine),
+                                     M=np.array(Ml),
+                                     t=np.array(Ml) * np.array(Tl))
+            run = mimc.MIMCRun(old_data=old_data, **run_params[0].getDict())
+            run.setFunctions(**run_params[4])
+            run.bias = _none2nan(data[5])
+            run.stat_error = _none2nan(data[6])
             run.Q = _unpickle(data[7])
-            val["run"] = run
-            run.Vl_estimate = np.array(Vl)[ind]
-            run.Wl_estimate = np.array(Wl)[ind]
-            lstvalues.append(mimc.MyDefaultDict(**val))
+            run.Vl_estimate = np.array(Vl)
+            run.Wl_estimate = np.array(Wl)
+            run.db_data = mimc.MyDefaultDict(**val)
+            lstvalues.append(run)
         return lstvalues
 
     def _fetchArray(self, query, params=None):
@@ -350,8 +353,8 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
         if iteration_idx is not None:
             ii = np.array(iteration_idx).reshape((-1,))
             from_end = ii<0
-            runs = [d for d in runs if d.iteration_index in
-                    d.total_iterations*from_end + ii]
+            runs = [r for r in runs if r.db_data.iteration_index in
+                    r.db_data.total_iterations*from_end + ii]
         return runs
 
     def readRuns(self, minTOL=None, maxTOL=None, tag=None,

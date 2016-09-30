@@ -209,7 +209,7 @@ class VarSizeList(object):
         else:
             assert inds is None, "Cannot set both _handle and inds"
             self._handle = _handle
-
+        assert len(kwargs) == 0, "Unrecognized options {}".format(kwargs)
 
     def copy(self):
         return VarSizeList(_handle=__lib__.VarSizeList_copy(self._handle),
@@ -308,32 +308,27 @@ class VarSizeList(object):
         __lib__.MakeProfitsAdmissible(self._handle, d_start, d_end, pro)
         return pro
 
-    def find(self, ind):
-        j_d = np.array([[i, j] for i, j in enumerate(ind) if j > 1],
-                       dtype=ind_t).reshape((-1, 2))
-        index = __lib__.VarSizeList_find(self._handle,
-                                         j_d[:, 0].ravel(),
-                                         j_d[:, 1].ravel(),
-                                         j_d.shape[0])
+    def find(self, ind, j=None):
+        if j is None:
+            j = np.arange(0, len(ind), dtype=ind_t)
+        else:
+            j = np.array(j, dtype=ind_t)
+        ind = np.array(ind, dtype=ind_t)
+        index = __lib__.VarSizeList_find(self._handle, j, ind, len(ind))
         return index if index >= 0 else None
 
-    def add_from_list(self, inds):
-        sizes = [len(i) for i in inds]
-        data = np.array(sum(np.array(inds).tolist(), []))
-        import itertools
-        d_j = np.fromiter(itertools.chain(*[xrange(0, s) for s in sizes]),
-                          dtype=ind_t)
-        self.add_from_sparse_list(sizes, d_j, data)
-
-
-    def add_from_sparse_list(self, sizes, d_j, data):
-        assert(len(d_j) == len(data))
-        assert(np.sum(sizes) == len(data))
+    def add_from_list(self, inds, j=None):
+        sizes = np.array([len(a) for a in inds], dtype=ind_t)
+        if j is None:
+            j = [np.arange(0, len(i), dtype=ind_t) for i in inds]
+        else:
+            assert(len(j) == len(inds))
+            assert np.all(sizes == np.array([len(a) for a in inds])), "Inconsistent data"
+        j = np.hstack(j).astype(ind_t)
+        inds = np.hstack(inds).astype(ind_t)
         __lib__.VarSizeList_from_matrix(self._handle,
-                                        np.array(sizes, dtype=ind_t),
-                                        len(sizes), np.array(d_j, dtype=ind_t),
-                                        len(d_j), np.array(data, dtype=ind_t),
-                                        len(data))
+                                        sizes, len(sizes),
+                                        j, len(j), inds, len(inds))
 
     def calc_log_prof(self, U):
         log_prof = np.empty(len(self))

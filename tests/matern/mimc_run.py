@@ -28,6 +28,14 @@ class MyRun:
     def mySampleQoI(self, run, inds, M):
         return self.misc.sample(inds, M, fnSample=self.solveFor_seq)
 
+    def workModel(self, run, lvls):
+        # from mimclib import ipdb
+        # ipdb.embed()
+        mat = lvls.to_dense_matrix()
+        gamma = np.hstack((run.params.gamma, np.ones(mat.shape[1]-len(run.params.gamma))))
+        beta = np.hstack((run.params.beta, 2*np.ones(mat.shape[1]-len(run.params.gamma))))
+        return np.prod(beta**(mat*gamma), axis=1)
+
     def initRun(self, run):
         self.prev_val = 0
         self.extrapolate_s_dims = 10
@@ -43,7 +51,8 @@ class MyRun:
         #                                            self.d_work_rates,
         #                                            np.ones(self.extrapolate_s_dims))
 
-        run.setFunctions(ExtendLvls=lambda lvls, r=run: self.extendLvls(run, lvls))
+        run.setFunctions(ExtendLvls=lambda lvls, r=run: self.extendLvls(run, lvls),
+                         WorkModel=lambda lvls, r=run: self.workModel(run, lvls))
         return
 
 

@@ -375,6 +375,7 @@ PVarSizeList VarSizeList_from_matrix(PVarSizeList pset,
         total_size += sizes[i];
         assert(j_size >= total_size);
         assert(data_size >= total_size);
+        //std::cout << "adding: " << mul_ind_t(j, data, sizes[i]) << "of size" << sizes[i] << std::endl;
         pset->push_back(mul_ind_t(j, data, sizes[i]));
         j += sizes[i];
         data += sizes[i];

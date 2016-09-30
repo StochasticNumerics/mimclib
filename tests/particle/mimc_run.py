@@ -25,7 +25,7 @@ class ParticleField(object):
         import time
         tStart = time.time()
         Ps = meshes[:, 0]
-        Ns = meshes[:, 1] if run.params.dim == 2 else meshes[:, 0]
+        Ns = meshes[:, 1] if run.params.min_dim == 2 else meshes[:, 0]
         samples = kuramoto.SampleKuramoto(self.gen, Ns=Ns, Ps=Ps, M=M,
                                           T=run.params.qoi_T, K=run.params.qoi_K,
                                           sig=run.params.qoi_sig, var_sig=False,
@@ -33,6 +33,8 @@ class ParticleField(object):
         return samples, time.time()-tStart
 
 if __name__ == "__main__":
+    from mimclib import ipdb
+    ipdb.set_excepthook()
     import mimclib.test
     field = ParticleField()
     mimclib.test.RunStandardTest(fnInit=field.Init,

@@ -194,14 +194,14 @@ def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
 
     runs_data is a list
     run_data[i] is another class
-    run_data[i].TOL
-    run_data[i].finalTOL
-    run_data[i].creation_date
-    run_data[i].iteration_index
-    run_data[i].total_iterations
-    run_data[i].totalTime
-    run_data[i].run is an instance of mimc.MIMCRun
-    run_data[i].run.data is an instance of mimc.MIMCData
+    run_data[i].db_data.TOL
+    run_data[i].db_data.finalTOL
+    run_data[i].db_data.Creation_date
+    run_data[i].db_data.niteration_index
+    run_data[i].db_data.total_iterations
+    run_data[i].db_data.totalTime
+    run_data[i] is an instance of mimc.MIMCRun
+    run_data[i].data is an instance of mimc.MIMCData
     """
 
     fnNorm = kwargs.pop('fnNorm')
@@ -217,16 +217,13 @@ def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
         # if minfinalTOL > minTOL:
         #     warnings.warn("The runs with the least tolerance are not done")
 
-        # exact = np.mean([r.run.data.calcEg() for r in final_run_data if
-        #                  r.TOL == minfinalTOL])
-        minfinalTOL = np.min([r.finalTOL for r in runs_data])
-        exact = np.mean([r.run.data.calcEg() for r in runs_data if
-                         r.finalTOL == minfinalTOL], axis=0)
-        print("Computed exact value is:", exact)
+        minErr = np.min([r.totalErrorEst() for r in runs_data])
+        exact = np.mean([r.data.calcEg() for r in runs_data if
+                         r.totalErrorEst() == minErr], axis=0)
 
     modifier = (1./fnNorm(np.array([exact]))[0]) if relative_error else 1.
-    val = np.array([r.run.data.calcEg() for r in runs_data])
-    xy = np.array([[r.finalTOL, 0, r.run.totalErrorEst()] for r in runs_data])
+    val = np.array([r.data.calcEg() for r in runs_data])
+    xy = np.array([[r.db_data.finalTOL, 0, r.totalErrorEst()] for r in runs_data])
     xy[:, 1] = fnNorm(val-exact)
     xy[:, 1:3] = xy[:, 1:3] * modifier
 
@@ -273,18 +270,89 @@ def plotErrorsVsTOL(ax, runs_data, *args, **kwargs):
     return xy[sel, :2], plotObj
 
 
+@public
+def plotWorkVsMaxError(ax, runs_data, *args, **kwargs):
+    """Plots Errors vs TOL of @runs_data, as
+    returned by MIMCDatabase.readRunData()
+    ax is in instance of matplotlib.axes
+
+    runs_data is a list
+    run_data[i] is another class
+    run_data[i].db_data.TOL
+    run_data[i].db_data.finalTOL
+    run_data[i].db_data.Creation_date
+    run_data[i].db_data.niteration_index
+    run_data[i].db_data.total_iterations
+    run_data[i].db_data.totalTime
+    run_data[i] is an instance of mimc.MIMCRun
+    run_data[i].data is an instance of mimc.MIMCData
+    """
+
+    fnNorm = kwargs.pop('fnNorm')
+    exact = kwargs.pop('exact', None)
+    relative_error = kwargs.pop('relative', True)
+    work_step = kwargs.pop('work_step', 1)
+    if exact is None:
+        # Calculate mean based on data
+        # final_run_data = [d for d in run_data if d.iteration_index+1
+        #                   == d.total_iterations]
+        # minTOL = np.min([r.TOL for r in runs_data])
+        # minfinalTOL = np.min([r.TOL for r in final_runs_data])
+        # if minfinalTOL > minTOL:
+        #     warnings.warn("The runs with the least tolerance are not done")
+
+        # exact = np.mean([r.data.calcEg() for r in final_run_data if
+        #                  r.TOL == minfinalTOL])
+        minErr = np.min([r.totalErrorEst() for r in runs_data])
+        exact = np.mean([r.data.calcEg() for r in runs_data if
+                         r.totalErrorEst() == minErr], axis=0)
+
+    modifier = (1./fnNorm(np.array([exact]))[0]) if relative_error else 1.
+    val = np.array([r.data.calcEg() for r in runs_data])
+    xy = np.array([[r.calcTotalWork(), 0, r.totalErrorEst()] for r in runs_data])
+    xy[:, 1] = fnNorm(val-exact)
+    xy[:, 1:3] *= modifier
+
+    bins = np.digitize(xy[:, 0],
+                       np.arange(np.min(xy[:, 0], np.max(xy[:, 0]), work_step)))
+    ubins = np.unique(bins)
+    xy_binned = np.zeros((len(ubins), 3))
+    for i, b in enumerate(ubins):
+        xy_binned[i, 0] = np.mean(xy[bins==b, 0])  # Mean work
+        xy_binned[i, 1] = np.max(xy[bins==b, 0])  # Max exact error
+        xy_binned[i, 2] = np.min(xy[bins==b, 0])  # min error estimate
+
+    plotObj = []
+
+    ax.set_xlabel('Work')
+    ax.set_ylabel('Relative Error' if relative_error else 'Error')
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+
+    ErrEst_kwargs = kwargs.pop('ErrEst_kwargs')
+    sel = np.logical_and(np.isfinite(xy[:, 1]), xy[:, 1] >=
+                         np.finfo(float).eps)
+    if np.sum(sel) == 0:
+        plotObj.append(None)
+    else:
+        plotObj.append(ax.plot(xy[:, 0], xy[:, 1], *args, **kwargs))
+
+    if ErrEst_kwargs is not None:
+        plotObj.append(ax.plot(xy[:, 0], xy[:, 1], **ErrEst_kwargs))
+    return xy[sel, :2], plotObj
+
+
 def __calc_moments(runs_data, seed=None, direction=None, fnNorm=None):
-    dim = runs_data[0].run.data.dim
+    dim = len(seed) if seed is not None else len(direction)
     seed = np.array(seed) if seed is not None else np.zeros(dim, dtype=np.uint32)
     direction = np.array(direction) if direction is not None else np.ones(dim, dtype=np.uint32)
-    moments = runs_data[0].run.data.psums_delta.shape[1]
+    moments = runs_data[0].data.psums_delta.shape[1]
     psums_delta, psums_fine, Tl, Vl_estimate, M = [None]*5
     for i, curRun in enumerate(runs_data):
         cur = seed
         inds = []
         while True:
-            ii = next((i for i, l in enumerate(curRun.run.data.lvls)
-                       if np.all(l == cur)), None)
+            ii = curRun.data.lvls.find(cur)
             if ii is None:
                 break
             inds.append(ii)
@@ -292,32 +360,32 @@ def __calc_moments(runs_data, seed=None, direction=None, fnNorm=None):
 
         L = len(inds)
         if psums_delta is None:
-            psums_delta = curRun.run.data.psums_delta[inds]
-            psums_fine = curRun.run.data.psums_fine[inds]
-            M = curRun.run.data.M[inds]
-            Tl = curRun.run.data.t[inds]
+            psums_delta = curRun.data.psums_delta[inds]
+            psums_fine = curRun.data.psums_fine[inds]
+            M = curRun.data.M[inds]
+            Tl = curRun.data.t[inds]
             Vl_estimate = np.zeros((L, len(runs_data)))
-            Vl_estimate[:, i] = curRun.run.Vl_estimate[inds]
+            Vl_estimate[:, i] = curRun.Vl_estimate[inds]
             continue
 
         oldL = np.minimum(L, len(M))
-        psums_delta[:oldL] += curRun.run.data.psums_delta[inds[:oldL]]
-        psums_fine[:oldL] += curRun.run.data.psums_fine[inds[:oldL]]
-        M[:oldL] += curRun.run.data.M[inds[:oldL]]
-        Tl[:oldL] += curRun.run.data.t[inds[:oldL]]
+        psums_delta[:oldL] += curRun.data.psums_delta[inds[:oldL]]
+        psums_fine[:oldL] += curRun.data.psums_fine[inds[:oldL]]
+        M[:oldL] += curRun.data.M[inds[:oldL]]
+        Tl[:oldL] += curRun.data.t[inds[:oldL]]
 
         if L > oldL:
             psums_delta = np.append(psums_delta,
-                                    curRun.run.data.psums_delta[inds[oldL:]], axis=0)
+                                    curRun.data.psums_delta[inds[oldL:]], axis=0)
             psums_fine = np.append(psums_fine,
-                                   curRun.run.data.psums_fine[inds[oldL:]], axis=0)
-            M = np.append(M, curRun.run.data.M[inds[oldL:]], axis=0)
-            Tl = np.append(Tl, curRun.run.data.t[inds[oldL:]], axis=0)
+                                   curRun.data.psums_fine[inds[oldL:]], axis=0)
+            M = np.append(M, curRun.data.M[inds[oldL:]], axis=0)
+            Tl = np.append(Tl, curRun.data.t[inds[oldL:]], axis=0)
             tmp = Vl_estimate.shape[0]
             Vl_estimate.resize((L, len(runs_data)), refcheck=False)
             Vl_estimate[tmp:] = np.nan
 
-        Vl_estimate[:L, i] = curRun.run.Vl_estimate[inds]
+        Vl_estimate[:L, i] = curRun.Vl_estimate[inds]
         Vl_estimate[(L+1):, i] = np.nan
 
     central_delta_moments = np.empty((psums_delta.shape[0],
@@ -346,20 +414,24 @@ def plotTotalWorkVsLvls(ax, runs_data, *args, **kwargs):
     ax.set_yscale('log')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    dim = runs_data[0].run.data.dim
-    seed=kwargs.pop('seed', None)
-    direction=kwargs.pop('direction', None)
+    seed = kwargs.pop('seed', None)
+    direction = kwargs.pop('direction', None)
 
-    seed = np.array(seed) if seed is not None else np.zeros(dim, dtype=np.uint32)
-    direction = np.array(direction) if direction is not None else np.ones(dim, dtype=np.uint32)
+    if seed is None and direction is None:
+        max_dim = kwargs.pop('max_dim')
+    else:
+        max_dim = len(seed) if seed is not None else len(direction)
+
+    seed = np.array(seed) if seed is not None else np.zeros(max_dim, dtype=np.uint32)
+    direction = np.array(direction) if direction is not None else np.ones(max_dim, dtype=np.uint32)
 
     plotObj = []
-    runs_data = sorted(runs_data, key=lambda r: r.finalTOL)
+    runs_data = sorted(runs_data, key=lambda r: r.db_data.finalTOL)
     import itertools
     label_fmt = kwargs.pop('label_fmt', None)
-    TOLs = np.unique([r.finalTOL for r in runs_data])
+    TOLs = np.unique([r.db_data.finalTOL for r in runs_data])
     TOLs = TOLs[:kwargs.pop("max_TOLs", len(TOLs))]
-    for TOL, itr in itertools.groupby(runs_data, key=lambda r: r.finalTOL):
+    for TOL, itr in itertools.groupby(runs_data, key=lambda r: r.db_data.finalTOL):
         if TOL not in TOLs:
             continue
 
@@ -368,14 +440,13 @@ def plotTotalWorkVsLvls(ax, runs_data, *args, **kwargs):
             cur = seed
             inds = []
             while True:
-                ii = next((i for i, l in enumerate(curRun.run.data.lvls)
-                           if np.all(l == cur)), None)
+                ii = curRun.data.lvls.find(cur)
                 if ii is None:
                     break
                 inds.append(ii)
                 cur = cur + direction
             for j, ind in enumerate(inds):
-                data_tw.append([j, curRun.run.data.M[j] * curRun.run.Wl_estimate[j]])
+                data_tw.append([j, curRun.data.M[j] * curRun.Wl_estimate[j]])
         lvls, total_work = __get_stats(data_tw)
         plotObj.append(ax.errorbar(lvls, total_work[:, 1],
                                    yerr=[total_work[:, 1]-total_work[:, 0],
@@ -384,13 +455,14 @@ def plotTotalWorkVsLvls(ax, runs_data, *args, **kwargs):
                                    *args,
                                    **kwargs))
 
-    if curRun.run.params.dim == 1 and hasattr(curRun.run.params, "s") and hasattr(curRun.run.params, "gamma"):
-        rate = np.array(curRun.run.params.gamma) - np.array(curRun.run.params.s)
-        if hasattr(curRun.run.params, "beta"):
-            rate *= np.log(curRun.run.params.beta)
-        ax.add_line(FunctionLine2D(lambda x, tol=TOL, r=rate: tol**-2 * np.exp(r*x),
-                                   data=np.array([lvls, total_work[:, 1]]).transpose(),
-                                   linestyle='--', c='k'))
+    # TODO: Gotta figure out what this plot is about!!
+    # if curRun.params.min_dim == 1 and hasattr(curRun.params, "s") and hasattr(curRun.params, "gamma"):
+    #     rate = np.array(curRun.params.gamma) - np.array(curRun.params.s)
+    #     if hasattr(curRun.params, "beta"):
+    #         rate *= np.log(curRun.params.beta)
+    #     ax.add_line(FunctionLine2D(lambda x, tol=TOL, r=rate: tol**-2 * np.exp(r*x),
+    #                                data=np.array([lvls, total_work[:, 1]]).transpose(),
+    #                                linestyle='--', c='k'))
     return plotObj
 
 
@@ -417,16 +489,22 @@ def plotExpectVsLvls(ax, runs_data, *args, **kwargs):
     fine_kwargs = kwargs.pop('fine_kwargs', None)
     plotObj = []
     El = central_delta_moments[:, 0]
-    Vl = central_delta_moments[:, 1]
-    plotObj.append(ax.errorbar(np.arange(0, len(El)), np.abs(El), *args,
-                               yerr=3*np.sqrt(np.abs(Vl/M)), **kwargs))
+    if central_delta_moments.shape[1] > 1:
+        Vl = central_delta_moments[:, 1]
+        plotObj.append(ax.errorbar(np.arange(0, len(El)), np.abs(El), *args,
+                                   yerr=3*np.sqrt(np.abs(Vl/M)), **kwargs))
+    else:
+        plotObj.append(ax.plot(np.arange(0, len(El)), np.abs(El), *args, **kwargs))
 
 
     if fine_kwargs is not None:
         El = central_fine_moments[:, 0]
-        Vl = central_fine_moments[:, 1]
-        plotObj.append(ax.errorbar(np.arange(0, len(El)), np.abs(El),
-                                   yerr=3*np.sqrt(np.abs(Vl/M)), **fine_kwargs))
+        if central_fine_moments.shape[1] > 1:
+            Vl = central_fine_moments[:, 1]
+            plotObj.append(ax.errorbar(np.arange(0, len(El)), np.abs(El),
+                                       yerr=3*np.sqrt(np.abs(Vl/M)), **fine_kwargs))
+        else:
+            plotObj.append(ax.plot(np.arange(0, len(El)), np.abs(El), **fine_kwargs))
 
     return plotObj[0][0].get_xydata(), plotObj
 
@@ -580,14 +658,14 @@ def plotTimeVsTOL(ax, runs_data, *args, **kwargs):
         if 'MC_kwargs' in kwargs:
             raise ValueError("Cannot estimate real time of Monte Carlo")
 
-        xy = [[r.finalTOL, r.totalTime] for r in runs_data]
+        xy = [[r.db_data.finalTOL, r.db_data.totalTime] for r in runs_data]
     elif work_estimate:
-        xy = [[r.finalTOL, np.sum(r.run.data.M*r.run.Wl_estimate),
-               np.max(r.run.Wl_estimate) * r.run.estimateMonteCarloSampleCount(r.finalTOL)]
+        xy = [[r.db_data.finalTOL, np.sum(r.data.M*r.Wl_estimate),
+               np.max(r.Wl_estimate) * r.estimateMonteCarloSampleCount(r.db_data.finalTOL)]
               for r in runs_data]
     else:
-        xy = [[r.finalTOL, np.sum(r.run.data.t),
-               np.max(r.run.all_data.calcTl()) * r.run.estimateMonteCarloSampleCount(r.finalTOL)]
+        xy = [[r.db_data.finalTOL, np.sum(r.data.t),
+               np.max(r.all_data.calcTl()) * r.estimateMonteCarloSampleCount(r.db_data.finalTOL)]
               for r in runs_data]
     ax.set_xscale('log')
     ax.set_yscale('log')
@@ -595,7 +673,7 @@ def plotTimeVsTOL(ax, runs_data, *args, **kwargs):
     if work_estimate:
         ax.set_ylabel('Work estimate')
     else:
-        ax.set_ylabel('Time (s)')
+        ax.set_ylabel('Average Time (s)')
 
     plotObj = []
     TOLs, times = __get_stats(xy)
@@ -621,8 +699,8 @@ def plotLvlsNumVsTOL(ax, runs_data, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
-    summary = np.array([[r.finalTOL,
-                         np.max([np.sum(l) for l in r.run.data.lvls])]
+    summary = np.array([[r.db_data.finalTOL,
+                         np.max([np.sum(l) for l in r.data.lvls])]
                         for r in runs_data])
 
     ax.set_xscale('log')
@@ -639,7 +717,7 @@ def plotThetaVsTOL(ax, runs_data, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
-    summary = np.array([[r.finalTOL, r.run.Q.theta] for r in runs_data])
+    summary = np.array([[r.db_data.finalTOL, r.Q.theta] for r in runs_data])
 
     ax.set_xscale('log')
     ax.set_xlabel('TOL')
@@ -655,12 +733,12 @@ def plotThetaRefVsTOL(ax, runs_data, eta, chi, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
-    L = lambda r: np.max([np.sum(l) for l in r.run.data.lvls])
+    L = lambda r: np.max([np.sum(l) for l in r.data.lvls])
     if chi == 1:
-        summary = np.array([[r.finalTOL, (1. + (1./(2.*eta))*1./(L(r)+1.))**-1]
+        summary = np.array([[r.db_data.finalTOL, (1. + (1./(2.*eta))*1./(L(r)+1.))**-1]
                             for r in runs_data])
     else:
-        summary = np.array([[r.finalTOL,
+        summary = np.array([[r.db_data.finalTOL,
                              (1. + (1./(2.*eta))*(1.-chi)/(1.-chi**(L(r)+1.)))**-1]
                             for r in runs_data])
     TOL, thetaRef = __get_stats(summary, staton=1)
@@ -685,15 +763,15 @@ def plotErrorsQQ(ax, runs_data, *args, **kwargs):
     # Use TOL instead of finalTOL. The normality is proven w.r.t. to TOL of MLMC
     # not the finalTOL of MLMC (might be different sometimes)
     if "tol" not in kwargs:
-        TOLs = [r.TOL for r in runs_data]
-        unTOLs = np.unique([r.TOL for r in runs_data])
+        TOLs = [r.db_data.TOL for r in runs_data]
+        unTOLs = np.unique([r.db_data.TOL for r in runs_data])
         unTOLs.sort()
         tol = unTOLs[np.argmax(np.bincount(np.digitize(TOLs, unTOLs)))-1]
     else:
         tol = kwargs.pop("tol")
     fnNorm = kwargs.pop('fnNorm')
     from scipy.stats import norm
-    x_data = np.array([r.run.data.calcEg() for r in runs_data if r.TOL == tol])
+    x_data = np.array([r.data.calcEg() for r in runs_data if r.db_data.TOL == tol])
     x = x_data - np.mean(x_data, axis=0)
     try:
         x = x.astype(np.float)
@@ -776,16 +854,19 @@ def __plot_except(ax):
 def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     import matplotlib.pyplot as plt
 
+    indep_runs = len(np.unique([r.db_data.run_id for r in runs_data]))
     verbose = kwargs.pop('verbose')
     if "params" in kwargs:
         params = kwargs.pop("params")
         fn = kwargs.pop("fn")
     else:
-        maxTOL = np.max([r.finalTOL for r in runs_data])
-        params = next(r.run.params for r in runs_data if r.finalTOL == maxTOL)
-        fn = next(r.run.fn for r in runs_data if r.finalTOL == maxTOL)
+        maxTOL = np.max([r.db_data.finalTOL for r in runs_data])
+        params = next(r.params for r in runs_data if r.db_data.finalTOL == maxTOL)
+        fn = next(r.fn for r in runs_data if r.db_data.finalTOL == maxTOL)
 
-    dim = params.dim
+    max_dim = np.max([np.max(r.data.lvls.max_dim()) for r in runs_data])
+    any_bayesian = np.any([r.params.bayesian for r in runs_data])
+
     legend_outside = kwargs.pop("legend_outside", 5)
 
     has_gamma_rate = hasattr(params, 'gamma')
@@ -805,27 +886,37 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
         figures.append(plt.figure())
         return figures[-1].gca()
 
-    ax = add_fig()
-    try:
-        plotErrorsVsTOL(ax, runs_data, exact=exact,
-                        relative=True, fnNorm=fn.Norm,
-                        ErrEst_kwargs={'label': 'Error Estimate'},
-                        TOLRef_kwargs={'linestyle': '--', 'c': 'k', 'label': 'TOL'},
-                        num_kwargs={'color': 'r'})
-    except:
-        __plot_except(ax)
+    if (indep_runs > 1):
+        ax = add_fig()
+        try:
+            plotErrorsVsTOL(ax, runs_data, exact=exact,
+                            relative=True, fnNorm=fn.Norm,
+                            ErrEst_kwargs={'label': 'Error Estimate'},
+                            TOLRef_kwargs={'linestyle': '--', 'c': 'k', 'label': 'TOL'},
+                            num_kwargs={'color': 'r'})
+        except:
+            __plot_except(ax)
 
     ax = add_fig()
     try:
-        plotErrorsQQ(ax, runs_data, fnNorm=fn.Norm,
-                     Ref_kwargs={'linestyle': '--', 'c': 'k'})
+        plotWorkVsMaxError(ax, runs_data, exact=exact,
+                           relative=True, fnNorm=fn.Norm,
+                           ErrEst_kwargs={'label': 'Error Estimate'})
     except:
         __plot_except(ax)
+
+    if (indep_runs > 1):
+        ax = add_fig()
+        try:
+            plotErrorsQQ(ax, runs_data, fnNorm=fn.Norm,
+                         Ref_kwargs={'linestyle': '--', 'c': 'k'})
+        except:
+            __plot_except(ax)
 
     ax_time = add_fig()
     try:
         data_time, _ = plotTimeVsTOL(ax_time, runs_data, label="MIMC",
-                                     MC_kwargs=None if dim > 1
+                                     MC_kwargs=None if max_dim > 1
                                      else {"label": "MC Estimate", "fmt": "--r"})
     except:
         __plot_except(ax_time)
@@ -834,7 +925,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     try:
         data_est, _ = plotTimeVsTOL(ax_est, runs_data, label="MIMC",
                                    work_estimate=True,
-                                   MC_kwargs= None if dim > 1 else {"label": "MC Estimate", "fmt":
+                                   MC_kwargs= None if max_dim > 1 else {"label": "MC Estimate", "fmt":
                                               "--r"})
         if has_s_rate and has_gamma_rate and has_w_rate:
             s = np.array(params.s)
@@ -878,17 +969,17 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                   if has_gamma_rate else None],
                  [1, True, False, plotExpectVsLvls, -np.array(params.w)
                   if has_w_rate else None],
-                 [2, True, True, plotVarVsLvls, -np.array(params.s)
+                 [2, True, any_bayesian, plotVarVsLvls, -np.array(params.s)
                   if has_s_rate else None],
                  [3, False, False, plotSkewnessVsLvls, None],
                  [4, False, False, plotKurtosisVsLvls, None]]
-    directions = np.eye(dim, dtype=np.int).tolist()
+    directions = np.eye(np.minimum(5, max_dim), dtype=np.int).tolist()
     cur = np.array(directions[0])
-    for i in range(1, dim):
+    for i in range(1, len(directions)):
         cur += np.array(directions[i])
         directions.append(cur.tolist())
 
-    max_moment = runs_data[0].run.data.psums_delta.shape[1]
+    max_moment = runs_data[0].data.psums_delta.shape[1]
     for min_moment, plotFine, plotEstimate, plotFunc, rate in lvl_funcs:
         if min_moment > max_moment:
             continue
@@ -902,10 +993,14 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
             for j, direction in enumerate(directions):
                 mrk = next(markers)
                 prop = next(cycler)
+                labal = '$\Delta$' if len(directions)==1 \
+                        else "$[{}]$".format(",".join(["0" if d==0
+                                                       else ("" if d==1 else str(d))
+                                                       +"\ell" for d in direction]))
                 cur_kwargs = {'ax' : ax, 'runs_data': runs_data,
                               'linestyle' : '-',
                               'marker' : mrk,
-                              'label': '$\Delta$' if len(directions)==1 else "$\ell={}$".format(direction),
+                              'label': labal,
                               'direction' : direction}
                 cur_kwargs.update(prop)
                 if plotFine:
@@ -913,7 +1008,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                                                  'marker' : mrk}
                     cur_kwargs['fine_kwargs'].update(prop)
 
-                if dim == 1 and plotEstimate:
+                if max_dim == 1 and plotEstimate:
                     cur_kwargs['estimate_kwargs'] = {'linestyle': ':',
                                                      'marker' : mrk,
                                                      'label' : 'Corrected estimate'}
@@ -921,7 +1016,9 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
                 line_data, _ = plotFunc(fnNorm=fn.Norm, **cur_kwargs)
                 if rate is None:
                     continue
-                add_rates[np.sum(rate[np.array(direction) != 0])] = line_data
+                ind = np.nonzero(np.array(direction) != 0)[0]
+                if np.all(ind < len(rate)):
+                    add_rates[np.sum(rate[ind])] = line_data
 
             for j, r in enumerate(sorted(add_rates.keys(), key=lambda x:
                                          np.abs(x))):
@@ -937,7 +1034,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
         plotTotalWorkVsLvls(ax, runs_data,
                             fmt='-o',
                             label_fmt="${:.2g}$",
-                            max_TOLs=5)
+                            max_TOLs=5, max_dim=max_dim)
     except:
         __plot_except(ax)
 
@@ -961,7 +1058,7 @@ def genPDFBooklet(runs_data, fileName=None, exact=None, **kwargs):
     ax = add_fig()
     try:
         plotThetaVsTOL(ax, runs_data)
-        if dim == 1 and has_s_rate and has_w_rate and has_gamma_rate:
+        if max_dim == 1 and has_s_rate and has_w_rate and has_gamma_rate:
             chi = params.s[0]/params.gamma[0]
             eta = params.w[0]/params.gamma[0]
             plotThetaRefVsTOL(ax, runs_data, eta=eta, chi=chi, fmt='--k')
@@ -1026,7 +1123,7 @@ def run_program():
     if args.db_user is not None:
         db_args["user"] = args.db_user
     if args.db_host is not None:
-        db_args["host"] = args.db_hostcp
+        db_args["host"] = args.db_host
     if args.o is None:
         args.o = args.db_tag + ".pdf"
     db = mimcdb.MIMCDatabase(**db_args)

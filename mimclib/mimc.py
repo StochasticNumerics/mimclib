@@ -430,10 +430,10 @@ Not needed if -bayesian is False.")
         # The following arguments are not always needed, and they have
         # a default value
         if additional:
-            add_store('max_TOL', type=float, default=0.1,
+            add_store('max_TOL', type=float,
                       help="The (approximate) tolerance for \
 the first iteration. Not needed if TOLs is provided to doRun.")
-            add_store('M0', nargs='+', type=int, default=np.array([10]),
+            add_store('M0', nargs='+', type=int, default=np.array([1]),
                       action=Store_as_array,
                       help="Initial number of samples used to estimate the \
 sample variance on levels when not using the Bayesian estimators. \
@@ -664,7 +664,7 @@ estimate optimal number of levels"
         active = totalM >= self.data.M
         totalM[active] -= self.data.M[active]
         if np.sum(totalM) == 0:
-            return
+            return False
         for i in range(0, s):
             if totalM[i] <= 0:
                 continue
@@ -677,6 +677,7 @@ estimate optimal number of levels"
             if self.all_data != self.data:
                 self.all_data.addSamples(i, *args)
         self._estimateAll()
+        return True
 
     def _calcTheta(self, TOL, bias_est):
         if not self.params.const_theta:
@@ -695,19 +696,25 @@ estimate optimal number of levels"
         return M
 
     def estimateMonteCarloSampleCount(self, TOL):
-        theta = np.maximum(self._calcTheta(TOL, self.bias), self.params.theta)
+        theta = self._calcTheta(TOL, self.bias)
+        V = self.Vl_estimate[self.data.lvls.find([])]
+        if np.isnan(V):
+            return np.nan
         from scipy.stats import norm
         Ca = norm.ppf(self.params.confidence)
+
         return np.maximum(np.reshape(self.params.M0, (1,))[-1],
-                          int(np.ceil((theta * TOL / Ca)**-2 * self.Vl_estimate[0])))
+                          int(np.ceil((theta * TOL / Ca)**-2 * V)))
 
     def doRun(self, finalTOL=None, TOLs=None, verbose=None):
         self._checkFunctions()
         finalTOL = finalTOL or self.params.TOL
-        TOLs = TOLs or get_tol_sequence(finalTOL, self.params.max_TOL,
-                                        max_additional_itr=self.params.max_add_itr,
-                                        r1=self.params.r1,
-                                        r2=self.params.r2)
+        if TOLs is None:
+            TOLs = [finalTOL] if not hasattr(self.params, "max_TOL") \
+                   else get_tol_sequence(finalTOL, self.params.max_TOL,
+                                         max_additional_itr=self.params.max_add_itr,
+                                         r1=self.params.r1,
+                                         r2=self.params.r2)
         if verbose is None:
             verbose = self.params.verbose
         if not all(x >= y for x, y in zip(TOLs, TOLs[1:])):
@@ -722,7 +729,9 @@ estimate optimal number of levels"
         def less(a, b, rel_tol=1e-09, abs_tol=0.0):
             return a-b <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
 
-        for itrIndex, TOL in enumerate(TOLs):
+        itrIndex = 0
+        for TOL in TOLs:
+            samples_added = False
             if verbose:
                 print("# TOL", TOL)
             while True:
@@ -742,7 +751,7 @@ estimate optimal number of levels"
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
                     newTodoM = self._extendLevels()
-                    self._genSamples(newTodoM, verbose)
+                    samples_added = self._genSamples(newTodoM, verbose) or samples_added
                     self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
                                               self.params.theta)
 
@@ -754,22 +763,20 @@ estimate optimal number of levels"
                     print("# New M: ", todoM)
                 if not self.params.reuse_samples:
                     self.data.zero_samples()
-                self._genSamples(todoM, verbose)
+                samples_added = self._genSamples(todoM, verbose) or samples_added
                 if verbose:
                     print(self, end="")
                     print("------------------------------------------------")
-                if self.params.bayesian or self.totalErrorEst() < TOL:
-                    break
+                if self.fn.ItrDone is not None and samples_added:
+                    self.fn.ItrDone(iteration_idx=itrIndex,
+                                    TOL=TOL,
+                                    totalTime=time.time() - tic)
+                itrIndex += 1
 
-            totalTime = time.time() - tic
-            tic = time.time()
+
             if verbose:
-                print("{} took {}".format(TOL, totalTime))
+                print("{} took {}".format(TOL, time.time()-tic))
                 print("################################################")
-            if self.fn.ItrDone:
-                self.fn.ItrDone(iteration_idx=itrIndex,
-                                TOL=TOL,
-                                totalTime=totalTime)
             if less(TOL, finalTOL) and self.totalErrorEst() <= finalTOL:
                 break
 
