@@ -105,6 +105,9 @@ class MyInteractiveShellEmbed(InteractiveShellEmbed):
         self.register_magics(StackEmbeddedMagics)
 
     def __call__(self, ex, ex_cls, tb, frames, **kwargs):
+        if not self.embedded_active:
+            return
+
         self.frames = frames
         self.ex = ex
         self.tb = tb
@@ -134,6 +137,7 @@ class MyInteractiveShellEmbed(InteractiveShellEmbed):
 @public
 def embed(**kwargs):
     stack_depth = kwargs.pop('stack_depth', 2)
+    force_active = kwargs.pop('force_active', False)
     ex_data = kwargs.pop('ex_data', None)
     config = kwargs.get('config')
     header = kwargs.pop('header', u'')
@@ -165,6 +169,8 @@ def embed(**kwargs):
     tb = kwargs.pop("tb", None)
     old_excepthool = sys.excepthook
     shell = MyInteractiveShellEmbed.instance(**kwargs)
+    if force_active:
+        shell.embedded_active = True
     shell(frames=frames, ex_cls=ex_cls, ex=ex, tb=tb, header=header,
           stack_depth=stack_depth)
     sys.excepthook = old_excepthool
@@ -176,7 +182,7 @@ def __excepthook(ex_cls, ex, tb):
     while tb_cur is not None:
         frames.append(tb_cur.tb_frame)
         tb_cur = tb_cur.tb_next
-    embed(ex_cls=ex_cls, ex=ex, frames=frames, tb=tb)
+    embed(ex_cls=ex_cls, ex=ex, frames=frames, tb=tb, force_active=True)
 
 @public
 def set_excepthook():
