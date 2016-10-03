@@ -50,7 +50,9 @@ def RunStandardTest(fnSampleLvl=None,
                         action="store", help="Database User")
     parser.add_argument("-db_password", type=str,
                         action="store", help="Database password")
-    parser.add_argument("-db_host", type=str, default='localhost',
+    parser.add_argument("-db_host", type=str,
+                        action="store", help="Database Host")
+    parser.add_argument("-db_engine", type=str, default='mysql',
                         action="store", help="Database Host")
     parser.add_argument("-db_tag", type=str, default="NoTag",
                         action="store", help="Database Tag")
@@ -58,6 +60,7 @@ def RunStandardTest(fnSampleLvl=None,
                         action="store", help="Save in Database")
     parser.add_argument("-qoi_seed", type=int, default=-1,
                         action="store", help="Seed for random generator")
+    parser.add_argument("-db_name", type=str, action="store", help="")
 
     if fnAddExtraArgs is not None:
         fnAddExtraArgs(parser)
@@ -84,10 +87,16 @@ def RunStandardTest(fnSampleLvl=None,
             db_args["passwd"] = mimcRun.params.db_password
         if hasattr(mimcRun.params, "db_host"):
             db_args["host"] = mimcRun.params.db_host
+        if hasattr(mimcRun.params, "db_engine"):
+            db_args["engine"] = mimcRun.params.db_engine
+        if hasattr(mimcRun.params, "db_name"):
+            db_args["db"] = mimcRun.params.db_name
         db = mimcdb.MIMCDatabase(**db_args)
         run_id = db.createRun(mimc_run=mimcRun,
                               tag=mimcRun.params.db_tag)
-        fnItrDone = lambda **kwargs: db.writeRunData(run_id, mimcRun, **kwargs)
+        fnItrDone = lambda: db.writeRunData(run_id,
+                                            mimcRun,
+                                            iteration_idx=len(mimcRun.iters)-1)
 
     mimcRun.setFunctions(fnItrDone=fnItrDone)
 
@@ -100,4 +109,4 @@ def RunStandardTest(fnSampleLvl=None,
 
     if mimcRun.params.db:
         db.markRunSuccessful(run_id, totalTime=time.time()-tStart)
-    return mimcRun.data.calcEg()
+    return mimcRun.last_itr.calcEg()

@@ -4,24 +4,17 @@ echo "If all goes well, this script should plot the relevant plots of the
 parallel mimc run. Output will be produced to 'GBM_*.pdf'"
 
 echo "Plotting GBM_std_real"
-python -c "import mimclib.ipdb; mimclib.ipdb.set_excepthook();\
-from mimclib.plot import run_program; \
-run_program()" -db_tag 'GBM_std_real' -db_host 127.0.0.1 -qoi_exact 2.7182818284590451
+../plot_prog.py -db_tag 'GBM_std_real' -db_host 127.0.0.1 -qoi_exact 2.7182818284590451 &
 
 echo "Plotting GBM_bayes_real"
-python -c "import mimclib.ipdb; mimclib.ipdb.set_excepthook();\
-from mimclib.plot import run_program; \
-run_program()" -db_tag 'GBM_bayes_real' -db_host 127.0.0.1 -qoi_exact 2.7182818284590451
+../plot_prog.py -db_tag 'GBM_bayes_real' -db_host 127.0.0.1 -qoi_exact 2.7182818284590451 &
 
 # echo "Plotting GBM_arr"
-# python -c "import mimclib.ipdb; mimclib.ipdb.set_excepthook();\
-# from mimclib.plot import run_program; \
-# import numpy as np; \
-# run_program()" -db_tag 'GBM_std_arr' -db_host 127.0.0.1
+../plot_prog.py -db_tag 'GBM_std_arr' -db_host 127.0.0.1 &
 
 # echo "Plotting GBM_obj"
-# python -c "import mimclib.ipdb; mimclib.ipdb.set_excepthook();\
-# from mimc_run import CustomClass; \
-# from mimclib.plot import run_program; \
-# import numpy as np; \
-# run_program()" -db_tag 'GBM_std_obj' -db_host 127.0.0.1
+python -c "import mimclib.ipdb; mimclib.ipdb.set_excepthook();\
+from mimc_run import CustomClass; \
+from mimclib.plot import run_program; \
+import numpy as np; \
+run_program()" -db_tag 'GBM_std_obj' -db_host 127.0.0.1 &

@@ -73,7 +73,7 @@ class MyRun:
 
 
     def extendLvls(self, run, lvls):
-        if len(run.data.lvls) == 0:
+        if len(lvls) == 0:
             # First run, add min_lvls on each dimension
             d = run.params.min_dim + self.extrapolate_s_dims
             eye = np.eye(d, dtype=int)
@@ -81,13 +81,12 @@ class MyRun:
                              [i*eye for i in range(1, run.params.min_lvls)])
             lvls.add_from_list(new_lvls)
             return
-        self.prev_val = run.data.calcEg()
 
         # estimate rates
         self.d_err_rates, \
             s_fit_rates = misc.estimate_misc_error_rates(d=run.params.min_dim,
                                                          lvls=lvls,
-                                                         errs=run.data.calcDeltaEl(),
+                                                         errs=run.last_itr.calcDeltaEl(),
                                                          d_err_rates=self.d_err_rates,
                                                          lev2knots=lambda beta:misc.lev2knots_doubling(1+beta))
         #################### extrapolate error rates

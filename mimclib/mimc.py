@@ -2,10 +2,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import time
+import copy
+import gc
 import numpy as np
 import itertools
 import warnings
 from . import setutil
+from scipy.stats import norm
 
 __all__ = []
 import argparse
@@ -99,46 +103,52 @@ def _expand(b, i, shape):
     return np.tile(b.reshape(b_shape), b_reps)
 
 @public
-class MIMCData(object):
+class MIMCItrData(object):
     """
     MIMC Data is a class for describing necessary data
     for a MIMC data, such as the dimension of the problem,
     list of levels, times exerted, sample sizes, etc...
 
-    In a MIMC Run object, the data is stored in a MIMCData object
+    In a MIMC Run object, the data is stored in a MIMCItrData object
 
     """
 
-    def __init__(self, min_dim=0, lvls=None, psums_delta=None,
-                 psums_fine=None, t=None, M=None, moments=2):
+    def __init__(self,
+                 # lvls=None, psums_delta=None,
+                 # psums_fine=None, t=None, M=None,
+                 min_dim=0, moments=None, theta=None):
         self.moments = moments
-        import copy
-        if lvls is not None:
-            self.lvls = lvls
-        else:
-            self.lvls = setutil.VarSizeList(min_dim=min_dim)
-
+        self.lvls = setutil.VarSizeList(min_dim=min_dim)
         self.psums_delta = None
         self.psums_fine = None
         self.t = np.zeros(len(self.lvls))      # Time of lvls
         self.M = np.zeros(len(self.lvls), dtype=np.int)      # Number of samples in each lvl
+        self.bias = np.inf           # Approximation of the discretization error
+        self.stat_error = np.inf     # Sampling error (based on M)
+        self.TOL = None              # Target tolerance
+        self.totalTime = None
+        self.Q = None
+        self._levels_added()
+        self.Vl_estimate = np.zeros(len(self.lvls))
+        self.Wl_estimate = np.zeros(len(self.lvls))
 
-        if psums_delta is not None:
-            self.psums_delta = psums_delta.copy()
-        if psums_fine is not None:
-            self.psums_fine = psums_fine.copy()
+    def copy(self):
+        ret = MIMCItrData()
+        ret.moments = self.moments
+        ret.lvls = self.lvls.copy()
+        ret.psums_delta = self.psums_delta.copy() if self.psums_delta is not None else None
+        ret.psums_fine = self.psums_fine.copy() if self.psums_fine is not None else None
+        ret.t = self.t.copy()
+        ret.M = self.M.copy()
+        ret.bias = self.bias
+        ret.stat_error = self.stat_error
+        ret.totalTime = self.totalTime
+        ret.TOL = self.TOL
+        ret.Q = copy.copy(self.Q)
+        ret.Vl_estimate = self.Vl_estimate.copy() if self.Vl_estimate is not None else None
+        ret.Wl_estimate = self.Wl_estimate.copy() if self.Wl_estimate is not None else None
+        return ret
 
-        if t is not None:
-            self.t = t.copy()
-        if M is not None:
-            self.M = M.copy()
-
-        if self.psums_fine is not None:
-            assert(len(self.lvls) == len(self.psums_fine))
-        if self.psums_delta is not None:
-            assert(len(self.lvls) == len(self.psums_delta))
-        assert(len(self.lvls) == len(self.M))
-        assert(len(self.lvls) == len(self.t))
 
     def calcEg(self):
         """
@@ -149,14 +159,6 @@ class MIMCData(object):
 
     def __len__(self):
         return len(self.lvls)
-
-    def __getitem__(self, ind):
-        # Reshape everything to allow ind to be a single index or a list
-        return MIMCData(lvls=self.lvls.sublist(ind),
-                        psums_delta=self.psums_delta[ind].reshape((-1,) + self.psums_delta.shape[1:]),
-                        psums_fine=self.psums_fine[ind].reshape((-1,) + self.psums_delta.shape[1:]),
-                        t=self.t[ind].reshape(-1),
-                        M=self.M[ind].reshape(-1))
 
     def computedMoments(self):
         return self.moments
@@ -201,6 +203,7 @@ class MIMCData(object):
     def addSamples(self, lvl_idx, M, psums_delta, psums_fine, t):
         assert psums_delta.shape == psums_fine.shape and \
             psums_fine.shape[0] == self.computedMoments(), "Inconsistent arguments "
+        #assert lvl_idx is not None, "Level was not found"
         if self.M[lvl_idx] == 0:
             if self.psums_delta is None:
                 self.psums_delta = np.zeros((len(self.lvls),)
@@ -224,28 +227,45 @@ class MIMCData(object):
         if psums_fine.dtype != self.psums_fine.dtype:
             self.psums_fine = self.psums_fine.astype(psums_fine.dtype)
 
-    def zero_samples(self):
-        self.M = np.zeros_like(self.M)
-        self.t = np.zeros_like(self.t)
-        self.psums_delta = np.empty((len(lvls), moments), dtype=object)
-        self.psums_fine = np.empty((len(lvls), moments), dtype=object)
-
     def _levels_added(self):
         prev = len(self.M)
         s = len(self.lvls)
         if s == prev:
-            return
+            return  # Levels were not really added
         if self.psums_delta is not None:
             self.psums_delta.resize((s, ) + self.psums_delta.shape[1:], refcheck=False)
         if self.psums_fine is not None:
             self.psums_fine.resize((s, ) + self.psums_fine.shape[1:], refcheck=False)
 
+        self.Vl_estimate.resize(s, refcheck=False)
+        self.Wl_estimate.resize(s, refcheck=False)
         self.t.resize(s, refcheck=False)
         self.M.resize(s, refcheck=False)
         return prev
 
+    def calcTotalWork(self):
+        return np.sum(self.Wl_estimate * self.M, axis=0)
 
-class MyDefaultDict(object):
+    def totalErrorEst(self):
+        return self.bias + (self.stat_error if not np.isnan(self.stat_error) else 0)
+
+    def zero_samples(self, ind=None):
+        if ind is None:
+            self.M = np.zeros_like(self.M)
+            self.t = np.zeros_like(self.t)
+            if self.psums_delta is not None:
+                self.psums_delta = np.zeros_like(self.psums_delta)
+            if self.psums_fine is not None:
+                self.psums_fine = np.zeros_like(self.psums_fine)
+        else:
+            self.M[ind] = 0
+            self.t[ind] = 0
+            if self.psums_delta is not None:
+                self.psums_delta[ind, :] = np.zeros_like(self.psums_delta[ind, :])
+            if self.psums_fine is not None:
+                self.psums_fine[ind, :] = np.zeros_like(self.psums_fine[ind, :])
+
+class Bunch(object):
     def __init__(self, **kwargs):
         self.__dict__ = dict([i for i in kwargs.items() if i[1] is not None])
 
@@ -264,45 +284,66 @@ class MIMCRun(object):
     Object for a Multi-Index Monte Carlo run.
 
     Data levels, moment estimators, sample sizes etc. are
-    stored in the *.data attribute that is of the MIMCData type
+    stored in the *.data attribute that is of the MIMCItrData type
 
     """
 
-    def __init__(self, old_data=None, **kwargs):
-        self.fn = MyDefaultDict(# Hierarchy=None, ExtendLvls=None,
-                                # WorkModel=None, SampleLvl=None,
-                                # ItrDone=None,
-                                Norm=np.abs)
-        self.params = MyDefaultDict(**kwargs)
-        self.Vl_estimate = None
-        self.Wl_estimate = None
-        self.bias = np.inf           # Approximation of the discretization error
-        self.stat_error = np.inf     # Sampling error (based on M)
-        if old_data is not None:
-            self.all_data = self.data = old_data
-        else:
-            self.all_data = self.data = MIMCData(min_dim=self.params.min_dim,
-                                                 moments=self.params.moments)
-            if not self.params.reuse_samples:
-                self.all_data = MIMCData(lvls=self.data.lvls,
-                                         min_dim=self.params.min_dim,
-                                         moments=self.params.moments)
-
+    def __init__(self, **kwargs):
+        self.fn = Bunch(# Hierarchy=None, ExtendLvls=None,
+                        # WorkModel=None, SampleLvl=None,
+                        # ItrDone=None,
+                        Norm=np.abs)
+        self.params = Bunch(**kwargs)
+        self.iters = []
         dims = np.array([len(getattr(self.params, a))
                 for a in ["w", "s", "gamma", "beta"] if hasattr(self.params, a)])
         if len(dims) > 0 and np.any(dims != dims[0]):
             raise ValueError("Size of beta, w, s and gamma must be of size dim")
 
-        if self.params.bayesian:
-            self.Q = MyDefaultDict(S=np.inf, W=np.inf,
-                                   w=self.params.w, s=self.params.s,
-                                   theta=np.nan)
-        else:
-            self.Q = MyDefaultDict(theta=np.nan)
+        # if self.params.bayesian:
+        #     self.Q = Bunch(S=np.inf, W=np.inf,
+        #                    w=self.params.w, s=self.params.s,
+        #                    theta=np.nan)
+        # else:
+        #     self.Q = Bunch(theta=np.nan)
+
+    @property
+    def last_itr(self):
+        return self.iters[-1] if len(self.iters) > 0 else None
+
+    @property
+    def all_itr(self):
+        return self.last_itr if self.params.reuse_samples else self._all_itr
+
+    @property
+    def Vl_estimate(self):
+        return self.last_itr.Vl_estimate
+
+    @property
+    def Q(self):
+        return self.last_itr.Q
+
+    @property
+    def Wl_estimate(self):
+        return self.last_itr.Wl_estimate
+
+    @property
+    def bias(self):
+        return self.last_itr.bias
+
+    @property
+    def stat_error(self):
+        return self.last_itr.stat_error
+
+    def calcEg(self):
+        return self.last_itr.calcEg()
+
+    def totalErrorEst(self):
+        return self.last_itr.totalErrorEst()
 
     def _checkFunctions(self):
         # If self.params.reuse_samples is True then
-        # all_data will always equal data
+        # all_itr will always equal last_itr
         if not hasattr(self.fn, "WorkModel") and hasattr(self.params, "gamma"):
             self.fn.WorkModel = lambda lvls: work_estimate(lvls,
                                                           np.log(self.params.beta) *
@@ -459,31 +500,25 @@ for tolerance smaller than TOL. Not needed if TOLs is provided to doRun.")
 Not needed if fnHierarchy is provided.")
         return mimcgrp
 
-    def calcTotalWork(self):
-        return np.sum(self.Wl_estimate * self.data.M, axis=0)
-
-    def totalErrorEst(self):
-        return self.bias + (self.stat_error if not np.isnan(self.stat_error) else 0)
-
     def __str__(self):
         output = "Time={:.12e}\nEg={}\n\
 Bias={:.12e}\nStatErr={:.12e}\
-\nTotalErrEst={:.12e}\n".format(self.data.calcTotalTime(),
-                                str(self.data.calcEg()),
+\nTotalErrEst={:.12e}\n".format(self.last_itr.calcTotalTime(),
+                                str(self.last_itr.calcEg()),
                                 self.bias,
                                 self.stat_error,
                                 self.totalErrorEst())
         V = self.Vl_estimate
-        Vl = self.fn.Norm(self.data.calcDeltaVl())
-        E = self.fn.Norm(self.data.calcDeltaEl())
-        T = self.data.calcTl()
+        Vl = self.fn.Norm(self.last_itr.calcDeltaVl())
+        E = self.fn.Norm(self.last_itr.calcDeltaEl())
+        T = self.last_itr.calcTl()
 
         output += ("{:<8}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
             "Level", "E", "V", "sampleV", "M", "Time"))
-        for i in range(0, len(self.data.lvls)):
+        for i in range(0, len(self.last_itr.lvls)):
             #,100 * np.sqrt(V[i]) / np.abs(E[i])
             output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
-                str(self.data.lvls[i]), E[i], V[i], Vl[i], self.data.M[i], T[i]))
+                str(self.last_itr.lvls[i]), E[i], V[i], Vl[i], self.last_itr.M[i], T[i]))
         return output
 
     def fnNorm1(self, x):
@@ -493,19 +528,27 @@ Bias={:.12e}\nStatErr={:.12e}\
 
     def _estimateBias(self):
         if not self.params.bayesian:
-            return self.data.lvls.estimate_bias(self.fn.Norm(self.data.calcDeltaEl()))
-
-            # if np.sum(bnd) == len(self.data.lvls):
+            return self.last_itr.lvls.estimate_bias(self.fn.Norm(self.last_itr.calcDeltaEl()))
+            # if np.sum(bnd) == len(self.last_itr.lvls):
             #     return np.inf
-            # bnd_val = self.data[bnd].calcDeltaEl()
+            # bnd_val = self.last_itr[bnd].calcDeltaEl()
             # if self.params.abs_bnd:
             #     return np.sum(self.fn.Norm(bnd_val))
             # return self.fnNorm1(np.sum(bnd_val))
         return self._estimateBayesianBias()
 
+    def estimateMonteCarloSampleCount(self, TOL):
+        theta = self._calcTheta(TOL, self.bias)
+        V = self.Vl_estimate[self.last_itr.lvls.find([])]
+        if np.isnan(V):
+            return np.nan
+        Ca = norm.ppf(self.params.confidence)
+        return np.maximum(np.reshape(self.params.M0, (1,))[-1],
+                          int(np.ceil((theta * TOL / Ca)**-2 * V)))
+
     ################## Bayesian specific functions
     def _estimateBayesianBias(self, L=None):
-        L = L or len(self.all_data.lvls)-1
+        L = L or len(self.all_itr.lvls)-1
         if L <= 1:
             raise Exception("Must have at least 2 levels")
         return self.Q.W * self._get_hl(L)[-1]**self.Q.w[0]
@@ -515,56 +558,52 @@ Bias={:.12e}\nStatErr={:.12e}\
         return  self.fn.Hierarchy(lvls=lvls).reshape(1, -1)[0]
 
     def _estimateBayesianVl(self, L=None):
-        if np.sum(self.all_data.M, axis=0) == 0:
-            return self.fn.Norm(self.all_data.calcDeltaVl())
-        oL = len(self.all_data.lvls)-1
+        if np.sum(self.all_itr.M, axis=0) == 0:
+            return self.fn.Norm(self.all_itr.calcDeltaVl())
+        oL = len(self.all_itr.lvls)-1
         L = L or oL
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        included = np.nonzero(np.logical_and(self.all_data.M > 0,
+        included = np.nonzero(np.logical_and(self.all_itr.M > 0,
                                              np.arange(0,
-                                                       len(self.all_data.lvls))
+                                                       len(self.all_itr.lvls))
                                              >= 1))[0]
         hl = self._get_hl(L)
-        M = self.all_data.M[included]
-        s1 = self.all_data.psums_delta[included, 0]
-        m1 = self.all_data[included].calcDeltaEl()
-        s2 = self.all_data.psums_delta[included, 1]
+        M = self.all_itr.M[included]
+        s1 = self.all_itr.psums_delta[included, 0]
+        m1 = self.all_itr.calcDeltaEl()[included]
+        s2 = self.all_itr.psums_delta[included, 1]
         mu = self.Q.W*(hl[included-1]**self.Q.w[0] - hl[included]**self.Q.w[0])
 
         Lambda = 1./(self.Q.S*(hl[:-1]**(self.Q.s[0]/2.) -
                                hl[1:]**(self.Q.s[0]/2.))**2)
 
-        tmpM = np.concatenate((self.all_data.M[1:], np.zeros(L-oL)))
+        tmpM = np.concatenate((self.all_itr.M[1:], np.zeros(L-oL)))
         G_3 = self.params.bayes_k1 * Lambda + tmpM/2.0
         G_4 = self.params.bayes_k1*np.ones(L+1)
         G_4[included] += 0.5*(self.fn.Norm(s2 - s1*m1*2 + s1*m1) + \
                               M*self.params.bayes_k0*(
                                   self.fn.Norm(m1)-mu)**2/
                               (self.params.bayes_k0+M) )
-
-        Vl_estimate = np.concatenate((
-            self.fn.Norm(self.all_data[0].calcDeltaVl()),G_4[1:] / G_3))
-        # Vl_sample = self.all_data.calcDeltaVl()
-        # Vl_estimate[:len(Vl_sample)] = Vl_sample
-        return Vl_estimate
+        return np.concatenate((
+            self.fn.Norm(self.all_itr.calcDeltaVl()[0:1]),G_4[1:] / G_3))
 
     def _estimateQParams(self):
         if not self.params.bayesian:
             return
-        if np.sum(self.all_data.M, axis=0) == 0:
+        if np.sum(self.all_itr.M, axis=0) == 0:
             return   # Cannot really estimate anything without at least some samples
-        L = len(self.all_data.lvls)-1
+        L = len(self.all_itr.lvls)-1
         if L <= 1:
             raise Exception("Must have at least 2 levels")
         hl = self._get_hl(L)
         included = np.nonzero(\
-                np.logical_and(self.all_data.M > 0,
-                               np.arange(0, len(self.all_data.lvls))
+                np.logical_and(self.all_itr.M > 0,
+                               np.arange(0, len(self.all_itr.lvls))
                                >= np.maximum(1, L-self.params.bayes_fit_lvls)))[0]
-        M = self.all_data[included].M
-        s1 = self.all_data.psums_delta[included, 0]
-        s2 = self.all_data.psums_delta[included, 1]
+        M = self.all_itr.M[included]
+        s1 = self.all_itr.psums_delta[included, 0]
+        s2 = self.all_itr.psums_delta[included, 1]
         t1 = hl[included-1]**self.Q.w[0] - hl[included]**self.Q.w[0]
         t2 = (hl[included-1]**(self.Q.s[0]/2.) - hl[included]**(self.Q.s[0]/2.))**-2
 
@@ -582,10 +621,10 @@ Bias={:.12e}\nStatErr={:.12e}\
     def _estimateOptimalL(self, TOL):
         assert self.params.bayesian, "MIMC should be Bayesian to \
 estimate optimal number of levels"
-        minL = len(self.data)
+        minL = len(self.last_itr.lvls)
         minWork = np.inf
-        LsRange = range(len(self.data.lvls),
-                        len(self.data.lvls)+1+self.params.incL)
+        LsRange = range(len(self.last_itr.lvls),
+                        len(self.last_itr.lvls)+1+self.params.incL)
         for L in LsRange:
             bias_est = self._estimateBayesianBias(L)
             if bias_est >= TOL and L < LsRange[-1]:
@@ -604,40 +643,39 @@ estimate optimal number of levels"
     ################## END: Bayesian specific function
     def _estimateAll(self):
         self._estimateQParams()
-        self.Vl_estimate = self.fn.Norm(self.all_data.calcDeltaVl()) \
-                           if not self.params.bayesian \
-                           else self._estimateBayesianVl()
-        self.Wl_estimate = self.fn.WorkModel(lvls=self.data.lvls)
-        self.bias = self._estimateBias()
-        from scipy.stats import norm
+        self.iters[-1].Vl_estimate = self.fn.Norm(self.all_itr.calcDeltaVl()) \
+                                     if not self.params.bayesian \
+                                        else self._estimateBayesianVl()
+        self.iters[-1].Wl_estimate = self.fn.WorkModel(lvls=self.last_itr.lvls)
+        self.iters[-1].bias = self._estimateBias()
         Ca = norm.ppf(self.params.confidence)
-        self.stat_error = np.inf if np.any(self.data.M == 0) \
-                          else Ca * \
-                               np.sqrt(np.sum(self.Vl_estimate / self.data.M))
+        self.iters[-1].stat_error = np.inf if np.any(self.last_itr.M == 0) \
+                                    else Ca * \
+                                         np.sqrt(np.sum(self.Vl_estimate / self.last_itr.M))
 
     def _extendLevels(self, new_lvls=None):
-        prev = len(self.data.lvls)
+        prev = len(self.last_itr.lvls)
         if new_lvls is not None:
-            self.data.lvls.add_from_list(new_lvls)
+            self.last_itr.lvls.add_from_list(new_lvls)
         else:
-            self.fn.ExtendLvls(lvls=self.data.lvls)
-        assert(prev != len(self.data.lvls))
+            self.fn.ExtendLvls(lvls=self.last_itr.lvls)
+        assert(prev != len(self.last_itr.lvls))
 
-        self.data._levels_added()
-        self.all_data._levels_added()
+        self.last_itr._levels_added()
+        self.all_itr._levels_added()
         newTodoM = self.params.M0
-        if len(newTodoM) < len(self.data.lvls):
+        if len(newTodoM) < len(self.last_itr.lvls):
             newTodoM = np.pad(newTodoM,
-                              (0,len(self.data.lvls)-len(newTodoM)), 'constant',
+                              (0,len(self.last_itr.lvls)-len(newTodoM)), 'constant',
                               constant_values=newTodoM[-1])
-        return np.concatenate((self.data.M[:prev], newTodoM[prev:len(self.data.lvls)]))
+        return np.concatenate((self.last_itr.M[:prev], newTodoM[prev:len(self.last_itr.lvls)]))
 
     def SampleLvl(self, mods, inds, M):
         # fnSampleLvl(inds, M) -> Returns a matrix of size (M, len(ind)) and
         # the time estimate
         calcM = 0
         total_time = 0
-        p = np.arange(1, self.data.computedMoments()+1)
+        p = np.arange(1, self.last_itr.computedMoments()+1)
         psums_delta = _empty_obj()
         psums_fine = _empty_obj()
         while calcM < M:
@@ -658,11 +696,11 @@ estimate optimal number of levels"
         return calcM, psums_delta, psums_fine, total_time
 
     def _genSamples(self, totalM, verbose):
-        lvls = self.data.lvls
+        lvls = self.last_itr.lvls
         s = len(lvls)
         t = np.zeros(s)
-        active = totalM >= self.data.M
-        totalM[active] -= self.data.M[active]
+        active = totalM >= self.last_itr.M
+        totalM[active] -= self.last_itr.M[active]
         if np.sum(totalM) == 0:
             return False
         for i in range(0, s):
@@ -673,9 +711,9 @@ estimate optimal number of levels"
             mods, inds = expand_delta(lvls[i])
             args = self.SampleLvl(mods, inds, totalM[i])
 
-            self.data.addSamples(i, *args)
-            if self.all_data != self.data:
-                self.all_data.addSamples(i, *args)
+            self.last_itr.addSamples(i, *args)
+            if self.last_itr != self.all_itr:
+                self.all_itr.addSamples(i, *args)
         self._estimateAll()
         return True
 
@@ -685,7 +723,6 @@ estimate optimal number of levels"
         return self.params.theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
-        from scipy.stats import norm
         Ca = norm.ppf(self.params.confidence)
         M = (theta * TOL / Ca)**-2 *\
             np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
@@ -695,18 +732,8 @@ estimate optimal number of levels"
             M = np.ceil(M).astype(np.int)
         return M
 
-    def estimateMonteCarloSampleCount(self, TOL):
-        theta = self._calcTheta(TOL, self.bias)
-        V = self.Vl_estimate[self.data.lvls.find([])]
-        if np.isnan(V):
-            return np.nan
-        from scipy.stats import norm
-        Ca = norm.ppf(self.params.confidence)
-
-        return np.maximum(np.reshape(self.params.M0, (1,))[-1],
-                          int(np.ceil((theta * TOL / Ca)**-2 * V)))
-
     def doRun(self, finalTOL=None, TOLs=None, verbose=None):
+        tic_run = time.time()
         self._checkFunctions()
         finalTOL = finalTOL or self.params.TOL
         if TOLs is None:
@@ -720,32 +747,46 @@ estimate optimal number of levels"
         if not all(x >= y for x, y in zip(TOLs, TOLs[1:])):
             raise Exception("Tolerances must be decreasing")
 
-        import time
         tic = time.time()
-        self.Q.theta = self.params.theta
-        self.bias = np.inf
-        self.stat_error = np.inf
-        import gc
         def less(a, b, rel_tol=1e-09, abs_tol=0.0):
             return a-b <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
 
         itrIndex = 0
         for TOL in TOLs:
-            samples_added = False
             if verbose:
                 print("# TOL", TOL)
             while True:
+                # Skip adding an iteration if the previous one is empty
+                tic = time.time()
+                if len(self.iters) == 0:
+                    self.iters.append(MIMCItrData(min_dim=self.params.min_dim,
+                                                  moments=self.params.moments))
+                    if self.params.bayesian:
+                        self.last_itr.Q = Bunch(S=np.inf, W=np.inf,
+                                                w=self.params.w,
+                                                s=self.params.s,
+                                                theta=self.params.theta)
+                    else:
+                        self.last_itr.Q = Bunch(theta=self.params.theta)
+                    if not self.params.reuse_samples:
+                        self._all_itr = self.last_itr.copy()
+                else:
+                    self.iters.append(self.last_itr.copy())
+
+                self.all_itr.lvls = self.last_itr.lvls
+                self.last_itr.TOL = TOL
+                samples_added = False
                 gc.collect()
-                if self.params.bayesian and len(self.data.lvls) > 0:
+                if self.params.bayesian and len(self.last_itr.lvls) > 0:
                     L = self._estimateOptimalL(TOL)
-                    if L > len(self.data.lvls):
+                    if L > len(self.last_itr.lvls):
                         self._extendLevels(new_lvls=np.arange(
-                            len(self.data.lvls), L+1).reshape((-1, 1)))
+                            len(self.last_itr.lvls), L+1).reshape((-1, 1)))
                         self._estimateAll()
 
                 self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
                                           self.params.theta)
-                if len(self.data.lvls) == 0 or \
+                if len(self.last_itr.lvls) == 0 or \
                    (not self.params.bayesian and
                     self.bias > (1 - self.params.theta) * TOL):
                     # Bias is not satisfied (or this is the first iteration)
@@ -762,23 +803,29 @@ estimate optimal number of levels"
                     print("# theta", self.Q.theta)
                     print("# New M: ", todoM)
                 if not self.params.reuse_samples:
-                    self.data.zero_samples()
+                    self.last_itr.zero_samples()
+
                 samples_added = self._genSamples(todoM, verbose) or samples_added
+                self.last_itr.totalTime = time.time() - tic
                 if verbose:
                     print(self, end="")
                     print("------------------------------------------------")
-                if self.fn.ItrDone is not None and samples_added:
-                    self.fn.ItrDone(iteration_idx=itrIndex,
-                                    TOL=TOL,
-                                    totalTime=time.time() - tic)
-                itrIndex += 1
-
+                if samples_added:
+                    if self.fn.ItrDone is not None:
+                        self.fn.ItrDone()
+                    if self.params.bayesian or self.totalErrorEst() < TOL:
+                        break
+                else:
+                    # remove last iteration since it is empty
+                    self.iters.pop()
 
             if verbose:
-                print("{} took {}".format(TOL, time.time()-tic))
+                print("MIMC iteration for TOL={} took {} seconds".format(TOL, time.time()-tic))
                 print("################################################")
             if less(TOL, finalTOL) and self.totalErrorEst() <= finalTOL:
                 break
+        if verbose:
+            print("MIMC run for TOL={} took {} seconds".format(finalTOL, time.time()-tic_run))
 
 @public
 def work_estimate(lvls, gamma):
