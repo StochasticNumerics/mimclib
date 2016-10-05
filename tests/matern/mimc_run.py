@@ -17,6 +17,9 @@ warnings.filterwarnings("error")
 warnings.filterwarnings("always", category=mimclib.test.ArgumentWarning)
 
 class MyRun:
+    def __init__(self):
+        self.stop_at = 6000
+
     def solveFor_seq(self, alpha, arrY):
         output = np.zeros(len(arrY))
         self.sf.BeginRuns(alpha, np.max([len(Y) for Y in arrY]))
@@ -24,6 +27,24 @@ class MyRun:
             output[i] = self.sf.SolveFor(np.array(Y))
         self.sf.EndRuns()
         return output
+
+
+    def testTime(self, M=1):
+        data = []
+        time = 0
+        for i in range(0, 10):
+            for m in range(0, M):
+                if i == 0:
+                    time += self.mySampleQoI(None, [[i]], 1)[1]
+                else:
+                    time += self.mySampleQoI(None, [[i-1], [i]], 1)[1]
+            time /= M
+            print("{}, {:.16},".format(i, time))
+            data.append([i, time])
+        data = np.array(data)
+        import matplotlib.pyplot as plt
+        plt.semilogy(data[:, 0], data[:, 1], '-o')
+        return data
 
     def mySampleQoI(self, run, inds, M):
         return self.misc.sample(inds, M, fnSample=self.solveFor_seq)
@@ -53,6 +74,7 @@ class MyRun:
 
         run.setFunctions(ExtendLvls=lambda lvls, r=run: self.extendLvls(run, lvls),
                          WorkModel=lambda lvls, r=run: self.workModel(run, lvls))
+
         return
 
 
@@ -82,6 +104,8 @@ class MyRun:
             lvls.add_from_list(new_lvls)
             return
 
+        import time
+        tStart = time.time()
         # estimate rates
         self.d_err_rates, \
             s_fit_rates = misc.estimate_misc_error_rates(d=run.params.min_dim,
@@ -101,11 +125,20 @@ class MyRun:
                                  np.min(s_fit_rates[valid]))
         s_err_rates[valid] = s_fit_rates[valid]  # The fitted rates should remain the same
 
+        tEnd_rates = time.time() - tStart
         ######### Update
+        tStart = time.time()
         self.profCalc = setutil.MISCProfCalculator(self.d_err_rates +
                                                    self.d_work_rates,
                                                    s_err_rates)
         mimc.extend_prof_lvls(lvls, self.profCalc, run.params.min_lvls)
+        if len(lvls) > self.stop_at:
+            print("Rates updated in {} seconds".format(tEnd_rates) )
+            print("New set, size {}, created in {} seconds".format(len(lvls), time.time()-tStart))
+            self.stop_at += 1000
+            from mimclib import ipdb
+            ipdb.embed()
+
 
     def addExtraArguments(self, parser):
         class store_as_array(argparse._StoreAction):

@@ -132,6 +132,18 @@ def initRun(run):
         raise Exception("qoi_type option is not recognized")
     return
 
+def testTime(run):
+    run._checkFunctions()
+    M = 1000
+    data = []
+    for i in range(0, 14):
+        time = mySampleQoI(run, [i], M)[1]/M
+        print("{}, {:.16},".format(i, time))
+        data.append([i, time])
+    data = np.array(data)
+    import matplotlib.pyplot as plt
+    plt.semilogy(data[:, 0], data[:, 1], '-o')
+    return data
 
 if __name__ == "__main__":
     import mimclib.test

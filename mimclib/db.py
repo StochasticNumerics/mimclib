@@ -5,6 +5,8 @@ from __future__ import print_function
 import numpy as np
 import cPickle
 from . import setutil
+from . import ipdb
+
 import hashlib
 __all__ = []
 
@@ -110,7 +112,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     El            REAL,
     Vl            REAL,
     Wl            REAL,
-    Tl            REAL,
+    tT            REAL,
     Ml            INTEGER,
     psums_delta   mediumblob,
     psums_fine    mediumblob,
@@ -119,7 +121,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
 );
 
 CREATE VIEW vw_lvls AS SELECT iter_id, lvl,
-El, Vl, Wl, Tl, Ml FROM tbl_lvls;
+El, Vl, Wl, tT, Ml FROM tbl_lvls;
 
 -- CREATE USER 'USER'@'%';
 -- GRANT ALL PRIVILEGES ON *.* TO 'USER'@'%' WITH GRANT OPTION;
@@ -205,7 +207,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     El            REAL,
     Vl            REAL,
     Wl            REAL,
-    Tl            REAL,
+    tT            REAL,
     Ml            INTEGER,
     psums_delta   mediumblob,
     psums_fine    mediumblob,
@@ -213,7 +215,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     CONSTRAINT idx_run_lvl UNIQUE (iter_id, lvl_hash)
 );
 
-CREATE VIEW vw_lvls AS SELECT iter_id, lvl, El, Vl, Wl, Tl, Ml FROM tbl_lvls;
+CREATE VIEW vw_lvls AS SELECT iter_id, lvl, El, Vl, Wl, tT, Ml FROM tbl_lvls;
 '''
         return script
 
@@ -269,14 +271,14 @@ class MIMCDatabase(object):
         iteration = mimc_run.iters[iteration_idx]
         El = mimc_run.fn.Norm(iteration.calcDeltaEl())
         Vl = iteration.Vl_estimate
-        Tl = iteration.calcTl()
+        tT = iteration.tT
         Wl = iteration.Wl_estimate
         Ml = iteration.M
 
         prev_iter = mimc_run.iters[iteration_idx-1] if iteration_idx >= 1 else None
         if prev_iter is not None:
             prev_Vl = iteration.Vl_estimate
-            prev_Tl = iteration.calcTl()
+            prev_tT = iteration.tT
             prev_Wl = iteration.Wl_estimate
             prev_Ml = iteration.M
 
@@ -293,24 +295,21 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?)''',
 
             # Only add levels that are different from the
             #       previous iteration
-            for k in range(0, len(iteration.lvls)):
-                lvl_data = _nan2none([El[k], Vl[k], Wl[k], Tl[k], Ml[k]])
+            for k in range(0, iteration.lvls_count):
+                lvl_data = _nan2none([El[k], Vl[k], Wl[k], tT[k], Ml[k]])
                 if prev_iter is not None:
-                    j = prev_iter.lvls.find(iteration.lvls[k])
-                    if j is not None:
-                        assert(j == k)
-
-                        if np.all(prev_iter.psums_delta[j, :] == iteration.psums_delta[k, :]) and \
-                           np.all(prev_iter.psums_fine[j, :] == iteration.psums_fine[k, :]) and \
+                    if k < prev_iter.lvls_count:
+                        if np.all(prev_iter.psums_delta[k, :] == iteration.psums_delta[k, :]) and \
+                           np.all(prev_iter.psums_fine[k, :] == iteration.psums_fine[k, :]) and \
                            np.all(np.array(lvl_data[1:]) ==
-                                  _nan2none([prev_Vl[j],
-                                             prev_Wl[j], prev_Tl[j], prev_Ml[j]])):
+                                  _nan2none([prev_Vl[k],
+                                             prev_Wl[k], prev_tT[k], prev_Ml[k]])):
                             continue         # Index is repeated as is in this iteration
 
                 lvl = ",".join(["%d|%d" % (i, j) for i, j in
                                 enumerate(iteration.lvls[k]) if j > base])
                 cur.execute('''
-INSERT INTO tbl_lvls(lvl, lvl_hash, psums_delta, psums_fine, iter_id,  El, Vl, Wl, Tl, Ml)
+INSERT INTO tbl_lvls(lvl, lvl_hash, psums_delta, psums_fine, iter_id,  El, Vl, Wl, tT, Ml)
 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                             [lvl, _md5(lvl),
                              _pickle(iteration.psums_delta[k, :]),
@@ -339,7 +338,7 @@ ORDER BY dr.run_id, dr.iteration_idx
 
             lvlsAll = cur.execute('''
             SELECT dr.iter_id, l.lvl, l.psums_delta, l.psums_fine, l.Ml,
-                     l.Tl, l.Wl, l.Vl
+                     l.tT, l.Wl, l.Vl
             FROM
             tbl_lvls l INNER JOIN tbl_iters dr ON
             dr.iter_id=l.iter_id INNER JOIN tbl_runs r on r.run_id=dr.run_id
@@ -361,25 +360,8 @@ ORDER BY dr.run_id, dr.iteration_idx
         for iter_id, itr in itertools.groupby(lvlsAll, key=lambda x:x[0]):
             dictLvls[iter_id] = list(itr)
 
-            # psums_delta, psums_fine, lvls, Ml, Tl, Wl, Vl = [], [], [], [], [], [], []
-            # lvls_data = []
-            # lvls_j = []
-            # for r in itr:
-            #     t = np.array(map(int, [p for p in re.split(",|\|", r[1]) if p]),
-            #                  dtype=setutil.ind_t)
-            #     lvls_data.append(t[1::2])
-            #     lvls_j.append(t[::2])
-            #     psums_delta.append(_unpickle(r[2]))
-            #     psums_fine.append(_unpickle(r[3]))
-            #     Ml.append(_none2nan(r[4]))
-            #     Tl.append(_none2nan(r[5]))
-            #     Wl.append(_none2nan(r[6]))
-            #     Vl.append(_none2nan(r[7]))
-            # lvls = setutil.VarSizeList()
-            # lvls.add_from_list(j=lvls_j, inds=lvls_data)
-            # dictLvls[iter_id] = [psums_delta, psums_fine, lvls, Ml, Tl, Wl, Vl]
-
-        for run_id, iter_iterator in itertools.groupby(iterAll, key=lambda x: x[0]):
+        for run_id, iter_iterator in itertools.groupby(iterAll,
+                                                       key=lambda x: x[0]):
             run_params = dictRuns[run_id]
             run = mimc.MIMCRun(**run_params["params"].getDict())
             run.db_data = mimc.Bunch()
@@ -395,7 +377,7 @@ ORDER BY dr.run_id, dr.iteration_idx
                 iter_id = data[1]
                 assert(i == data[9])  # Should be the same as the iteration index
                 if run.last_itr is not None:
-                    iteration = run.last_itr.copy()
+                    iteration = run.last_itr.next_itr()
                 else:
                     iteration = mimc.MIMCItrData(min_dim=run.params.min_dim,
                                                  moments=run.params.moments)
@@ -414,19 +396,16 @@ ORDER BY dr.run_id, dr.iteration_idx
                     k = iteration.lvls.find(ind=t[1::2], j=t[::2])
                     if k is None:
                         iteration.lvls.add_from_list(inds=[t[1::2]], j=[t[::2]])
-                        k = len(iteration.lvls)-1
                         iteration._levels_added()
-
+                        k = iteration.lvls_count-1
                     iteration.zero_samples(k)
                     iteration.addSamples(k, M=_none2nan(l[4]),
-                                         t=_none2nan(l[5]),
+                                         tT=_none2nan(l[5]),
                                          psums_delta=_unpickle(l[2]),
                                          psums_fine=_unpickle(l[3]))
                     iteration.Wl_estimate[k] = _none2nan(l[6])
                     iteration.Vl_estimate[k] = _none2nan(l[7])
-
                 run.iters.append(iteration)
-
         return lstruns
 
     def _fetchArray(self, query, params=None):

@@ -32,8 +32,8 @@ else:
 base += " ".join(unknowns)
 
 if not args.db:
-    cmd_single = "python " + base + " -mimc_verbose True -db False "
+    cmd_single = "python " + base + " -mimc_verbose 10 -db False "
     print(cmd_single.format(TOL=0.001))
 else:
-    cmd_multi = "python " + base + " -mimc_verbose False -db True -db_tag {tag} "
+    cmd_multi = "python " + base + " -mimc_verbose 0 -db True -db_tag {tag} "
     print cmd_multi.format(tag="misc_matern_d{}_nu{}".format(args.qoi_dim, args.qoi_df_nu), TOL=1e-10)

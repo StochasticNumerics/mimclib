@@ -65,9 +65,6 @@ __lib__.CalculateSetProfit.restype = None
 __lib__.CalculateSetProfit.argtypes = [ct.c_voidp, ct.c_voidp,
                                        __arr_double__, ct.c_uint32]
 
-__lib__.FreeMemory.restype = None
-__lib__.FreeMemory.argtypes = [ct.POINTER(ct.c_voidp)]
-
 __lib__.CreateMISCProfCalc.restype = ct.c_voidp
 __lib__.CreateMISCProfCalc.argtypes = [__ct_ind_t__, __ct_ind_t__,
                                        __arr_double__, __arr_double__]
@@ -196,12 +193,14 @@ __lib__.VarSizeList_check_errors.argtypes = [ct.c_voidp,
                                              __arr_bool__,
                                              ct.c_uint32]
 
+
 @public
 class VarSizeList(object):
     def __init__(self, inds=None, **kwargs):
         self.min_dim = kwargs.pop("min_dim", 0)
         _handle = kwargs.pop("_handle", None)
         self._handle = None
+
         if _handle is None:
             self._handle = __lib__.VarSizeList_copy(0)
             if inds is not None:
@@ -218,6 +217,7 @@ class VarSizeList(object):
     def __del__(self):
         if self._handle is not None:
             __lib__.FreeIndexSet(self._handle)
+            self._handle = None
 
     # def __inflate_ind(self, ind):
     #     if len(ind) >= self.min_dim:
@@ -430,7 +430,9 @@ class ProfCalculator(object):
 
     #     return indSet, profits
     def __del__(self):
-        __lib__.FreeProfitCalculator(self._handle)
+        if self._handle is not None:
+            __lib__.FreeProfitCalculator(self._handle)
+            self._handle = None
 
 
 class MISCProfCalculator(ProfCalculator):
