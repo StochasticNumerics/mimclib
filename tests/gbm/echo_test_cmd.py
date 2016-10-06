@@ -35,8 +35,7 @@ if __name__ == "__main__":
         cmd_multi = "python " + base + \
                     " -mimc_verbose 0 -db True -db_tag {tag} "
         #TOLs = 0.05*np.sqrt(2.)**-np.arange(0., 21.)
-        TOLs = [0.05*np.sqrt(2.)**-21]
-        for TOL in TOLs:
-            for i in range(0, args.tries):
-                print cmd_multi.format(tag=args.db_tag, TOL=TOL,
+        TOL = 0.05*np.sqrt(2.)**-18
+        for i in range(0, args.tries):
+            print cmd_multi.format(tag=args.db_tag, TOL=TOL,
                                        seed=np.random.randint(2**32-1))

@@ -18,6 +18,7 @@ from __future__ import print_function
 import warnings
 import os.path
 import numpy as np
+import time
 
 warnings.filterwarnings("error")
 
@@ -97,6 +98,7 @@ def mySampleQoI(run, inds, M):
     meshes = (run.params.qoi_T/run.fn.Hierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
 
+    tStart = time.time()
     if run.params.qoi_type == "real":
         solves = np.empty((M, len(inds)), dtype=float)
     elif run.params.qoi_type == "obj":
@@ -104,8 +106,6 @@ def mySampleQoI(run, inds, M):
     elif run.params.qoi_type == "arr":
         solves = np.empty((M, len(inds), 2), dtype=float)
 
-    import time
-    tStart = time.time()
     dW = np.random.normal(size=(M, maxN))/np.sqrt(maxN)
     for i, mesh in enumerate(meshes):
         assert(maxN % mesh == 0)
@@ -120,30 +120,18 @@ def mySampleQoI(run, inds, M):
             solves[:, i] = [CustomClass(d) for d in val]
         elif run.params.qoi_type == "arr":
             solves[:, i, 0] = val
-            solves[:, i, 1] = 2*val
+            solves[:, i, 1] = val
     return solves, time.time()-tStart
 
 def initRun(run):
     if run.params.qoi_type == "obj":
         run.setFunctions(fnNorm=lambda x: np.array([np.abs(xx.data) for xx in x]))
     elif run.params.qoi_type == "arr":
-        run.setFunctions(fnNorm=lambda x: np.array([np.max(np.abs(xx)) for xx in x]))
+        run.setFunctions(fnNorm=lambda x: np.max(np.abs(x), axis=1))
     elif run.params.qoi_type != "real":
         raise Exception("qoi_type option is not recognized")
     return
 
-def testTime(run):
-    run._checkFunctions()
-    M = 1000
-    data = []
-    for i in range(0, 14):
-        time = mySampleQoI(run, [i], M)[1]/M
-        print("{}, {:.16},".format(i, time))
-        data.append([i, time])
-    data = np.array(data)
-    import matplotlib.pyplot as plt
-    plt.semilogy(data[:, 0], data[:, 1], '-o')
-    return data
 
 if __name__ == "__main__":
     import mimclib.test

@@ -5,6 +5,7 @@ from __future__ import print_function
 import numpy as np
 import matplotlib.pylab as plt
 from . import mimc
+from . import ipdb
 from matplotlib.ticker import MaxNLocator
 
 __all__ = []
@@ -216,6 +217,12 @@ def enum_iter(runs, fnFilter):
             if fnFilter(r, i):
                 yield r, r.iters[i]
 
+def estimate_exact(runs):
+    minErr = np.min([r.totalErrorEst() for r in runs])
+    exact = np.mean([r.calcEg() for r in runs if
+                     r.totalErrorEst() == minErr], axis=0)
+    return exact
+
 @public
 def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     """Plots Errors vs TOL of @runs, as
@@ -236,13 +243,9 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
 
     fnNorm = kwargs.pop('fnNorm')
     num_kwargs = kwargs.pop('num_kwargs', None)
-    exact = kwargs.pop('exact', None)
+    exact = kwargs.pop('exact')
     relative_error = kwargs.pop('relative', True)
     filteritr = kwargs.pop("filteritr", filteritr_all)
-    if exact is None:
-        minErr = np.min([r.totalErrorEst() for r in runs])
-        exact = np.mean([r.calcEg() for r in runs if
-                         r.totalErrorEst() == minErr], axis=0)
 
     modifier = (1./fnNorm(np.array([exact]))[0]) if relative_error else 1.
     val = np.array([itr.calcEg() for _, itr in enum_iter(runs, filteritr)])
@@ -292,43 +295,138 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
 
     return xy[sel, :2], plotObj
 
+def computeIterationStats(runs, work_bins, xi, filteritr, fnNorm=None,
+                          exact=None, relative=False):
+    if xi == 'work':
+        xi = 0
+        x_label = "Avg. work"
+    elif xi == 'time':
+        xi = 1
+        x_label = "Avg. running time"
+    elif xi == 'tol':
+        xi = 2
+        x_label = "Avg. tolerance"
+    else:              raise ValueError('x_axis')
+
+    if exact is None:
+        modifier = 1
+    else:
+        modifier = (1./fnNorm(np.array([exact]))[0]) if relative else 1.
+    val = np.array([itr.calcEg() for _, itr in enum_iter(runs, filteritr)])
+
+    mymax = lambda A: [np.max(A[:, i]) for i in xrange(0, A.shape[1])]
+    xy = []
+    val = []
+    prev = 0
+    for _, itr in enum_iter(runs, filteritr):
+        stats = mymax(np.array([[
+            1+np.max(j) if len(j) > 0 else 0,
+            np.max(data) if len(data) > 0 else 0,
+            len(data)] for j, data in itr.lvls_sparse_itr(prev)]))
+
+        if len(xy) > 0:
+            stats = mymax(np.vstack((stats, xy[-1][5:])))
+        xy.append([itr.calcTotalWork(), itr.calcTotalTime(),
+                   itr.TOL, 0, modifier*itr.totalErrorEst()]+stats)
+        val.append(itr.calcEg())
+        prev = itr.lvls_count
+    xy = np.array(xy)
+    if exact is not None:
+        xy[:, 3] = modifier*fnNorm(val-exact)
+
+    lxy = np.log(xy[:, xi])
+    bins = np.digitize(lxy, np.linspace(np.min(lxy), np.max(lxy), work_bins))
+    bins[bins == work_bins] = work_bins-1
+    ubins = np.unique(bins)
+    xy_binned = np.zeros((len(ubins), 6))
+    for i, b in enumerate(ubins):
+        d = xy[bins==b, :]
+        xy_binned[i, 0] = np.mean(d[:, xi])  # Mean work
+        xy_binned[i, 1] = np.max(xy[bins==b, 3])  # Max exact error
+        xy_binned[i, 2] = np.min(xy[bins==b, 4])  # min error estimate
+
+        xy_binned[i, 3] = np.max(d[:, 5])  # Max dimension
+        xy_binned[i, 4] = np.max(d[:, 6])  # max level in all dim
+        xy_binned[i, 5] = np.max(d[:, 7])  # max active dim
+
+    xy_binned = xy_binned[xy_binned[:,0].argsort(), :]
+    return xy_binned
+
+@public
+def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
+    work_bins = kwargs.pop('work_bins', 50)
+    xi = kwargs.pop('x_axis', 'work').lower()
+    filteritr = kwargs.pop("filteritr", filteritr_all)
+
+    if xi == 'work':
+        x_label = "Avg. work"
+    elif xi == 'time':
+        x_label = "Avg. running time"
+    elif xi == 'tol':
+        x_label = "Avg. tolerance"
+    else:              raise ValueError('x_axis')
+
+    xy_binned = computeIterationStats(runs, xi=xi,
+                                      work_bins=work_bins,
+                                      filteritr=filteritr)
+
+    plotObj = []
+    ax.set_xlabel(x_label)
+    #ax.set_ylabel('??')
+    ax.set_xscale('log')
+
+    maxlvl_kwargs = kwargs.pop('maxlvl_kwargs', None)
+    active_kwargs = kwargs.pop('active_kwargs', None)
+
+    maxdim_args, maxdim_kwargs = __normalize_fmt(args, kwargs)
+    # Max dimensions
+    ax2 = ax.twinx()
+    ax2.set_yscale('log')
+    plotObj.append(ax2.plot(xy_binned[:, 0], xy_binned[:, 3],
+                            *maxdim_args, **maxdim_kwargs))
+
+    # Max level in all dimension
+    if maxlvl_kwargs is not None:
+        maxlvl_args, maxlvl_kwargs = __normalize_fmt((), maxlvl_kwargs)
+        plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 4],
+                               *maxlvl_args, **maxlvl_kwargs))
+
+    # Max active dim
+    if maxlvl_kwargs is not None:
+        active_args, active_kwargs = __normalize_fmt((), active_kwargs)
+        plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 5],
+                               *active_args, **active_kwargs))
+
+    return xy_binned[:, [0,3]], plotObj
+
 
 @public
 def plotWorkVsMaxError(ax, runs, *args, **kwargs):
     fnNorm = kwargs.pop('fnNorm')
-    exact = kwargs.pop('exact', None)
-    relative_error = kwargs.pop('relative', True)
+    exact = kwargs.pop('exact')
+    relative = kwargs.pop('relative', True)
     work_bins = kwargs.pop('work_bins', 50)
-    timeplot = kwargs.pop('time', False)
+    xi = kwargs.pop('x_axis', 'work').lower()
     filteritr = kwargs.pop("filteritr", filteritr_all)
-    if exact is None:
-        minErr = np.min([r.totalErrorEst() for r in runs])
-        exact = np.mean([r.calcEg() for r in runs if
-                         r.totalErrorEst() == minErr], axis=0)
 
-    modifier = (1./fnNorm(np.array([exact]))[0]) if relative_error else 1.
-    val = np.array([itr.calcEg() for _, itr in enum_iter(runs, filteritr)])
-    xy = np.array([[itr.calcTotalTime() if timeplot else itr.calcTotalWork(),
-                    0, itr.totalErrorEst(), itr.TOL] for \
-                   _, itr in enum_iter(runs, filteritr)])
-    xy[:, 1] = fnNorm(val-exact)
-    xy[:, 1:3] *= modifier
+    if xi == 'work':
+        x_label = "Avg. work"
+    elif xi == 'time':
+        x_label = "Avg. running time"
+    elif xi == 'tol':
+        x_label = "Avg. tolerance"
+    else:              raise ValueError('x_axis')
 
-    lxy = np.log(xy[:, 0])
-    bins = np.digitize(lxy, np.linspace(np.min(lxy), np.max(lxy), work_bins))
-    bins[bins == work_bins] = work_bins-1
-    ubins = np.unique(bins)
-    xy_binned = np.zeros((len(ubins), 3))
-    for i, b in enumerate(ubins):
-        xy_binned[i, 0] = np.mean(xy[bins==b, 0])  # Mean work
-        xy_binned[i, 1] = np.max(xy[bins==b, 1])  # Max exact error
-        xy_binned[i, 2] = np.min(xy[bins==b, 2])  # min error estimate
-
-    xy_binned = xy_binned[xy_binned[:,0].argsort(), :]
+    xy_binned = computeIterationStats(runs, xi=xi,
+                                      work_bins=work_bins,
+                                      fnNorm=fnNorm,
+                                      relative=relative,
+                                      filteritr=filteritr,
+                                      exact=exact)
     plotObj = []
 
-    ax.set_xlabel('Avg. running time' if timeplot else 'Avg. Work')
-    ax.set_ylabel('Max Relative Error' if relative_error else 'Max Error')
+    ax.set_xlabel(x_label)
+    ax.set_ylabel('Max Relative Error' if relative else 'Max Error')
     ax.set_yscale('log')
     ax.set_xscale('log')
 
@@ -365,7 +463,7 @@ def __calc_moments(runs, seed=None, direction=None, fnNorm=None):
         cur = seed
         inds = []
         while True:
-            ii = curRun.last_itr.lvls.find(cur)
+            ii = curRun.last_itr.lvls_find(cur)
             if ii is None:
                 break
             inds.append(ii)
@@ -460,13 +558,13 @@ def plotTotalWorkVsLvls(ax, runs, *args, **kwargs):
             cur = seed
             inds = []
             while True:
-                ii = curIter.lvls.find(cur)
+                ii = curIter.lvls_find(cur)
                 if ii is None:
                     break
                 inds.append(ii)
                 cur = cur + direction
             for j, ind in enumerate(inds):
-                data_tw.append([j, curIter.M[j] * curIter.Wl_estimate[j]])
+                data_tw.append([ind, curIter.M[ind] * curIter.Wl_estimate[ind]])
         lvls, total_work = __get_stats(data_tw)
         plotObj.append(ax.errorbar(lvls, total_work[:, 1],
                                    yerr=[total_work[:, 1]-total_work[:, 0],
@@ -476,13 +574,13 @@ def plotTotalWorkVsLvls(ax, runs, *args, **kwargs):
                                    **kwargs))
 
     # TODO: Gotta figure out what this plot is about!!
-    # if curRun.params.min_dim == 1 and hasattr(curRun.params, "s") and hasattr(curRun.params, "gamma"):
-    #     rate = np.array(curRun.params.gamma) - np.array(curRun.params.s)
-    #     if hasattr(curRun.params, "beta"):
-    #         rate *= np.log(curRun.params.beta)
-    #     ax.add_line(FunctionLine2D(lambda x, tol=TOL, r=rate: tol**-2 * np.exp(r*x),
-    #                                data=np.array([lvls, total_work[:, 1]]).transpose(),
-    #                                linestyle='--', c='k'))
+    if curRun.params.min_dim == 1 and hasattr(curRun.params, "s") and hasattr(curRun.params, "gamma"):
+        rate = np.array(curRun.params.gamma) - np.array(curRun.params.s)
+        if hasattr(curRun.params, "beta"):
+            rate *= np.log(curRun.params.beta)
+        ax.add_line(FunctionLine2D(lambda x, tol=TOL, r=rate: tol**-2 * np.exp(r*x),
+                                   data=np.array([lvls, total_work[:, 1]]).transpose(),
+                                   linestyle='--', c='k'))
     return plotObj
 
 
@@ -724,7 +822,7 @@ def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
     """
     filteritr = kwargs.pop("filteritr", filteritr_all)
     summary = np.array([[itr.TOL,
-                         np.max([np.sum(l) for l in itr.lvls])]
+                         np.max([np.sum(l) for l in itr.lvls_itr()])]
                         for _, itr in enum_iter(runs, filteritr)])
 
     ax.set_xscale('log')
@@ -760,7 +858,7 @@ def plotThetaRefVsTOL(ax, runs, eta, chi, *args, **kwargs):
     ax is in instance of matplotlib.axes
     """
     filteritr = kwargs.pop("filteritr", filteritr_all)
-    L = lambda itr: np.max([np.sum(l) for l in itr.lvls])
+    L = lambda itr: np.max([np.sum(l) for l in itr.lvls_itr()])
     if chi == 1:
         summary = np.array([[itr.TOL, (1. + (1./(2.*eta))*1./(L(itr)+1.))**-1]
                             for _, itr in enum_iter(runs, filteritr)])
@@ -789,7 +887,7 @@ def plotErrorsQQ(ax, runs, *args, **kwargs):
     """
     # Use TOL instead of finalTOL. The normality is proven w.r.t. to TOL of MLMC
     # not the finalTOL of MLMC (might be different sometimes)
-    filteritr = kwargs.pop("filteritr", filteritr_all)
+    filteritr = kwargs.pop("filteritr", filteritr_convergent)
 
     if "tol" not in kwargs:
         TOLs = [itr.TOL for _, itr in enum_iter(runs, filteritr)]
@@ -884,9 +982,11 @@ def __plot_except(ax):
 def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
     import matplotlib.pyplot as plt
 
+
     filteritr = kwargs.pop("filteritr", filteritr_convergent)
 
     TOLs_count = len(np.unique([itr.TOL for _, itr in enum_iter(runs, filteritr)]))
+    convergent_count = len(np.unique([itr.TOL for _, itr in enum_iter(runs, filteritr_convergent)]))
     iters_count = np.sum([len(r.iters) for r in runs])
     verbose = kwargs.pop('verbose', False)
     if verbose:
@@ -904,7 +1004,7 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
         params = next(r.params for r in runs if r.db_data.finalTOL == maxTOL)
         fn = next(r.fn for r in runs if r.db_data.finalTOL == maxTOL)
 
-    max_dim = np.max([np.max(r.last_itr.lvls.max_dim()) for r in runs])
+    max_dim = np.max([np.max(r.last_itr.lvls_max_dim()) for r in runs])
     any_bayesian = np.any([r.params.bayesian for r in runs])
 
     legend_outside = kwargs.pop("legend_outside", 5)
@@ -913,6 +1013,10 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
     has_w_rate = hasattr(params, 'w')
     has_s_rate = hasattr(params, 's')
     has_beta = hasattr(params, 'beta')
+
+    if exact is None:
+        exact = estimate_exact(runs)
+        print("Estimated exact value is {:.14f}".format(exact))
 
     import matplotlib as mpl
     mpl.rc('text', usetex=True)
@@ -942,18 +1046,31 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
         plotWorkVsMaxError(ax, runs, exact=exact, filteritr=filteritr,
                            relative=True, fnNorm=fn.Norm, fmt='-*',
                            ErrEst_kwargs={'fmt': '--*', 'label': 'Error Estimate'},
-                           Ref_kwargs={'ls': '--', 'c':'k', 'label': '{rate}'})
+                           Ref_kwargs={'ls': '--', 'c':'k', 'label': '{rate:.2g}'})
     except:
         __plot_except(ax)
 
-    if (iters_count > 1):
+    print_msg("plotWorkVsLvlStats")
+    ax = add_fig()
+    try:
+        plotWorkVsLvlStats(ax, runs, filteritr=filteritr,
+                           fmt='-ob', label='Max dim.',
+                           active_kwargs={'fmt': '-*g', 'label': 'Max active dim.'},
+                           maxlvl_kwargs={'fmt': '-sr', 'label': 'Max level'})
+    except:
+        __plot_except(ax)
+
+    if (convergent_count > 10):   # Need at least 10 plots for this plot to be significant
         print_msg("plotErrorsQQ")
         ax = add_fig()
         try:
-            plotErrorsQQ(ax, runs, filteritr=filteritr, fnNorm=fn.Norm,
+            # This plot only makes sense for convergent plots
+            plotErrorsQQ(ax, runs, filteritr=filteritr_convergent,
+                         fnNorm=fn.Norm,
                          Ref_kwargs={'ls': '--', 'c': 'k'})
         except:
             __plot_except(ax)
+
 
     if (TOLs_count > 1):
         print_msg("plotTimeVsTOL")
@@ -1076,15 +1193,15 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
         except:
             __plot_except(ax)
 
-    print_msg("plotTotalWorkVsLvls")
-    ax = add_fig()
-    try:
-        plotTotalWorkVsLvls(ax, runs,
-                            fmt='-o',  filteritr=filteritr,
-                            label_fmt="${:.2g}$",
-                            max_TOLs=5, max_dim=max_dim)
-    except:
-        __plot_except(ax)
+    # print_msg("plotTotalWorkVsLvls")
+    # ax = add_fig()
+    # try:
+    #     plotTotalWorkVsLvls(ax, runs,
+    #                         fmt='-o',  filteritr=filteritr,
+    #                         label_fmt="${:.2g}$",
+    #                         max_TOLs=5, max_dim=max_dim)
+    # except:
+    #     __plot_except(ax)
 
     if TOLs_count > 1:
         print_msg("plotLvlsNumVsTOL")
@@ -1122,7 +1239,8 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
         from matplotlib.backends.backend_pdf import PdfPages
         with PdfPages(fileName) as pdf:
             for fig in figures:
-                __add_legend(fig.gca(), outside=legend_outside)
+                for ax in fig.axes:
+                    __add_legend(ax, outside=legend_outside)
                 pdf.savefig(fig)
     return figures
 
@@ -1170,7 +1288,7 @@ def run_program():
         parser.add_argument("-all_itr", type='bool', action="store",
                             default=False)
         parser.add_argument("-done_flag", type=int, nargs='+',
-                            action="store", default=[1])
+                            action="store", default=None)
 
     parser = argparse.ArgumentParser(add_help=True)
     addExtraArguments(parser)

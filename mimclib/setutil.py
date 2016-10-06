@@ -111,7 +111,7 @@ __lib__.VarSizeList_max_dim.argtypes = [ct.c_voidp]
 
 __lib__.VarSizeList_get.restype = __ct_ind_t__
 __lib__.VarSizeList_get.argtypes = [ct.c_voidp, ct.c_uint32, __arr_ind_t__,
-                                    __ct_ind_t__]
+                                    __arr_ind_t__, __ct_ind_t__]
 
 __lib__.VarSizeList_count.restype = ct.c_uint32
 __lib__.VarSizeList_count.argtypes = [ct.c_voidp]
@@ -229,6 +229,7 @@ class VarSizeList(object):
         sel = np.array(sel).reshape((-1,))
         if sel.dtype == np.bool:
             sel = np.nonzero(sel)[0]
+        sel[sel < 0] = len(self) + sel[sel < 0]
         new = __lib__.VarSizeList_sublist(self._handle,
                                           np.array(sel, dtype=np.uint32),
                                           len(sel))
@@ -236,16 +237,41 @@ class VarSizeList(object):
 
     def __getitem__(self, i):
         item = np.empty(np.maximum(self.min_dim, self.get_dim(i)), dtype=ind_t)
-        __lib__.VarSizeList_get(self._handle, i, item, item.shape[0])
+        data = np.empty(self.get_active_dim(i), dtype=ind_t)
+        j    = np.empty(len(data), dtype=ind_t)
+        if i < 0:
+            i = len(self) + i
+        __lib__.VarSizeList_get(self._handle, i, data, j, len(data))
+        item.fill(__lib__.GetDefaultSetBase())
+        item[j] = data
         return item
 
     def __iter__(self):
+        return self.dense_itr()
+
+    def dense_itr(self, start=0, end=None):
+        if end is None:
+            end = len(self)
         dims = self.get_dim()
-        for i, dim in enumerate(dims):
+        active_dims = self.get_active_dim()
+        for i in xrange(start, end):
             item = np.empty(np.maximum(self.min_dim, dims[i]), dtype=ind_t)
-            __lib__.VarSizeList_get(self._handle, i, item, item.shape[0])
+            data = np.empty(active_dims[i], dtype=ind_t)
+            j    = np.empty(active_dims[i], dtype=ind_t)
+            __lib__.VarSizeList_get(self._handle, i, data, j, len(data))
+            item.fill(__lib__.GetDefaultSetBase())
+            item[j] = data
             yield item
 
+    def sparse_itr(self, start=0, end=None):
+        if end is None:
+            end = len(self)
+        dims = self.get_active_dim()
+        for i in xrange(start, end):
+            data = np.empty(dims[i], dtype=ind_t)
+            j    = np.empty(dims[i], dtype=ind_t)
+            __lib__.VarSizeList_get(self._handle, i, data, j, len(data))
+            yield j, data
 
     def __len__(self):
         return __lib__.VarSizeList_count(self._handle)

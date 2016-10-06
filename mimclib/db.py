@@ -120,8 +120,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     UNIQUE KEY idx_run_lvl (iter_id, lvl_hash)
 );
 
-CREATE VIEW vw_lvls AS SELECT iter_id, lvl,
-El, Vl, Wl, tT, Ml FROM tbl_lvls;
+CREATE VIEW vw_lvls AS SELECT iter_id, lvl, El, Vl, Wl, tT, Ml FROM tbl_lvls;
 
 -- CREATE USER 'USER'@'%';
 -- GRANT ALL PRIVILEGES ON *.* TO 'USER'@'%' WITH GRANT OPTION;
@@ -154,8 +153,24 @@ class SQLiteDBConn(object):
         self.conn.close()
 
     def execute(self, query, params=[]):
+        if len(params) > 0 and len(query.split(';')) > 1:
+            raise Exception("Multiple queries with parameters is unsupported")
+
+        # Expand lists in paramters
+        prev = -1
+        new_params = []
+        for p in params:
+            prev = query.find('?', prev+1)
+            if type(p) in [list, tuple]:
+                rep = "(" + ",".join("?"*len(p)) + ")"
+                query = query[:prev] + rep + query[prev+1:]
+                prev += len(rep)
+                new_params.extend(p)
+            else:
+                new_params.append(p)
+
         for q in query.split(';'):
-            self.cur.execute(q, tuple(params))
+            self.cur.execute(q, tuple(new_params))
         return self.cur
 
     def getLastRowID(self):
@@ -307,7 +322,7 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?)''',
                             continue         # Index is repeated as is in this iteration
 
                 lvl = ",".join(["%d|%d" % (i, j) for i, j in
-                                enumerate(iteration.lvls[k]) if j > base])
+                                enumerate(iteration.lvls_get(k)) if j > base])
                 cur.execute('''
 INSERT INTO tbl_lvls(lvl, lvl_hash, psums_delta, psums_fine, iter_id,  El, Vl, Wl, tT, Ml)
 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
@@ -393,10 +408,9 @@ ORDER BY dr.run_id, dr.iteration_idx
                 for l in dictLvls[iter_id]:
                     t = np.array(map(int, [p for p in re.split(",|\|", l[1]) if p]),
                                  dtype=setutil.ind_t)
-                    k = iteration.lvls.find(ind=t[1::2], j=t[::2])
+                    k = iteration.lvls_find(ind=t[1::2], j=t[::2])
                     if k is None:
-                        iteration.lvls.add_from_list(inds=[t[1::2]], j=[t[::2]])
-                        iteration._levels_added()
+                        iteration.lvls_add_from_list(inds=[t[1::2]], j=[t[::2]])
                         k = iteration.lvls_count-1
                     iteration.zero_samples(k)
                     iteration.addSamples(k, M=_none2nan(l[4]),

@@ -341,6 +341,9 @@ def estimate_misc_error_rates(d, lvls, errs,
     lvls = lvls.sublist(sel)
     errs = errs[sel]
 
+    if len(lvls) == 0:
+        return d_err_rates, None   # Nothing to fit
+
     mat = lvls.to_dense_matrix()
     mat[:, d:] = lev2knots(mat[:, d:]-1)
 

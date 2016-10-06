@@ -433,8 +433,10 @@ double VarSizeList::estimate_bias(const double *err_contributions,
                 if (!this->has_ind(cur) && this->is_ind_admissible(cur)) {
                     double prev = std::numeric_limits<double>::infinity();
                     auto itr = map_contrib.find(cur);
-                    if (itr != map_contrib.end()) prev = itr->second;
-                    map_contrib[cur] = std::min(prev, rates[i]*err_contributions[k]);
+                    if (itr != map_contrib.end()) prev = std::abs(itr->second);
+                    //map_contrib[cur] = std::min(prev, rates[i]*err_contributions[k]);
+                    if (prev > std::abs(rates[i]*err_contributions[k]))
+                        map_contrib[cur] = rates[i]*err_contributions[k];
                 }
                 cur.step(i, -1);
             }

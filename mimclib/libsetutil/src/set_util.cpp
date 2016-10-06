@@ -301,12 +301,16 @@ PVarSizeList VarSizeList_set_union(const PVarSizeList lhs, const PVarSizeList rh
 }
 
 
-ind_t VarSizeList_get(const PVarSizeList pset, uint32 i, ind_t* data, ind_t max_dim){
-    assert(i < pset->count());
-    auto cur = pset->get(i);
-    for (int i=0;i<max_dim;i++)
-        data[i] = cur[i];
-    return cur.size();
+ind_t VarSizeList_get(const PVarSizeList pset, uint32 i, ind_t* data,
+                      ind_t* j, ind_t size){
+    const mul_ind_t& cur = pset->get(i);
+    i=0;
+    assert(cur.active() <= size);
+    for (auto itr=cur.begin();itr!=cur.end();itr++, i++) {
+        data[i] = itr->value;
+        j[i] = itr->ind;
+    }
+    return cur.active();
 }
 
 uint32 VarSizeList_count(const PVarSizeList pset){

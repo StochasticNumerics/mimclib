@@ -36,4 +36,4 @@ if not args.db:
     print(cmd_single.format(TOL=0.001))
 else:
     cmd_multi = "python " + base + " -mimc_verbose 0 -db True -db_tag {tag} "
-    print cmd_multi.format(tag="misc_matern_d{}_nu{}".format(args.qoi_dim, args.qoi_df_nu), TOL=1e-10)
+    print cmd_multi.format(tag="misc_matern_d{:d}_nu{:.2g}".format(args.qoi_dim, args.qoi_df_nu), TOL=1e-10)

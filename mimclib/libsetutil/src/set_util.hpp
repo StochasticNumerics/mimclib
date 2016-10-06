@@ -64,7 +64,8 @@ extern "C"{
                     uint32 count);
 
     ind_t VarSizeList_max_dim(const PVarSizeList);
-    ind_t VarSizeList_get(const PVarSizeList, uint32 i, ind_t* data, ind_t max_dim);
+    ind_t VarSizeList_get(const PVarSizeList, uint32 i, ind_t* data,
+                          ind_t* j, ind_t size);
     ind_t VarSizeList_get_dim(const PVarSizeList, uint32 i);
     ind_t VarSizeList_get_active_dim(const PVarSizeList, uint32 i);
     void VarSizeList_count_neighbors(const PVarSizeList, ind_t *out_neighbors, uint32 count);

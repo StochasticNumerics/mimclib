@@ -17,9 +17,6 @@ warnings.filterwarnings("error")
 warnings.filterwarnings("always", category=mimclib.test.ArgumentWarning)
 
 class MyRun:
-    def __init__(self):
-        self.stop_at = 6000
-
     def solveFor_seq(self, alpha, arrY):
         output = np.zeros(len(arrY))
         self.sf.BeginRuns(alpha, np.max([len(Y) for Y in arrY]))
@@ -28,30 +25,10 @@ class MyRun:
         self.sf.EndRuns()
         return output
 
-
-    def testTime(self, M=1):
-        data = []
-        time = 0
-        for i in range(0, 10):
-            for m in range(0, M):
-                if i == 0:
-                    time += self.mySampleQoI(None, [[i]], 1)[1]
-                else:
-                    time += self.mySampleQoI(None, [[i-1], [i]], 1)[1]
-            time /= M
-            print("{}, {:.16},".format(i, time))
-            data.append([i, time])
-        data = np.array(data)
-        import matplotlib.pyplot as plt
-        plt.semilogy(data[:, 0], data[:, 1], '-o')
-        return data
-
     def mySampleQoI(self, run, inds, M):
         return self.misc.sample(inds, M, fnSample=self.solveFor_seq)
 
     def workModel(self, run, lvls):
-        # from mimclib import ipdb
-        # ipdb.embed()
         mat = lvls.to_dense_matrix()
         gamma = np.hstack((run.params.gamma, np.ones(mat.shape[1]-len(run.params.gamma))))
         beta = np.hstack((run.params.beta, 2*np.ones(mat.shape[1]-len(run.params.gamma))))
@@ -59,7 +36,11 @@ class MyRun:
 
     def initRun(self, run):
         self.prev_val = 0
-        self.extrapolate_s_dims = 10
+        self.extrapolate_s_dims = 0 if run.params.qoi_problem < 0 else 10
+
+        if run.params.qoi_problem < 0: # Fake mode for deterministic problem
+            run.params.qoi_problem = 0
+
         fnKnots= lambda beta: misc.knots_CC(misc.lev2knots_doubling(1+beta),
                                             -np.sqrt(3), np.sqrt(3))
         self.misc = misc.MISCSampler(d=run.params.min_dim, fnKnots=fnKnots)
@@ -114,16 +95,19 @@ class MyRun:
                                                          d_err_rates=self.d_err_rates,
                                                          lev2knots=lambda beta:misc.lev2knots_doubling(1+beta))
         #################### extrapolate error rates
-        valid = np.nonzero(s_fit_rates > 1e-15)[0]  # rates that are negative or close to zero are not accurate.
-        N = len(s_fit_rates) + self.extrapolate_s_dims
-        k_of_N = self.transNK(run.params.qoi_dim, N, run.params.qoi_problem)
-        K = np.max(k_of_N)
+        if s_fit_rates is not None:
+            valid = np.nonzero(s_fit_rates > 1e-15)[0]  # rates that are negative or close to zero are not accurate.
+            N = len(s_fit_rates) + self.extrapolate_s_dims
+            k_of_N = self.transNK(run.params.qoi_dim, N, run.params.qoi_problem)
+            K = np.max(k_of_N)
 
-        c = np.polyfit(np.log(1+k_of_N[valid]), s_fit_rates[valid], 1)
-        k_rates_stoch = c[0]*np.log(1+np.arange(0, K+1)) + c[1]
-        s_err_rates = np.maximum(k_rates_stoch[k_of_N[:N]],
-                                 np.min(s_fit_rates[valid]))
-        s_err_rates[valid] = s_fit_rates[valid]  # The fitted rates should remain the same
+            c = np.polyfit(np.log(1+k_of_N[valid]), s_fit_rates[valid], 1)
+            k_rates_stoch = c[0]*np.log(1+np.arange(0, K+1)) + c[1]
+            s_err_rates = np.maximum(k_rates_stoch[k_of_N[:N]],
+                                     np.min(s_fit_rates[valid]))
+            s_err_rates[valid] = s_fit_rates[valid]  # The fitted rates should remain the same
+        else:
+            s_err_rates = []
 
         tEnd_rates = time.time() - tStart
         ######### Update
@@ -132,13 +116,6 @@ class MyRun:
                                                    self.d_work_rates,
                                                    s_err_rates)
         mimc.extend_prof_lvls(lvls, self.profCalc, run.params.min_lvls)
-        if len(lvls) > self.stop_at:
-            print("Rates updated in {} seconds".format(tEnd_rates) )
-            print("New set, size {}, created in {} seconds".format(len(lvls), time.time()-tStart))
-            self.stop_at += 1000
-            from mimclib import ipdb
-            ipdb.embed()
-
 
     def addExtraArguments(self, parser):
         class store_as_array(argparse._StoreAction):

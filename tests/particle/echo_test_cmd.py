@@ -36,10 +36,8 @@ if __name__ == "__main__":
         print(cmd_single.format(seed=0, bayesian=False, TOL=0.001))
     else:
         cmd_multi = "python " + base + " -mimc_verbose 0 -db True -db_tag {tag} "
-        #TOLs = 0.05*np.sqrt(2.)**-np.arange(0., 21.)
-        TOLs = [0.05*np.sqrt(2.)**-21]
-        for TOL in TOLs:
-            for i in range(0, args.tries):
-                print cmd_multi.format(bayesian=False,
-                                       tag="particle_{}".format(dim), TOL=TOL,
-                                       seed=np.random.randint(2**32-1))
+        TOL = 0.05*np.sqrt(2.)**-21
+        for i in range(0, args.tries):
+            print cmd_multi.format(bayesian=False,
+                                   tag="particle_{}".format(dim), TOL=TOL,
+                                   seed=np.random.randint(2**32-1))
