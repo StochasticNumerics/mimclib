@@ -16,8 +16,16 @@ void legendre_quadrature(int *n, const double **points, const double **weights);
 void hermite_quadrature(int *n, const double **points, const double **weights);   // Over interval [-inf,inf] with pdf exp(-x^2)
 
 #pragma GCC visibility push(default)
+extern "C"{
 void myPetscInit(int argc, char *argv[]);
 void myPetscFinal();
+}
 #pragma GCC visibility pop
+
+
+typedef unsigned short ind_t;
+typedef unsigned int uint32;
+
+void GenTDSet(ind_t d, ind_t base, ind_t *td_set, uint32 count);
 
 #endif

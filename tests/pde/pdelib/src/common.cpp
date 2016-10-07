@@ -1,6 +1,5 @@
-
 #include "petsc.h"
-#include "common.h"
+#include "common.hpp"
 #include "assert.h"
 
 #define POLAR_FORM
@@ -181,5 +180,47 @@ void hermite_quadrature(int *n, const double **points, const double **weights)
         default:
                  printf("Unsupported number of quadrature points, %d\n", *n);
                  assert(0);
+    }
+}
+
+#include<vector>
+
+
+std::vector<ind_t> TDSet(ind_t d, uint32 count, unsigned int base){
+    assert(d>=1);
+    std::vector<ind_t> res;
+    if (!count) return res;
+    for (unsigned int k=0;k<d;k++){
+        res.push_back(base);
+    }
+    std::vector<int> branch_point_prev;
+    branch_point_prev.push_back(0);
+    unsigned int cur_count = 1;   // Already added base
+    unsigned int prev = 0;
+    while (cur_count < count){
+        std::vector<int> branch_point;
+        for (unsigned int il=0;il<branch_point_prev.size();il++){
+            for (unsigned int j=branch_point_prev[il];j<d;j++){
+                branch_point.push_back(j);
+                for (unsigned int k=0;k<d;k++){
+                    res.push_back(res[(il+prev)*d+k] + (k==j));
+                }
+                cur_count++;
+                if (cur_count >= count) break;
+            }
+            if (cur_count >= count) break;
+        }
+        prev += branch_point_prev.size();
+        branch_point_prev = branch_point;
+    }
+    return res;
+}
+
+void GenTDSet(ind_t d, ind_t base, ind_t *td_set, uint32 count){
+    std::vector<ind_t> ind_set = TDSet(d, count, base);
+    assert(ind_set.size()/d==count);
+    uint32 k=0;
+    for (std::vector<ind_t>::iterator itr=ind_set.begin();itr!=ind_set.end();itr++){
+        td_set[k++] = *itr;
     }
 }

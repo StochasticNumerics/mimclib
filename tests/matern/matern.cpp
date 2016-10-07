@@ -1,5 +1,5 @@
 #include "petsc.h"
-#include "common.h"
+#include "common.hpp"
 #include "assert.h"
 //////// This solver is based on Leveque book
 #define MAXD 10

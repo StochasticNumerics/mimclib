@@ -387,10 +387,10 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
     #ax.set_ylabel('??')
     ax.set_xscale('log')
 
-    maxlvl_kwargs = kwargs.pop('maxlvl_kwargs', None)
+    maxrefine_kwargs = kwargs.pop('maxrefine_kwargs', None)
     active_kwargs = kwargs.pop('active_kwargs', None)
 
-    maxdim_args, maxdim_kwargs = __normalize_fmt(args, kwargs)
+    dim_args, dim_kwargs = __normalize_fmt(args, kwargs)
     # Max dimensions
     if np.max(xy_binned[:, 3]) / np.min(xy_binned[:, 5]) > 100:
         ax2 = ax.twinx()
@@ -398,16 +398,16 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
     else:
         ax2 = ax
     plotObj.append(ax2.plot(xy_binned[:, 0], xy_binned[:, 3],
-                            *maxdim_args, **maxdim_kwargs))
+                            *dim_args, **dim_kwargs))
 
     # Max level in all dimension
-    if maxlvl_kwargs is not None:
-        maxlvl_args, maxlvl_kwargs = __normalize_fmt((), maxlvl_kwargs)
+    if maxrefine_kwargs is not None:
+        maxrefine_args, maxrefine_kwargs = __normalize_fmt((), maxrefine_kwargs)
         plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 4],
-                               *maxlvl_args, **maxlvl_kwargs))
+                               *maxrefine_args, **maxrefine_kwargs))
 
     # Max active dim
-    if maxlvl_kwargs is not None:
+    if maxrefine_kwargs is not None:
         active_args, active_kwargs = __normalize_fmt((), active_kwargs)
         plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 5],
                                *active_args, **active_kwargs))
@@ -1069,9 +1069,9 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
     ax = add_fig()
     try:
         plotWorkVsLvlStats(ax, runs, filteritr=filteritr,
-                           fmt='-ob', label='Max dim.',
+                           fmt='-ob', label='Total dim.',
                            active_kwargs={'fmt': '-*g', 'label': 'Max active dim.'},
-                           maxlvl_kwargs={'fmt': '-sr', 'label': 'Max level'})
+                           maxrefine_kwargs={'fmt': '-sr', 'label': 'Max refinement'})
     except:
         __plot_except(ax)
 
