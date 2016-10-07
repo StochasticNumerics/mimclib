@@ -314,23 +314,34 @@ def computeIterationStats(runs, work_bins, xi, filteritr, fnNorm=None,
         modifier = (1./fnNorm(np.array([exact]))[0]) if relative else 1.
     val = np.array([itr.calcEg() for _, itr in enum_iter(runs, filteritr)])
 
-    mymax = lambda A: [np.max(A[:, i]) for i in xrange(0, A.shape[1])]
+    mymax = lambda A: [np.max(A[:, i]) for i in xrange(0, A.shape[1])] if len(A) > 0 else None
     xy = []
     val = []
-    prev = 0
-    for _, itr in enum_iter(runs, filteritr):
-        stats = mymax(np.array([[
-            1+np.max(j) if len(j) > 0 else 0,
-            np.max(data) if len(data) > 0 else 0,
-            len(data)] for j, data in itr.lvls_sparse_itr(prev)]))
+    for r in runs:
+        prev = 0
+        for i in xrange(0, len(r.iters)):
+            if not filteritr(r, i):
+                continue
+            itr = r.iters[i]
+            stats = mymax(np.array([[
+                1+np.max(j) if len(j) > 0 else 0,
+                np.max(data) if len(data) > 0 else 0,
+                len(data)] for j, data in itr.lvls_sparse_itr(prev)]))
 
-        if len(xy) > 0:
-            stats = mymax(np.vstack((stats, xy[-1][5:])))
-        xy.append([itr.calcTotalWork(), itr.calcTotalTime(),
-                   itr.TOL, 0, modifier*itr.totalErrorEst()]+stats)
-        val.append(itr.calcEg())
-        prev = itr.lvls_count
+            if stats is None:
+                assert(prev > 0)
+                stats = xy[-1][5:]
+            else:
+                if prev > 0:
+                    stats = mymax(np.vstack((stats, xy[-1][5:])))
+
+            xy.append([itr.calcTotalWork(), itr.calcTotalTime(),
+                       itr.TOL, 0, modifier*itr.totalErrorEst()]+stats)
+            val.append(itr.calcEg())
+            prev = itr.lvls_count
+
     xy = np.array(xy)
+    val = np.array(val)
     if exact is not None:
         xy[:, 3] = modifier*fnNorm(val-exact)
 
@@ -342,14 +353,15 @@ def computeIterationStats(runs, work_bins, xi, filteritr, fnNorm=None,
     for i, b in enumerate(ubins):
         d = xy[bins==b, :]
         xy_binned[i, 0] = np.mean(d[:, xi])  # Mean work
-        xy_binned[i, 1] = np.max(xy[bins==b, 3])  # Max exact error
-        xy_binned[i, 2] = np.min(xy[bins==b, 4])  # min error estimate
+        xy_binned[i, 1] = np.max(d[:, 3])  # Max exact error
+        xy_binned[i, 2] = np.min(d[:, 4])  # min error estimate
 
         xy_binned[i, 3] = np.max(d[:, 5])  # Max dimension
         xy_binned[i, 4] = np.max(d[:, 6])  # max level in all dim
         xy_binned[i, 5] = np.max(d[:, 7])  # max active dim
 
     xy_binned = xy_binned[xy_binned[:,0].argsort(), :]
+    #ipdb.embed()
     return xy_binned
 
 @public
@@ -380,8 +392,11 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
 
     maxdim_args, maxdim_kwargs = __normalize_fmt(args, kwargs)
     # Max dimensions
-    ax2 = ax.twinx()
-    ax2.set_yscale('log')
+    if np.max(xy_binned[:, 3]) / np.min(xy_binned[:, 5]) > 100:
+        ax2 = ax.twinx()
+        ax2.set_yscale('log')
+    else:
+        ax2 = ax
     plotObj.append(ax2.plot(xy_binned[:, 0], xy_binned[:, 3],
                             *maxdim_args, **maxdim_kwargs))
 

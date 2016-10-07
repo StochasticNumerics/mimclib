@@ -27,13 +27,14 @@ We wish you a pleasant day of simulations.\
 
 make
 
+COMMON='-db_engine sqlite -db_name db/mimc.sql -tries 200 '
 # ./echo_test_cmd.py -db_tag GBM_real -qoi_type real -tries 50 | parallel -j4 &
 # ./echo_test_cmd.py -db_tag GBM_arr -qoi_type arr -tries 50 | parallel -j4 &
 # ./echo_test_cmd.py -db_tag GBM_obj -qoi_type obj -tries 50 | parallel -j4 &
 
 
-./echo_test_cmd.py -mimc_bayesian False -db_host 127.0.0.1 -db_tag GBM_std_real -qoi_type real -tries 50 | parallel -j4
-./echo_test_cmd.py -mimc_bayesian True -db_host 127.0.0.1 -db_tag GBM_bayes_real -qoi_type real -tries 50 | parallel -j4
+./echo_test_cmd.py -mimc_bayesian False $COMMON -db_tag GBM_std_real -qoi_type real  | parallel -j12
+./echo_test_cmd.py -mimc_bayesian True $COMMON -db_tag GBM_bayes_real -qoi_type real | parallel -j12
 
 # ./echo_test_cmd.py -mimc_bayesian False -db_host 127.0.0.1 -db_tag GBM_std_arr -qoi_type arr -tries 50 | parallel -j4
 # ./echo_test_cmd.py -mimc_bayesian True -db_host 127.0.0.1 -db_tag GBM_bayes_arr -qoi_type arr -tries 50 | parallel -j4
