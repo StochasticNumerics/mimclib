@@ -1,10 +1,9 @@
-
 #include "petsc.h"
-#include "common.h"
+#include "common.hpp"
 #include "assert.h"
+#include <vector>
 
 #define POLAR_FORM
-
 
 void myPetscInit(int argc, char *argv[])
 {
@@ -181,5 +180,86 @@ void hermite_quadrature(int *n, const double **points, const double **weights)
         default:
                  printf("Unsupported number of quadrature points, %d\n", *n);
                  assert(0);
+    }
+}
+
+
+std::vector<ind_t> TDSet(ind_t d, uint32 count, unsigned int base){
+    assert(d>=1);
+    std::vector<ind_t> res;
+    if (!count) return res;
+    for (unsigned int k=0;k<d;k++){
+        res.push_back(base);
+    }
+    std::vector<int> branch_point_prev;
+    branch_point_prev.push_back(0);
+    unsigned int cur_count = 1;   // Already added base
+    unsigned int prev = 0;
+    while (cur_count < count){
+        std::vector<int> branch_point;
+        for (unsigned int il=0;il<branch_point_prev.size();il++){
+            for (unsigned int j=branch_point_prev[il];j<d;j++){
+                branch_point.push_back(j);
+                for (unsigned int k=0;k<d;k++){
+                    res.push_back(res[(il+prev)*d+k] + (k==j));
+                }
+                cur_count++;
+                if (cur_count >= count) break;
+            }
+            if (cur_count >= count) break;
+        }
+        prev += branch_point_prev.size();
+        branch_point_prev = branch_point;
+    }
+    return res;
+}
+
+void GenTDSet(ind_t d, ind_t base, ind_t *td_set, uint32 count){
+    std::vector<ind_t> ind_set = TDSet(d, count, base);
+    assert(ind_set.size()/d==count);
+    uint32 k=0;
+    for (std::vector<ind_t>::iterator itr=ind_set.begin();itr!=ind_set.end();itr++){
+        td_set[k++] = *itr;
+    }
+}
+
+#include <iostream>
+
+ind_t* TensorGrid(ind_t d, uint32 td,
+                  ind_t base, const ind_t *m, ind_t *cur, ind_t i,
+                  ind_t* tensor_grid, uint32* pCount){
+    if (i >= d){
+        assert(td == 0);
+        for (ind_t k=0;k<d;k++)
+            *(tensor_grid++) = base+cur[k];
+        (*pCount)--;
+        return tensor_grid;
+    }
+    ind_t max= m[i]-base; //std::min(static_cast<ind_t>(m[i]-base), static_cast<ind_t>(td));
+    if (max > td) max = td;
+    for (cur[i]=(i==d-1)?td:0;
+         cur[i]<=max;
+         cur[i]++){
+        tensor_grid = TensorGrid(d, td-cur[i], base, m, cur,
+                                 i+1, tensor_grid, pCount);
+        if (!(*pCount)) break;
+    }
+    return tensor_grid;
+}
+
+
+void TensorGrid(ind_t d, ind_t base,
+                const ind_t *m, ind_t* tensor_grid, uint32 count){
+    // Returns a tensorized product of (1 ... m[0]) x (1 ... m[1]) ..
+    // sorted by degree
+    uint32 max_degree=0;
+    for (ind_t i=0;i<d;i++) {
+        assert(m[i] >= base);
+        max_degree += m[i]-base+1;
+    }
+    ind_t cur[d];
+    for (uint32 td=0;td<=max_degree;td++){
+        tensor_grid=TensorGrid(d, td, base, m, cur, 0, tensor_grid, &count);
+        if (!count) break;
     }
 }

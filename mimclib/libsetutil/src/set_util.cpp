@@ -6,8 +6,7 @@
 #include <list>
 #include <assert.h>
 #include <iostream>
-#include "var_list.h"
-#include "set_util.h"
+#include "set_util.hpp"
 
 #define DEBUG_ASSERT(x)
 // static std::ostream& operator<<(std::ostream& out, const std::vector<ind_t>& v) {
@@ -27,92 +26,80 @@
 //     return boost::hash_range(ind.begin(), ind.end());
 // }
 
-class MISCProfitCalculator : public ProfitCalculator {
+class MISCProfCalculator : public ProfitCalculator {
 public:
-    MISCProfitCalculator(ind_t d, ind_t maxN,
-                         const double *d_err_rates,
-                         const double *d_work_rates,
-                         const double *s_g_rates,
-                         const double *s_g_bar_rates) :
-        d_err_rates(d_err_rates, d_err_rates+d),
-        d_work_rates(d_work_rates, d_work_rates+d),
-        s_g_rates(s_g_rates, s_g_rates+maxN),
-        s_g_bar_rates(s_g_bar_rates, s_g_bar_rates+maxN) {
-    }
+    MISCProfCalculator(ind_t d, ind_t s,
+                       const double *d_rates,
+                       const double *s_err_rates) :
+        d_rates(d_rates, d_rates+d),
+        s_err_rates(s_err_rates, s_err_rates+s) { }
 
-    void calc_log_EW(const mul_ind_t &cur, double& lE, double& lW){
-        assert(cur.size() <= max_dim());
-        double d_work=0, d_error=0;
-        double s_work=0, s_error_chi=0, s_error_theta=0;
-        unsigned int d = d_err_rates.size();
+    double calc_log_prof(const mul_ind_t &cur) {
+        check_ind(cur);
+        double d_cont=0;
+        double s_cont=0;
+        unsigned int d = d_rates.size();
         auto mfun = [](unsigned int i) { return (i==0)?0:(i==1?1:(1+(1<<(i-1)))); };
         for (auto itr=cur.begin();itr!=cur.end();itr++){
-            if (itr->ind < d){
-                d_error -= (itr->value-1)*d_err_rates[itr->ind];
-                d_work  += (itr->value-1)*d_work_rates[itr->ind];
-            }
+            if (itr->ind < d)
+                d_cont += (itr->value - SparseMIndex::SET_BASE)*d_rates[itr->ind];
             else{
-                unsigned int M_1 = mfun(itr->value-1);
-                unsigned int M = mfun(itr->value);
+                unsigned int M_1 = mfun(itr->value-SparseMIndex::SET_BASE);
+                unsigned int M = mfun(1+itr->value-SparseMIndex::SET_BASE);
                 double dM_1 = static_cast<double>(M_1);
                 double dM = static_cast<double>(M);
 
-                s_work += log(dM - dM_1);
-                s_error_chi += -dM_1*s_g_bar_rates[itr->ind-d];
-                s_error_theta += -dM_1*(s_g_rates[itr->ind-d]-s_g_bar_rates[itr->ind-d]);
+                // log(dM - dM_1) is the work contribution
+                s_cont += log(dM - dM_1) + dM_1*s_err_rates[itr->ind-d];
             }
         }
+        return d_cont + s_cont;
+    }
 
-        lW = d_work + s_work;
-        lE = s_error_chi + std::min(s_error_theta, d_error);
-    }
-    ind_t max_dim(){
-        return d_err_rates.size() + s_g_rates.size();
-    }
+    ind_t max_dim() { return d_rates.size() + s_err_rates.size(); }
 private:
-    std::vector<double> d_err_rates;
-    std::vector<double> d_work_rates;
-    std::vector<double> s_g_rates;
-    std::vector<double> s_g_bar_rates;
+    std::vector<double> d_rates;
+    std::vector<double> s_err_rates;
 };
 
-class AnisoProfitCalculator : public ProfitCalculator {
+// Total Degree profit calculator
+class TDProfCalculator : public ProfitCalculator {
 public:
-    AnisoProfitCalculator(ind_t d, const double *_wE, const double *_wW) :
-        wE(_wE, _wE+d), wW(_wW, _wW+d){
-    }
-    void calc_log_EW(const mul_ind_t &cur, double& lE, double& lW){
-        static const int SET_BASE = SparseMIndex::SET_BASE;
-        assert(cur.size() <= max_dim());
-        lW = lE = 0;
-        for (auto itr=cur.begin();itr!=cur.end();itr++){
-            lW += (itr->value-SET_BASE)*wW[itr->ind];
-            lE += (itr->value-SET_BASE)*wE[itr->ind];
-        }
+    TDProfCalculator(ind_t d, const double *_weights) :
+        weights(_weights, _weights+d) { }
+
+    double calc_log_prof(const mul_ind_t &cur){
+        check_ind(cur);
+        double prof=0;
+        for (auto itr=cur.begin();itr!=cur.end();itr++)
+            prof += (itr->value-SparseMIndex::SET_BASE)*weights[itr->ind];
+        return prof;
     }
     ind_t max_dim(){
-        return wE.size();
+        return weights.size();
     }
 private:
-    std::vector<double> wE;
-    std::vector<double> wW;
+    std::vector<double> weights;
 };
 
-
-#include <chrono>
-class Timer
-{
+// Full tensor profit calculator
+class FTProfCalculator : public ProfitCalculator {
 public:
-    Timer() : beg_(clock_::now()) {}
-    void reset() { beg_ = clock_::now(); }
-    double elapsed() const {
-        return std::chrono::duration_cast<second_>
-            (clock_::now() - beg_).count(); }
+    FTProfCalculator(ind_t d, const double *_weights) :
+        weights(_weights, _weights+d) { }
 
+    double calc_log_prof(const mul_ind_t &cur){
+        check_ind(cur);
+        double prof=0;
+        for (auto itr=cur.begin();itr!=cur.end();itr++)
+            prof = std::max(prof, (itr->value-SparseMIndex::SET_BASE)*weights[itr->ind]);
+        return prof;
+    }
+    ind_t max_dim(){
+        return weights.size();
+    }
 private:
-    typedef std::chrono::high_resolution_clock clock_;
-    typedef std::chrono::duration<double, std::ratio<1> > second_;
-    std::chrono::time_point<clock_> beg_;
+    std::vector<double> weights;
 };
 
 ind_t* TensorGrid(ind_t d, uint32 td,
@@ -172,7 +159,8 @@ bool compare_setprof(const setprof_t& first, const setprof_t& second)
     return first.profit < second.profit;
 }
 
-PVarSizeList GetIndexSet(const PProfitCalculator profCalc,
+PVarSizeList GetIndexSet(PVarSizeList pRet,
+                         const PProfitCalculator profCalc,
                          double max_prof,
                          double **p_profits) {
     ind_t max_d = profCalc->max_dim();
@@ -205,11 +193,16 @@ PVarSizeList GetIndexSet(const PProfitCalculator profCalc,
 
     ind_set.sort(compare_setprof);
 
-    *p_profits = static_cast<double*>(malloc(sizeof(double) * ind_set.size()));
+    if (p_profits)
+        *p_profits = static_cast<double*>(malloc(sizeof(double) * ind_set.size()));
+
     uint32 i=0;
-    PVarSizeList pRet = new VarSizeList(ind_set.size());
+    if (!pRet)
+        pRet = new VarSizeList(ind_set.size());
+
     for (auto itr=ind_set.begin();itr!=ind_set.end();itr++){
-        pRet->push_back(itr->ind);
+        if (!pRet->has_ind(itr->ind))
+            pRet->push_back(itr->ind);
         if (p_profits)
             (*p_profits)[i++] = itr->profit;
     }
@@ -265,13 +258,13 @@ double GetMinOuterProfit(const PVarSizeList pset,
 
 void CalculateSetProfit(const PVarSizeList pset,
                         const PProfitCalculator profCalc,
-                        double *log_error, double *log_work){
-    pset->calc_set_profit(profCalc, log_error, log_work, pset->count());
+                        double *log_prof, uint32 size){
+    pset->calc_set_profit(profCalc, log_prof, size);
 }
 
 
 void CheckAdmissibility(const PVarSizeList pset, ind_t d_start, ind_t d_end,
-                        bool *admissible){
+                        unsigned char *admissible){
     pset->check_admissibility(d_start, d_end, admissible, pset->count());
 }
 
@@ -308,12 +301,16 @@ PVarSizeList VarSizeList_set_union(const PVarSizeList lhs, const PVarSizeList rh
 }
 
 
-ind_t VarSizeList_get(const PVarSizeList pset, uint32 i, ind_t* data, ind_t max_dim){
-    assert(i < pset->count());
-    auto cur = pset->get(i);
-    for (int i=0;i<max_dim;i++)
-        data[i] = cur[i];
-    return cur.size();
+ind_t VarSizeList_get(const PVarSizeList pset, uint32 i, ind_t* data,
+                      ind_t* j, ind_t size){
+    const mul_ind_t& cur = pset->get(i);
+    i=0;
+    assert(cur.active() <= size);
+    for (auto itr=cur.begin();itr!=cur.end();itr++, i++) {
+        data[i] = itr->value;
+        j[i] = itr->ind;
+    }
+    return cur.active();
 }
 
 uint32 VarSizeList_count(const PVarSizeList pset){
@@ -350,19 +347,17 @@ void VarSizeList_to_matrix(const PVarSizeList pset, ind_t *ij, uint32 ij_size,
     pset->to_matrix(ij, ij_size, data, data_size);
 }
 
-PProfitCalculator GetMISCProfit(ind_t d, ind_t maxN,
-                                const double *d_err_rates,
-                                const double *d_work_rates,
-                                const double *s_g_rates,
-                                const double *s_g_bar_rates){
-    return new MISCProfitCalculator(d, maxN, d_err_rates,
-                                    d_work_rates,
-                                    s_g_rates,
-                                    s_g_bar_rates);
+PProfitCalculator CreateMISCProfCalc(ind_t d, ind_t s, const double *d_w,
+                                     const double *s_err_w){
+    return new MISCProfCalculator(d, s, d_w, s_err_w);
 }
 
-PProfitCalculator GetAnisoProfit(ind_t d, const double *wE, const double *wW){
-    return new AnisoProfitCalculator(d, wE, wW);
+PProfitCalculator CreateTDProfCalc(ind_t d, const double *w){
+    return new TDProfCalculator(d, w);
+}
+
+PProfitCalculator CreateFTProfCalc(ind_t d, const double *w){
+    return new FTProfCalculator(d, w);
 }
 
 void FreeProfitCalculator(PProfitCalculator profCalc){
@@ -373,16 +368,18 @@ void FreeIndexSet(PVarSizeList pset){
     delete pset;
 }
 
-PVarSizeList VarSizeList_from_matrix(const ind_t *sizes, uint32 count,
+PVarSizeList VarSizeList_from_matrix(PVarSizeList pset,
+                                     const ind_t *sizes, uint32 count,
                                      const ind_t *j, uint32 j_size,
                                      const ind_t *data, uint32 data_size){
-    PVarSizeList pset = new VarSizeList(count);
+    if (!pset)
+        pset = new VarSizeList(count);
     uint32 total_size = 0;
     for (uint32 i=0;i<count;i++){
         total_size += sizes[i];
         assert(j_size >= total_size);
         assert(data_size >= total_size);
-
+        //std::cout << "adding: " << mul_ind_t(j, data, sizes[i]) << "of size" << sizes[i] << std::endl;
         pset->push_back(mul_ind_t(j, data, sizes[i]));
         j += sizes[i];
         data += sizes[i];
@@ -394,7 +391,7 @@ int VarSizeList_find(const PVarSizeList pset, ind_t *j, ind_t *data,
                      ind_t size){
     uint32 index;
     bool bfound = pset->find_ind(SparseMIndex(j, data, size), index);
-    return bfound?index:-1;
+    return bfound ? index:-1;
 }
 
 void VarSizeList_get_adaptive_order(const PVarSizeList pset,
@@ -406,6 +403,46 @@ void VarSizeList_get_adaptive_order(const PVarSizeList pset,
     pset->get_adaptive_order(error, work, adaptive_order, count, seedLookahead);
 }
 
-void VarSizeList_check_errors(const PVarSizeList pset, const double *errors, bool* strange, uint32 count){
+void VarSizeList_check_errors(const PVarSizeList pset, const double *errors, unsigned char* strange, uint32 count){
     pset->check_errors(errors, strange, count);
+}
+
+void VarSizeList_count_neighbors(const PVarSizeList pset, ind_t *out_neighbors, uint32 count){
+    pset->count_neighbors(out_neighbors, count);
+}
+
+void VarSizeList_is_parent_of_admissible(const PVarSizeList pset, unsigned char *out, uint32 count){
+    pset->is_parent_of_admissible(out, count);
+}
+
+double VarSizeList_estimate_bias(const PVarSizeList pset,
+                                 const double *err_contributions,
+                                 uint32 count,
+                                 const double *rates, uint32 rates_size){
+    return pset->estimate_bias(err_contributions, count,
+                               rates, rates_size);
+}
+ind_t GetDefaultSetBase(){
+    return SparseMIndex::SET_BASE;
+}
+
+
+PTree Tree_new(){
+    return new Node(0);
+}
+
+unsigned char Tree_add_node(PTree tree, const double* value, uint32 count, double data, double eps){
+    return tree->add_node(std::vector<double>(value, value+count), data, 0, eps);
+}
+
+unsigned char Tree_find(PTree tree, const double* value, uint32 count, double* data, unsigned char remove, double eps){
+    return tree->find(std::vector<double>(value, value+count), *data, remove, 0, eps);
+}
+
+void Tree_free(PTree tree){
+    delete tree;
+}
+
+void Tree_print(PTree tree){
+    tree->print();
 }

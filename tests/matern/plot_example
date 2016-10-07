@@ -1,0 +1,29 @@
+#!/bin/bash
+
+COMMON="-all_itr True  -db_host 127.0.0.1 "
+
+echo "Plotting misc_matern_d1_nu3.5"
+../plot_prog.py -db_tag 'misc_matern_d1_nu3.5' $COMMON &
+
+echo "Plotting misc_matern_d1_nu2.5"
+../plot_prog.py -db_tag 'misc_matern_d1_nu2.5' $COMMON &
+
+echo "Plotting misc_matern_d1_nu1.0"
+../plot_prog.py -db_tag 'misc_matern_d1_nu1.0' $COMMON &
+
+echo "Plotting misc_matern_d1_nu1.5"
+../plot_prog.py -db_tag 'misc_matern_d1_nu1.5' $COMMON &
+
+echo "Plotting misc_matern_d1_nu50"
+../plot_prog.py -db_tag 'misc_matern_d1_nu50' $COMMON &
+
+echo "Plotting misc_matern_d3_nu4.5"
+../plot_prog.py -db_tag 'misc_matern_d3_nu4.5' $COMMON &
+
+echo "Plotting misc_matern_d3_nu50"
+../plot_prog.py -db_tag 'misc_matern_d3_nu50' $COMMON &
+
+echo "Plotting misc_matern_d3_nu3"
+../plot_prog.py -db_tag 'misc_matern_d3_nu3' $COMMON &
+
+wait

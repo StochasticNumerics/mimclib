@@ -1,8 +1,8 @@
 #include "petsc.h"
-#include "common.h"
+#include "common.hpp"
 #include "assert.h"
 
-//////// This solver is based on Leveque book
+//////// this solver is based on Leveque book
 #define MAXD 10
 #define M_SQRT_PI 1.77245385091
 
@@ -16,7 +16,9 @@ typedef unsigned long long int uint64;
 typedef unsigned short ind_t;
 typedef unsigned int uint32;
 void GenTDSet(ind_t d, ind_t base, ind_t *td_set, uint32 count);
+
 #pragma GCC visibility push(default)
+extern "C"{
 PetscErrorCode SFieldCreate(SField *);
 int SFieldBeginRuns(SField, const unsigned int*, unsigned int);
 int SFieldSolveFor(SField, double *, unsigned int, double *, int);
@@ -24,6 +26,7 @@ int SFieldEndRuns(SField);
 int SFieldGetN(SField sfv);
 int SFieldGetDim(SField sfv);
 int SFieldDestroy(SField *);
+}
 #pragma GCC visibility pop
 
 struct RunData {
@@ -70,8 +73,8 @@ typedef const struct __sfield *myCSField;
 
 PetscErrorCode SFieldCreate(SField *_sf){
     PetscErrorCode ierr;
-    *_sf = malloc(sizeof(struct __sfield));
-    mySField sf = *_sf;
+    mySField sf = new  __sfield;
+    *_sf = sf;
 
     sf->a0 = 0.01;
     sf->f0 = 1;
@@ -113,7 +116,7 @@ PetscErrorCode SFieldCreate(SField *_sf){
 
     sf->running = 0;
 
-    sf->multi_idx = malloc(sizeof(double)*sf->d*sf->N);
+    sf->multi_idx = new ind_t[sf->d*sf->N];
     GenTDSet(sf->d, 1, sf->multi_idx, sf->N);
     return 0;
 }
@@ -197,7 +200,7 @@ PetscReal Solution(int d_i, int dd, PetscReal* x, myCSField ctx){
 
 PetscReal EvaluateField(int derivative, const PetscReal* x,
                         myCSField ctx){
-    unsigned int i,j;
+    int i,j;
     double field = 0;
     for (j=0;j<ctx->N;j++){
         double Y = ctx->Y[j];
@@ -299,12 +302,12 @@ double Integrate(Vec U, int *pt, int i, CRunContext ctx) {
 
 
 int SFieldBeginRuns(SField sfv, const unsigned int *nelem, unsigned int count) {
-    mySField sf = (mySField)sfv;
+    mySField sf = static_cast<mySField>(sfv);
     int i,j;
     assert(!sf->running);
 
     sf->running = count;
-    sf->run_data = malloc(sizeof(struct RunData)*count);
+    sf->run_data = new RunData[count];
     for (i=0;i<sf->running;i++) {
         RunContext r = &sf->run_data[i];
         // Hook up the stochastic field to the context
@@ -449,8 +452,8 @@ int SFieldSolveFor(SField sfv, double *Y,
                    unsigned int yCount,
                    double *goals,
                    int goals_size) {
-    mySField sf = (mySField)sfv;
-    assert(yCount == sf->N);
+    mySField sf = static_cast<mySField>(sfv);
+    assert(yCount == static_cast<unsigned int>(sf->N));
     assert(goals_size >= sf->running);
     assert(Y && goals);
 
@@ -495,7 +498,7 @@ int SFieldSolveFor(SField sfv, double *Y,
 }
 
 int SFieldEndRuns(SField sfv) {
-    mySField sf = (mySField)sfv;
+    mySField sf = static_cast<mySField>(sfv);
     assert(sf->running);
     PetscErrorCode ierr;
     int i;
@@ -509,31 +512,31 @@ int SFieldEndRuns(SField sfv) {
         ierr = VecDestroy(&r->F);CHKERRQ(ierr);
         ierr = VecDestroy(&r->U);CHKERRQ(ierr);
     }
-    free(sf->run_data);
+    delete [] sf->run_data;
     sf->run_data = 0;
     sf->running = 0;
     return 0;
 }
 
 int SFieldDestroy(SField *_sf) {
-    mySField sf = *_sf; *_sf = 0;
+    mySField sf = static_cast<mySField>(*_sf);
+    *_sf = 0;
     if (sf->running){
         fprintf(stderr, "WARNING: must end runs before\n");
         SFieldEndRuns(sf);
     }
 
-    free(sf->multi_idx);
-    PetscErrorCode ierr;
-    ierr = PetscFree(sf);CHKERRQ(ierr);
+    delete [] sf->multi_idx;
+    delete sf;
     return 0;
 }
 
 int SFieldGetDim(SField sfv) {
-    mySField sf = (mySField)sfv;
+    mySField sf = static_cast<mySField>(sfv);
     return sf->d;
 }
 
 int SFieldGetN(SField sfv) {
-    mySField sf = (mySField)sfv;
+    mySField sf = static_cast<mySField>(sfv);
     return sf->N;
 }

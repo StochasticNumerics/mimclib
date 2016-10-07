@@ -9,10 +9,77 @@ typedef unsigned short ind_t;
 #include <vector>
 #include <map>
 #include <list>
+#include <algorithm>
+
+class Node {
+public:
+    Node(double value) : m_value(value), m_data(-1),
+                         m_is_leaf(false) {}
+
+    bool add_node(const std::vector<double> &value, double data,
+                  size_t depth=0, double eps=1e-14)
+    {
+        assert(depth <= value.size());
+        if (depth == value.size()){
+            m_data = data;
+	    if (m_is_leaf)
+	      return true;
+	    m_is_leaf = true;
+            return false;
+        }
+        auto mfun = [eps](const Node &node, const double &v)
+	  { return std::abs(node.m_value - v) < eps? false : (node.m_value < v); };
+        std::vector<Node>::iterator itr = std::lower_bound(m_nodes.begin(),
+                                                           m_nodes.end(),
+                                                           value[depth], mfun);
+        if (itr != m_nodes.end() && std::abs(value[depth]-itr->m_value) < eps)
+	  return itr->add_node(value, data, depth+1, eps);
+        itr = m_nodes.insert(itr, Node(value[depth]));
+        return itr->add_node(value, data, depth+1, eps);
+    }
+
+    bool find(const std::vector<double> &value, double &data,
+              bool remove=false, size_t depth=0, double eps=1e-14) {
+        if (depth == value.size()){
+	  if (m_is_leaf){
+	    data = m_data;
+	    m_is_leaf = !remove;
+	    return true;
+	  }
+	  return false;
+        }
+        auto mfun = [eps](const Node &node, const double &v)
+	  { return std::abs(node.m_value - v) < eps? false : (node.m_value < v); };
+        std::vector<Node>::iterator itr = std::lower_bound(m_nodes.begin(),
+                                                           m_nodes.end(),
+                                                           value[depth], mfun);
+
+        if (itr != m_nodes.end() && std::abs(value[depth]-itr->m_value) < eps){
+            return itr->find(value, data, remove, depth+1, eps);
+        }
+        return false;
+    }
+
+    void print(const std::string &pre=""){
+        std::cout << pre << m_value;
+        if (m_is_leaf)
+	  std::cout << std::cout.setf(std::ios::fixed) << std::cout.precision(14) << "(" << m_data << ")";
+        std::cout << std::endl;
+        for (auto itr=m_nodes.begin();itr!=m_nodes.end();itr++){
+	  itr->print(pre + "|-> ");
+        }
+    }
+
+protected:
+    double m_value;
+    std::vector<Node> m_nodes;
+    double m_data;
+    bool m_is_leaf;
+};
 
 class SparseMIndex {
 public:
-    static const int SET_BASE = 1;
+    static const int SET_BASE = 0;
     struct Index
     {
     Index() : ind(0), value(SET_BASE) {}
@@ -187,9 +254,13 @@ typedef SparseMIndex mul_ind_t;
 class ProfitCalculator {
 public:
     virtual ~ProfitCalculator(){}
-    virtual void calc_log_EW(const mul_ind_t &ind, double& lE, double& lW)=0;
-    virtual double calc_log_prof(const mul_ind_t &ind) { double lE, lW; calc_log_EW(ind, lE, lW); return lW-lE;};
+    virtual double calc_log_prof(const mul_ind_t &ind)=0;
     virtual ind_t max_dim()=0;
+
+    void check_ind(const mul_ind_t &ind){
+        if (ind.size() > max_dim())
+            throw std::runtime_error("Index too large for profit calculator");
+    }
 };
 
 typedef ProfitCalculator* PProfitCalculator;
@@ -197,7 +268,8 @@ typedef ProfitCalculator* PProfitCalculator;
 class VarSizeList {
 public:
  VarSizeList(uint32 reserve=1) : m_max_dim(0) { m_ind_set.reserve(1); }
-    VarSizeList(const VarSizeList &set, const uint32 *idx, uint32 _count)
+    VarSizeList(const VarSizeList &set, const uint32 *idx, uint32 _count) :
+        m_max_dim(0)
     {
         for (uint32 i=0;i<_count;i++){
             if (idx[i] >= set.m_ind_set.size())
@@ -288,7 +360,8 @@ public:
 
     void push_back(const mul_ind_t& ind){
         // WARNING: Does not check uniqueness
-        assert(!has_ind(ind));
+        if (this->has_ind(ind))
+            throw std::runtime_error("Index already in set");
         m_ind_set.push_back(ind);
         m_ind_map[ind] = m_ind_set.size()-1;
         m_max_dim = std::max(m_max_dim, ind.size());
@@ -304,16 +377,23 @@ public:
 
     double get_min_outer_profit(const PProfitCalculator profCalc) const;
     void check_admissibility(ind_t d_start, ind_t d_end,
-                            bool *admissible, uint32 count) const;
+                            unsigned char *admissible, uint32 count) const;
     void make_profits_admissible(ind_t d_start, ind_t d_end,
                                double *pProfits, uint32 count) const;
     void calc_set_profit(const PProfitCalculator profCalc,
-                            double *log_error,
-                            double *log_work, uint32 count) const;
+                         double *log_prof, uint32 count) const;
     void get_level_boundaries(const uint32 *levels, uint32 levels_count,
-                              int32 *inner_bnd, bool *inner_real_lvls) const;
+                              int32 *inner_bnd, unsigned char *inner_real_lvls) const;
 
-    std::vector<ind_t> count_neighbors() const;
+#define DECLARE_ARR_ACCESSOR(NAME, TYPE) \
+    void NAME(TYPE* out, size_t size) const;    \
+    std::vector<TYPE> NAME() const {                                 \
+        std::vector<TYPE> ret = std::vector<TYPE>(this->count());    \
+        if (!this->count()) return ret; \
+        NAME(&ret[0], ret.size()); return ret; }
+
+    DECLARE_ARR_ACCESSOR(count_neighbors, ind_t);
+    DECLARE_ARR_ACCESSOR(is_parent_of_admissible, unsigned char);  // std::vector<bool> is broken
 
     VarSizeList expand_set(const double *error,
                            const double *work,
@@ -328,7 +408,9 @@ public:
                             uint32 count,
                             ind_t seedLookahead) const;
 
-    void check_errors(const double *errors, bool* strange, uint32 count) const;
+    void check_errors(const double *errors, unsigned char* strange, uint32 count) const;
+    double estimate_bias(const double *err_contributions,
+                         uint32 count, const double *rates, uint32 rates_size) const;
 protected:
     typedef std::vector<mul_ind_t> ind_vector;
     ind_vector  m_ind_set;

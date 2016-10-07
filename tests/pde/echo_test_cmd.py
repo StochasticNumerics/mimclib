@@ -5,15 +5,14 @@ import argparse
 parser = argparse.ArgumentParser(add_help=True)
 parser.register('type', 'bool',
                 lambda v: v.lower() in ("yes", "true", "t", "1"))
-parser.add_argument("-multi", type="bool", action="store",
-                    default=False, help="True output a single command")
+parser.add_argument("-tries", type=int, action="store", default=0)
 parser.add_argument("-mimc_dim", type=int, action="store",
                     default=1, help="MIMC dim")
 
 args, unknowns = parser.parse_known_args()
 
 dim = args.mimc_dim
-base = "mimc_run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  -mimc_dim {dim} -qoi_seed {seed} -qoi_dim 3 \
+base = "mimc_run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  -mimc_min_dim {dim} -qoi_seed {seed} -qoi_dim 3 \
 -qoi_x0 0.3,0.2,0.6 -qoi_sigma 0.16 -qoi_scale 1 -ksp_rtol 1e-25 \
 -mimc_theta 0.2 -qoi_scale 50 -mimc_M0 5 \
 -ksp_type gmres -mimc_w {w} -mimc_s {s} -mimc_gamma {gamma} -mimc_beta {beta} \
@@ -27,16 +26,13 @@ base = "mimc_run.py -mimc_TOL {TOL} -mimc_max_TOL 0.5  -mimc_dim {dim} -qoi_seed
 
 base += " ".join(unknowns)
 
-cmd_multi = "python " + base + " -mimc_verbose False -db True -db_tag {tag} "
-cmd_single = "python " + base + " -mimc_verbose True -db False "
-
-if not args.multi:
+if args.tries == 0:
+    cmd_single = "python " + base + " -mimc_verbose 10 -db False "
     print(cmd_single.format(seed=0, bayesian=False, TOL=0.001, dim=args.mimc_dim))
 else:
-    realizations = 35
-    TOLs = 0.1*np.sqrt(2.)**-np.arange(0., 16.)
-    for TOL in TOLs:
-        for i in range(0, realizations):
-            print cmd_multi.format(bayesian=False, dim=args.mimc_dim,
-                                   tag="PDE_testcase_dim{}".format(dim), TOL=TOL,
-                                   seed=np.random.randint(2**32-1))
+    cmd_multi = "python " + base + " -mimc_verbose 0 -db True -db_tag {tag} "
+    TOL = 0.1*np.sqrt(2.)**-16
+    for i in range(0, args.tries):
+        print cmd_multi.format(bayesian=False, dim=args.mimc_dim,
+                               tag="PDE_testcase_dim{}".format(dim), TOL=TOL,
+                               seed=np.random.randint(2**32-1))

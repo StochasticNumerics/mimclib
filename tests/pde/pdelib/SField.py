@@ -14,7 +14,7 @@ class SField(object):
         try:
             ct.cdll._dlltype = lambda name: ct.CDLL(name, ct.RTLD_GLOBAL)
             path = os.path.join(os.path.dirname(__file__))
-            lib = npct.load_library("libsolver_nd_df.so", path)
+            lib = npct.load_library("nd_df", path)
         finally:
             ct.cdll._dlltype = save
         lib.SFieldCreate.restype = ct.c_ulong
