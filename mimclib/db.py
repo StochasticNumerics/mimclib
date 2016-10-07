@@ -3,8 +3,11 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import cPickle
+from . import setutil
+from . import ipdb
 
-
+import hashlib
 __all__ = []
 
 def public(sym):
@@ -12,24 +15,30 @@ def public(sym):
     return sym
 
 
-def _pickle(obj):
+def _md5(string):
+    return hashlib.md5(string).hexdigest()
+
+def _pickle(obj, dump=cPickle.dump):
     import io
-    import cPickle
     import MySQLdb
     with io.BytesIO() as f:
-        cPickle.dump(obj, f, protocol=2)
+        dump(obj, f, protocol=2)
         f.seek(0)
         return MySQLdb.Binary(f.read())
 
 
-def _unpickle(obj):
+def _unpickle(obj, load=cPickle.load):
     import io
-    import cPickle
     with io.BytesIO(obj) as f:
-        return cPickle.load(f)
+        return load(f)
 
+def _nan2none(arr):
+    return [None if np.isnan(x) else x for x in arr]
 
-class DBConn(object):
+def _none2nan(x):
+    return np.nan if x is None else x
+
+class MySQLDBConn(object):
     def __init__(self, **kwargs):
         self.connArgs = kwargs
 
@@ -58,248 +67,370 @@ class DBConn(object):
     def Commit(self):
         self.conn.commit()
 
-
-@public
-class MIMCDatabase(object):
-    def __init__(self, db='mimc', runTable='tbl_runs', dataTable='tbl_data',
-                 lvlTable='tbl_lvls', **kwargs):
-        self.DBName = db
-        self.runTable = runTable
-        self.dataTable = dataTable
-        self.lvlTable = lvlTable
-        kwargs["db"] = db
-        self.connArgs = kwargs.copy()
-
-    def DBCreationScript(self, drop_db=False):
+    @staticmethod
+    def DBCreationScript(drop_db=False, db="mimc"):
         script = ""
         if drop_db:
-            script += "DROP DATABASE IF EXISTS {DBName};".format(DBName=self.DBName)
+            script += "DROP DATABASE IF EXISTS {DBName};".format(DBName=db)
         script += '''
 CREATE DATABASE IF NOT EXISTS {DBName};
 USE {DBName};
-CREATE TABLE IF NOT EXISTS {runTable} (
+CREATE TABLE IF NOT EXISTS tbl_runs (
     run_id                INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
     creation_date           DATETIME NOT NULL,
-    TOL                   REAL,
+    TOL                   REAL NOT NULL,
     done_flag            INTEGER NOT NULL,
-    dim                   INTEGER,
-    tag                   VARCHAR(128),
+    totalTime               REAL,
+    tag                   VARCHAR(128) NOT NULL,
     params                mediumblob,
+    fn                    mediumblob,
     comment               TEXT
 );
-CREATE VIEW vw_runs AS SELECT run_id, creation_date, TOL, done_flag, dim, tag, comment FROM {runTable};
+CREATE VIEW vw_runs AS SELECT run_id, creation_date, TOL, done_flag, tag, totalTime, comment FROM tbl_runs;
 
-CREATE TABLE IF NOT EXISTS {dataTable} (
-    data_id                 INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
+CREATE TABLE IF NOT EXISTS tbl_iters (
+    iter_id                 INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
     run_id                  INTEGER NOT NULL,
-    TOL                     REAL NOT NULL,
+    TOL                     REAL,
     bias                    REAL,
     stat_error              REAL,
     creation_date           DATETIME NOT NULL,
-    totalTime               REAL NOT NULL,
+    totalTime               REAL,
     Qparams                 mediumblob,
     userdata                mediumblob,
     iteration_idx           INTEGER NOT NULL,
-    FOREIGN KEY (run_id) REFERENCES {runTable}(run_id) ON DELETE CASCADE,
+    FOREIGN KEY (run_id) REFERENCES tbl_runs(run_id) ON DELETE CASCADE,
     UNIQUE KEY idx_itr_idx (run_id, iteration_idx)
 );
-CREATE VIEW vw_data AS SELECT data_id, run_id, TOL,
-creation_date, bias, stat_error, totalTime, iteration_idx FROM {dataTable};
+CREATE VIEW vw_iters AS SELECT iter_id, run_id, TOL,
+creation_date, bias, stat_error, totalTime, iteration_idx FROM tbl_iters;
 
-CREATE TABLE IF NOT EXISTS {lvlTable} (
-    data_id       INTEGER NOT NULL,
+CREATE TABLE IF NOT EXISTS tbl_lvls (
+    iter_id       INTEGER NOT NULL,
     lvl           text NOT NULL,
     lvl_hash      varchar(35) NOT NULL,
     El            REAL,
     Vl            REAL,
     Wl            REAL,
-    Tl            REAL,
+    tT            REAL,
     Ml            INTEGER,
     psums_delta   mediumblob,
     psums_fine    mediumblob,
-    FOREIGN KEY (data_id) REFERENCES {dataTable}(data_id) ON DELETE CASCADE,
-    UNIQUE KEY idx_run_lvl (data_id, lvl_hash)
+    FOREIGN KEY (iter_id) REFERENCES tbl_iters(iter_id) ON DELETE CASCADE,
+    UNIQUE KEY idx_run_lvl (iter_id, lvl_hash)
 );
 
-CREATE VIEW vw_lvls AS SELECT data_id, lvl,
-El, Vl, Wl, Tl, Ml FROM {lvlTable};
+CREATE VIEW vw_lvls AS SELECT iter_id, lvl, El, Vl, Wl, tT, Ml FROM tbl_lvls;
 
--- CREATE USER 'abdo'@'%';
--- GRANT ALL PRIVILEGES ON *.* TO 'abdo'@'%' WITH GRANT OPTION;
-'''.format(DBName=self.DBName, runTable=self.runTable,
-           dataTable=self.dataTable, lvlTable=self.lvlTable)
-
+-- CREATE USER 'USER'@'%';
+-- GRANT ALL PRIVILEGES ON *.* TO 'USER'@'%' WITH GRANT OPTION;
+'''.format(DBName=db)
         return script
 
-    def createRun(self, tag, TOL=None, dim=None, params=None,
+
+class SQLiteDBConn(object):
+    def __init__(self, **kwargs):
+        if "db" in kwargs:
+            kwargs["database"] = kwargs.pop("db")
+        self.connArgs = kwargs
+        if "database" in kwargs:
+            import os.path
+            if not os.path.isfile(kwargs.get("database")):
+                with self:
+                    self.execute(SQLiteDBConn.DBCreationScript())
+        with self:
+            self.execute("PRAGMA foreign_keys = ON;")
+
+    def __enter__(self):
+        import sqlite3
+        self.conn = sqlite3.connect(**self.connArgs)
+        self.conn.text_factory = str
+        self.cur = self.conn.cursor()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.Commit()
+        self.conn.close()
+
+    def execute(self, query, params=[]):
+        if len(params) > 0 and len(query.split(';')) > 1:
+            raise Exception("Multiple queries with parameters is unsupported")
+
+        # Expand lists in paramters
+        prev = -1
+        new_params = []
+        for p in params:
+            prev = query.find('?', prev+1)
+            if type(p) in [list, tuple]:
+                rep = "(" + ",".join("?"*len(p)) + ")"
+                query = query[:prev] + rep + query[prev+1:]
+                prev += len(rep)
+                new_params.extend(p)
+            else:
+                new_params.append(p)
+
+        for q in query.split(';'):
+            self.cur.execute(q, tuple(new_params))
+        return self.cur
+
+    def getLastRowID(self):
+        return self.cur.lastrowid
+
+    def getRowCount(self):
+        return self.cur.rowcount
+
+    def Commit(self):
+        self.conn.commit()
+
+    @staticmethod
+    def DBCreationScript():
+        script = '''
+CREATE TABLE IF NOT EXISTS tbl_runs (
+    run_id                INTEGER PRIMARY KEY NOT NULL,
+    creation_date           DATETIME NOT NULL,
+    TOL                   REAL NOT NULL,
+    done_flag            INTEGER NOT NULL,
+    totalTime               REAL,
+    tag                   VARCHAR(128) NOT NULL,
+    params                mediumblob,
+    fn                    mediumblob,
+    comment               TEXT
+);
+CREATE VIEW vw_runs AS SELECT run_id, creation_date, TOL, done_flag, tag, totalTime, comment FROM tbl_runs;
+
+CREATE TABLE IF NOT EXISTS tbl_iters (
+    iter_id                 INTEGER PRIMARY KEY NOT NULL,
+    run_id                  INTEGER NOT NULL,
+    TOL                     REAL,
+    bias                    REAL,
+    stat_error              REAL,
+    creation_date           DATETIME NOT NULL,
+    totalTime               REAL,
+    Qparams                 mediumblob,
+    userdata                mediumblob,
+    iteration_idx           INTEGER NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES tbl_runs(run_id) ON DELETE CASCADE,
+    CONSTRAINT idx_itr_idx UNIQUE (run_id, iteration_idx)
+);
+CREATE VIEW vw_iters AS SELECT iter_id, run_id, TOL,
+creation_date, bias, stat_error, totalTime, iteration_idx FROM tbl_iters;
+
+CREATE TABLE IF NOT EXISTS tbl_lvls (
+    iter_id       INTEGER NOT NULL,
+    lvl           text NOT NULL,
+    lvl_hash      varchar(35) NOT NULL,
+    El            REAL,
+    Vl            REAL,
+    Wl            REAL,
+    tT            REAL,
+    Ml            INTEGER,
+    psums_delta   mediumblob,
+    psums_fine    mediumblob,
+    FOREIGN KEY (iter_id) REFERENCES tbl_iters(iter_id) ON DELETE CASCADE,
+    CONSTRAINT idx_run_lvl UNIQUE (iter_id, lvl_hash)
+);
+
+CREATE VIEW vw_lvls AS SELECT iter_id, lvl, El, Vl, Wl, tT, Ml FROM tbl_lvls;
+'''
+        return script
+
+@public
+class MIMCDatabase(object):
+    def __init__(self, engine='mysql', **kwargs):
+        self.DBName = kwargs.pop("db", 'mimc')
+        kwargs["db"] = self.DBName
+        self.engine = engine
+        if self.engine == "mysql":
+            self.DBConn = MySQLDBConn
+        elif self.engine == 'sqlite':
+            self.DBConn = SQLiteDBConn
+        else:
+            raise Exception("Unrecognized DB engine")
+
+        self.connArgs = kwargs.copy()
+
+    def createRun(self, tag, TOL=None, params=None, fn=None,
                   mimc_run=None, comment=""):
         TOL = TOL or mimc_run.params.TOL
         params = params or mimc_run.params
-        dim = dim or mimc_run.data.dim
-        with DBConn(**self.connArgs) as cur:
+        fn = fn or dict(filter(lambda i:i[0] in "Norm",
+                               mimc_run.fn.getDict().iteritems())) # Only save the Norm function
+        import dill
+        with self.DBConn(**self.connArgs) as cur:
             cur.execute('''
-INSERT INTO {runTable}(creation_date, TOL, tag, dim, params, done_flag, comment)
-VALUES(datetime(), ?, ?, ?, ?, -1, ?)'''.format(runTable=self.runTable),
-                        [TOL, tag, dim, _pickle(params), comment])
+            INSERT INTO tbl_runs(creation_date, TOL, tag, params, fn, done_flag, comment)
+            VALUES(datetime(), ?, ?, ?, ?, -1, ?)''',
+                        [TOL, tag, _pickle(params), _pickle(fn, dump=dill.dump), comment])
             return cur.getLastRowID()
 
-    def markRunDone(self, run_id, flag, comment=''):
-        with DBConn(**self.connArgs) as cur:
-            cur.execute(''' UPDATE {runTable} SET done_flag=?,
-            comment = CONCAT(comment,  ?)
-            WHERE run_id=?'''.format(runTable=self.runTable,
-                                     flag=flag, run_id=run_id,
-                                     comment=comment), [flag, comment, run_id])
+    def markRunDone(self, run_id, flag, totalTime=None, comment=''):
+        with self.DBConn(**self.connArgs) as cur:
+            cur.execute('''UPDATE tbl_runs SET done_flag=?, totalTime=?,
+            comment = {}
+            WHERE run_id=?'''.format('CONCAT(comment,  ?)' if self.engine=='mysql' else
+            'comment || ?'), [flag, totalTime, comment, run_id])
 
-    def markRunSuccessful(self, run_id, comment=''):
-        self.markRunDone(run_id, flag=1, comment=comment)
+    def markRunSuccessful(self, run_id, totalTime=None, comment=''):
+        self.markRunDone(run_id, flag=1, comment=comment, totalTime=totalTime)
 
-    def markRunFailed(self, run_id, comment='', add_exception=True):
+    def markRunFailed(self, run_id, totalTime=None, comment='', add_exception=True):
         if add_exception:
             import sys
             exc_type, exc_obj, exc_tb = sys.exc_info()
             if exc_obj is not None:
                 comment += "{}: {}".format(exc_type.__name__, exc_obj)
-        self.markRunDone(run_id, flag=0, comment=comment)
+        self.markRunDone(run_id, flag=0, comment=comment, totalTime=totalTime)
 
-    def writeRunData(self, run_id, mimc_run, iteration_idx, TOL,
-                     totalTime, userdata=None):
+    def writeRunData(self, run_id, mimc_run, iteration_idx, userdata=None):
         base = 0
-        El = mimc_run.data.calcDeltaEl()
-        Vl = mimc_run.Vl_estimate
-        Tl = mimc_run.data.calcTl()
-        Wl = mimc_run.Wl_estimate
-        Ml = mimc_run.data.M
+        iteration = mimc_run.iters[iteration_idx]
+        El = mimc_run.fn.Norm(iteration.calcDeltaEl())
+        Vl = iteration.Vl_estimate
+        tT = iteration.tT
+        Wl = iteration.Wl_estimate
+        Ml = iteration.M
 
-        with DBConn(**self.connArgs) as cur:
+        prev_iter = mimc_run.iters[iteration_idx-1] if iteration_idx >= 1 else None
+        if prev_iter is not None:
+            prev_Vl = iteration.Vl_estimate
+            prev_tT = iteration.tT
+            prev_Wl = iteration.Wl_estimate
+            prev_Ml = iteration.M
+
+        with self.DBConn(**self.connArgs) as cur:
             cur.execute('''
-INSERT INTO {dataTable}(creation_date, totalTime, TOL, bias, stat_error,
+INSERT INTO tbl_iters(creation_date, totalTime, TOL, bias, stat_error,
 Qparams, userdata, iteration_idx, run_id)
-VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?)'''.format(dataTable=self.dataTable),
-                        [totalTime, TOL, mimc_run.bias, mimc_run.stat_error,
-                         _pickle(mimc_run.Q), _pickle(userdata),
-                         iteration_idx, run_id])
-            data_id = cur.getLastRowID()
-            for k in range(0, len(mimc_run.data.lvls)):
+VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?)''',
+                        _nan2none([iteration.totalTime, iteration.TOL,
+                                   iteration.bias, iteration.stat_error])
+                        +[_pickle(iteration.Q), _pickle(userdata),
+                          iteration_idx, run_id])
+            iter_id = cur.getLastRowID()
+
+            # Only add levels that are different from the
+            #       previous iteration
+            for k in range(0, iteration.lvls_count):
+                lvl_data = _nan2none([El[k], Vl[k], Wl[k], tT[k], Ml[k]])
+                if prev_iter is not None:
+                    if k < prev_iter.lvls_count:
+                        if np.all(prev_iter.psums_delta[k, :] == iteration.psums_delta[k, :]) and \
+                           np.all(prev_iter.psums_fine[k, :] == iteration.psums_fine[k, :]) and \
+                           np.all(np.array(lvl_data[1:]) ==
+                                  _nan2none([prev_Vl[k],
+                                             prev_Wl[k], prev_tT[k], prev_Ml[k]])):
+                            continue         # Index is repeated as is in this iteration
+
                 lvl = ",".join(["%d|%d" % (i, j) for i, j in
-                                enumerate(mimc_run.data.lvls[k]) if j > base])
+                                enumerate(iteration.lvls_get(k)) if j > base])
                 cur.execute('''
-INSERT INTO {lvlTable}(lvl, lvl_hash, El, Vl, Wl, Tl, Ml, psums_delta, psums_fine, data_id)
-VALUES(?, md5(?), ?, ?, ?, ?, ?, ?, ?, ?)
-'''.format(lvlTable=self.lvlTable, lvl=lvl),
-                            [lvl, lvl, El[k], Vl[k], Wl[k], Tl[k], Ml[k],
-                             _pickle(mimc_run.data.psums_delta[k, :]),
-                             _pickle(mimc_run.data.psums_fine[k, :]), data_id])
+INSERT INTO tbl_lvls(lvl, lvl_hash, psums_delta, psums_fine, iter_id,  El, Vl, Wl, tT, Ml)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                            [lvl, _md5(lvl),
+                             _pickle(iteration.psums_delta[k, :]),
+                             _pickle(iteration.psums_fine[k, :]), iter_id]+
+                            lvl_data)
 
     def readRunsByID(self, run_ids):
         from . import mimc
         import re
-        lstvalues = []
+        lstruns = []
         run_ids = np.array(run_ids).astype(np.int).reshape(-1).tolist()
         if len(run_ids) == 0:
-            return lstvalues
+            return lstruns
 
-        with DBConn(**self.connArgs) as cur:
+        with self.DBConn(**self.connArgs) as cur:
             runAll = cur.execute(
-                        '''SELECT r.run_id, r.params, r.TOL, r.comment, count(*), r.tag
-                        FROM {runTable} r INNER JOIN {dataTable} dr ON
-                        r.run_id = dr.run_id WHERE r.run_id in ? GROUP BY
-                        r.run_id, r.params, r.TOL, r.comment'''.
-                        format(runTable=self.runTable,
-                               dataTable=self.dataTable), [run_ids]).fetchall()
+                        '''SELECT r.run_id, r.params, r.TOL, r.comment, r.fn, r.tag, r.totalTime
+                        FROM tbl_runs r WHERE r.run_id in ?''', [run_ids]).fetchall()
 
-            dataAll = cur.execute('''
-SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
+            iterAll = cur.execute('''
+SELECT dr.run_id, dr.iter_id, dr.TOL, dr.creation_date,
         dr.totalTime, dr.bias, dr.stat_error, dr.Qparams, dr.userdata,
-        dr.iteration_idx FROM {dataTable} dr WHERE dr.run_id in ?
-'''.format(dataTable=self.dataTable), [run_ids]).fetchall()
+        dr.iteration_idx FROM tbl_iters dr WHERE dr.run_id in ?
+ORDER BY dr.run_id, dr.iteration_idx
+''', [run_ids]).fetchall()
 
             lvlsAll = cur.execute('''
-            SELECT dr.data_id, l.lvl, l.psums_delta, l.psums_fine, l.Ml,
-                     l.Tl, l.Wl, l.Vl, r.dim
+            SELECT dr.iter_id, l.lvl, l.psums_delta, l.psums_fine, l.Ml,
+                     l.tT, l.Wl, l.Vl
             FROM
-            {lvlTable} l INNER JOIN {dataTable} dr ON
-            dr.data_id=l.data_id INNER JOIN {runTable} r on r.run_id=dr.run_id
-            WHERE dr.run_id in ? ORDER BY dr.data_id'''.
-                                  format(lvlTable=self.lvlTable,
-                                         dataTable=self.dataTable,
-                                         runTable=self.runTable),
+            tbl_lvls l INNER JOIN tbl_iters dr ON
+            dr.iter_id=l.iter_id INNER JOIN tbl_runs r on r.run_id=dr.run_id
+            WHERE dr.run_id in ? ORDER BY dr.iter_id''',
                                   [run_ids]).fetchall()
 
         dictRuns = dict()
+        import dill
         for run in runAll:
-            dictRuns[run[0]] = [_unpickle(run[1]), run[2], run[3],
-                                run[4], run[5]]
+            dictRuns[run[0]] = {"params" : _unpickle(run[1]),
+                                "TOL" : run[2],
+                                "comment" : run[3],
+                                "fn" :  _unpickle(run[4], load=dill.load),
+                                "tag" : run[5],
+                                "totalTime" : run[6]}
 
         dictLvls = dict()
         import itertools
-        for run_id, itr in itertools.groupby(lvlsAll, key=lambda x:x[0]):
-            psums_delta, psums_fine, lvls, Ml, Tl, Wl, Vl = [], [], [], [], [], [], []
-            for r in itr:
-                t = np.array(map(int, [p for p in re.split(",|\|", r[1]) if p]),
-                             dtype=np.uint32)
-                ind = np.zeros(r[-1], dtype=np.uint)
-                ind[t[::2]] = t[1::2]
-                lvls.append(ind.tolist())
-                psums_delta.append(_unpickle(r[2]))
-                psums_fine.append(_unpickle(r[3]))
-                Ml.append(r[4])
-                Tl.append(r[5])
-                Wl.append(r[6])
-                Vl.append(r[7])
-            dictLvls[run_id] = [psums_delta, psums_fine, lvls, Ml, Tl, Wl, Vl]
+        for iter_id, itr in itertools.groupby(lvlsAll, key=lambda x:x[0]):
+            dictLvls[iter_id] = list(itr)
 
-        for data in dataAll:
-            val = dict()
-            run_id = data[1]
-            data_id = data[0]
+        for run_id, iter_iterator in itertools.groupby(iterAll,
+                                                       key=lambda x: x[0]):
             run_params = dictRuns[run_id]
-            val["data_id"] = data_id
-            val["finalTOL"] = run_params[1]
-            val["comment"] = run_params[2]
-            val["total_iterations"] = run_params[3]
-            val["tag"] = run_params[4]
-            val["TOL"] = data[2]
-            val["creation_date"] = data[3]
-            val["totalTime"] = data[4]
-            val["user_data"] = _unpickle(data[8])
-            val["iteration_index"] = data[9]
+            run = mimc.MIMCRun(**run_params["params"].getDict())
+            run.db_data = mimc.Bunch()
+            run.db_data.finalTOL = run_params["TOL"]
+            run.db_data.comment = run_params["comment"]
+            run.db_data.tag = run_params["tag"]
+            run.db_data.totalTime = run_params["totalTime"]
+            run.db_data.run_id = run_id
 
-            psums_delta, psums_fine, lvls, Ml, Tl, Wl, Vl = dictLvls[data_id]
-
-            lvls = np.array(lvls)
-            sort_rows = lambda a: np.argsort(a.view([('',a.dtype)]*a.shape[1]),0).T[0]
-            ind = sort_rows(lvls)
-
-            old_data = mimc.MIMCData(run_params[0].dim, lvls=lvls[ind],
-                                     psums_delta=np.array(psums_delta)[ind],
-                                     psums_fine=np.array(psums_fine)[ind],
-                                     M=np.array(Ml)[ind],
-                                     t=np.array(Ml)[ind] * np.array(Tl)[ind])
-            run = mimc.MIMCRun(old_data=old_data,
-                               **run_params[0].getDict())
-            run.bias = data[5]
-            run.stat_error = data[6]
-            run.Q = _unpickle(data[7])
-            val["run"] = run
-            run.Vl_estimate = np.array(Vl)[ind]
-            run.Wl_estimate = np.array(Wl)[ind]
-            lstvalues.append(mimc.MyDefaultDict(**val))
-        return lstvalues
+            run.setFunctions(**run_params["fn"])
+            lstruns.append(run)
+            for i, data in enumerate(iter_iterator):
+                iter_id = data[1]
+                assert(i == data[9])  # Should be the same as the iteration index
+                if run.last_itr is not None:
+                    iteration = run.last_itr.next_itr()
+                else:
+                    iteration = mimc.MIMCItrData(min_dim=run.params.min_dim,
+                                                 moments=run.params.moments)
+                iteration.TOL = data[2]
+                iteration.db_data = mimc.Bunch()
+                iteration.db_data.iter_id = iter_id
+                iteration.db_data.user_data = _unpickle(data[8])
+                iteration.db_data.creation_date = data[3]
+                iteration.totalTime = data[4]
+                iteration.bias = _none2nan(data[5])
+                iteration.stat_error = _none2nan(data[6])
+                iteration.Q = _unpickle(data[7])
+                for l in dictLvls[iter_id]:
+                    t = np.array(map(int, [p for p in re.split(",|\|", l[1]) if p]),
+                                 dtype=setutil.ind_t)
+                    k = iteration.lvls_find(ind=t[1::2], j=t[::2])
+                    if k is None:
+                        iteration.lvls_add_from_list(inds=[t[1::2]], j=[t[::2]])
+                        k = iteration.lvls_count-1
+                    iteration.zero_samples(k)
+                    iteration.addSamples(k, M=_none2nan(l[4]),
+                                         tT=_none2nan(l[5]),
+                                         psums_delta=_unpickle(l[2]),
+                                         psums_fine=_unpickle(l[3]))
+                    iteration.Wl_estimate[k] = _none2nan(l[6])
+                    iteration.Vl_estimate[k] = _none2nan(l[7])
+                run.iters.append(iteration)
+        return lstruns
 
     def _fetchArray(self, query, params=None):
-        with DBConn(**self.connArgs) as cur:
-            dataAll = cur.execute(query, params if params else [])
-            return np.array(dataAll.fetchall())
+        with self.DBConn(**self.connArgs) as cur:
+            return np.array(cur.execute(query, params if params else []).fetchall())
 
-    def getRunsIDs(self, minTOL=None, maxTOL=None, dim=None, tag=None,
+    def getRunsIDs(self, minTOL=None, maxTOL=None, tag=None,
                    TOL=None, from_date=None, to_date=None,
                    done_flag=None):
         qs = []
         params = []
-        if dim is not None:
-            qs.append('dim in ?')
-            params.append(np.array(dim).astype(np.int).reshape(-1).tolist())
         if done_flag is not None:
             qs.append('done_flag in ?')
             params.append(np.array(done_flag).astype(np.int).reshape(-1).tolist())
@@ -322,49 +453,29 @@ SELECT dr.data_id, dr.run_id, dr.TOL, dr.creation_date,
             qs.append('creation_date <= ?')
             params.append(to_date)
         wherestr = ("WHERE " + " AND ".join(qs)) if len(qs) > 0 else ''
-        query = '''SELECT run_id FROM {runTable} {wherestr} ORDER BY tag, dim,
-        TOL'''.format(runTable=self.runTable, wherestr=wherestr)
+        query = '''SELECT run_id FROM tbl_runs {wherestr} ORDER BY tag,
+        TOL'''.format(wherestr=wherestr)
 
         ids = self._fetchArray(query, params)
         if ids.size > 0:
             return ids[:, 0]
         return ids
 
-    def getRunDataIDs(self, run_ids):
-        run_ids = np.array(run_ids).astype(np.int).reshape(-1).tolist()
-        if len(run_ids) == 0:
-            raise ValueError("Must have at least one run")
-
-        query = '''SELECT DISTINCT data_id FROM {dataTable} rd WHERE rd.run_id in ? '''.format(dataTable=self.dataTable)
-        ids = self._fetchArray(query, params=[run_ids])
-        if ids.size > 0:
-            return ids[:, 0]
-        return ids
-
-    def filterRuns(self, runs, iteration_idx=None):
-        if iteration_idx is not None:
-            ii = np.array(iteration_idx).reshape((-1,))
-            from_end = ii<0
-            runs = [d for d in runs if d.iteration_index in
-                    d.total_iterations*from_end + ii]
-        return runs
-
-    def readRuns(self, minTOL=None, maxTOL=None, dim=None, tag=None,
+    def readRuns(self, minTOL=None, maxTOL=None, tag=None,
                  TOL=None, from_date=None, to_date=None,
-                 done_flag=None, iteration_idx=None):
+                 done_flag=None):
         runs_ids = self.getRunsIDs(minTOL=minTOL, maxTOL=maxTOL,
-                                   dim=dim, tag=tag, TOL=TOL,
+                                   tag=tag, TOL=TOL,
                                    from_date=from_date, to_date=to_date,
                                    done_flag=done_flag)
         if len(runs_ids) == 0:
             return []
-        return self.filterRuns(self.readRunsByID(runs_ids),
-                               iteration_idx=iteration_idx)
+        return self.readRunsByID(runs_ids)
 
     def deleteRuns(self, run_ids):
         if len(run_ids) == 0:
             return 0
-        with DBConn(**self.connArgs) as cur:
-            cur.execute("DELETE from {runTable} where run_id in ?".format(runTable=self.runTable),
+        with self.DBConn(**self.connArgs) as cur:
+            cur.execute("DELETE from tbl_runs where run_id in ?",
                         [np.array(run_ids).astype(np.int).reshape(-1).tolist()])
             return cur.getRowCount()

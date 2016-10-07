@@ -15,7 +15,10 @@ def read(fname):
 
 setup(
     name="mimclib",
-    version="0.2.0.dev0",
+    # 1st is increased if it is not compatible with previous version.
+    # 2nd is increased if new features are added.
+    # 3rd is increased for small fixes.
+    version="1.0.0.dev0",
     author="Abdul-Lateef Haji-Ali",
     author_email="abdullateef.hajiali@kaust.edu.sa",
     description="A library implementing the MIMC and CMLMC methods.",
@@ -23,7 +26,7 @@ setup(
     url="http://stochastic_numerics.kaust.edu.sa/",
     packages=find_packages(),
     long_description=read('README.md'),
-    install_requires=['matplotlib>=1.5', 'numpy>=1.9', 'scipy > 0.17.0'],
+    install_requires=[],#['matplotlib>=1.5', 'numpy>=1.9', 'scipy>=0.17.0', 'dill'],
     extras_require={'mysqldb':  ["MySQL-python"]},
     ext_modules=[
         Extension('mimclib.libset_util',

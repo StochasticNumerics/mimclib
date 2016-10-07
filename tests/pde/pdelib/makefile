@@ -1,15 +1,15 @@
-TARGETS = libsolver_nd_df.so
+TARGETS = nd_df.so
 #DEBUG = -g -pg
 
 all: ${TARGETS}
 
-libsolver_nd_df.so: common.o nd_df.o libset_util.a
+nd_df.so: common.o nd_df.o
 	${CLINKER} -Wall -shared -Wl,-soname,$@ -o $@  $^ ${PETSC_LIB} -llapack -lblas ${DEBUG}
 
-common.o: src/common.c src/common.h
+common.o: src/common.cpp src/common.hpp
 	${PETSC_COMPILE_SINGLE} $< ${DEBUG}
 
-nd_df.o: src/nd_df.c src/SField.h src/common.h
+nd_df.o: src/nd_df.cpp src/common.hpp
 	${PETSC_COMPILE_SINGLE} $< ${DEBUG}
 
 clean::

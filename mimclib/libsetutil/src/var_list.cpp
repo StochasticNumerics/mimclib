@@ -7,7 +7,7 @@
 #include <assert.h>
 #include <iostream>
 #include <algorithm>
-#include "var_list.h"
+#include "var_list.hpp"
 
 #define DEBUG_ASSERT(x)
 static const int SET_BASE = SparseMIndex::SET_BASE;
@@ -28,7 +28,7 @@ std::vector<uint32> argsort(const std::vector<T>& v) {
 }
 
 void VarSizeList::check_admissibility(ind_t d_start, ind_t d_end,
-                                     bool *admissible, uint32 size) const{
+                                     unsigned char *admissible, uint32 size) const{
     assert(size >= this->count());
     for (unsigned int i=0;i<this->count();i++)
         admissible[i]=true;
@@ -81,6 +81,7 @@ void VarSizeList::make_profits_admissible(ind_t d_start,
 }
 
 
+// Returns the minimum profit on the outer set
 double VarSizeList::get_min_outer_profit(const PProfitCalculator profCalc) const {
     ind_t max_d = profCalc->max_dim();//set.max_dim();
     std::vector<ind_t> bnd_neigh = this->count_neighbors();
@@ -113,19 +114,17 @@ double VarSizeList::get_min_outer_profit(const PProfitCalculator profCalc) const
 }
 
 void VarSizeList::calc_set_profit(const PProfitCalculator profCalc,
-                                  double *log_error, double *log_work,
-                                  uint32 size) const {
-    assert(size >= this->count());
-    for (size_t i=0;i<this->count();i++){
-        profCalc->calc_log_EW(this->get(i), log_error[i], log_work[i]);
-    }
+                                    double *log_prof,
+                                    uint32 size) const {
+    for (size_t i=0;i<this->count() && i < size;i++)
+        log_prof[i] = profCalc->calc_log_prof(this->get(i));
 }
 
 
 void VarSizeList::get_level_boundaries(const uint32 *levels,
                                        uint32 levels_count,
                                        int32 *inner_bnd,
-                                       bool *inner_real_lvls) const {
+                                       unsigned char *inner_real_lvls) const {
     throw std::runtime_error("Must make it work with variables sets and also, the boundary of the axis is just the last element. Even if the axis is not covered!!!!!!!");
     /////// TODO: The following code does not work with variable size sets.
     const VarSizeList& set = *this;
@@ -181,15 +180,17 @@ void VarSizeList::get_level_boundaries(const uint32 *levels,
 }
 
 // void GetBoundaryInd(uint32 setSize, uint32 l, int32 i,
-//                     int32* sel, int32* inner_bnd, bool* bnd_ind){
+//                     int32* sel, int32* inner_bnd, unsigned char* bnd_ind){
 //     // bnd_ind[self.sel][np.logical_and(self.inner_bnd >= self.i, inds < self.l)] = True
 //     for (unsigned int j=0;j<setSize && j < l;j++){
 //         bnd_ind[sel[j]] = (inner_bnd[j] >= i);
 //     }
 // }
 
-std::vector<ind_t> VarSizeList::count_neighbors() const {
-    std::vector<ind_t> bnd_neigh = std::vector<ind_t>(this->count(), 0);
+void VarSizeList::count_neighbors(ind_t* bnd_neigh, size_t size) const {
+    assert(size >= this->count());
+    for (uint32 k=0;k<this->count();k++) bnd_neigh[k]=0;
+
     for (uint32 k=0;k<this->count();k++){
         // Update Neighbors
         auto cur = this->get(k);
@@ -203,7 +204,6 @@ std::vector<ind_t> VarSizeList::count_neighbors() const {
             DEBUG_ASSERT(cur.size() == this->get(k).size());
         }
     }
-    return bnd_neigh;
 }
 
 uint32 add_children(const VarSizeList* pthis, uint32 k, VarSizeList &result,
@@ -343,7 +343,7 @@ void VarSizeList::get_adaptive_order(const double *error,
     // Start with an empty index
     // TODO: Can be heavily optimized
     for (uint32 i=0;i<count;i++)
-        adaptive_order[i] = std::numeric_limits<double>::infinity();
+        adaptive_order[i] = std::numeric_limits<uint32>::max();
 
     VarSizeList curList;
     uint32 cur_order = 1;
@@ -372,7 +372,7 @@ void VarSizeList::get_adaptive_order(const double *error,
     }
 }
 
-void VarSizeList::check_errors(const double *errors, bool* strange, uint32 count) const{
+void VarSizeList::check_errors(const double *errors, unsigned char* strange, uint32 count) const{
     assert(count == this->count());
     for (uint32 k=0;k<this->count();k++){
         // Update Neighbors
@@ -391,4 +391,59 @@ void VarSizeList::check_errors(const double *errors, bool* strange, uint32 count
             DEBUG_ASSERT(cur.size() == this->get(k).size());
         }
     }
+}
+
+void VarSizeList::is_parent_of_admissible(unsigned char* pout, size_t size) const{
+    ind_t max_d = this->max_dim();
+    std::vector<ind_t> bnd_neigh = this->count_neighbors();
+    //------------- Calculate outer boundary
+    for (uint32 k=0;k<this->count();k++){
+        pout[k] = false;
+        if (bnd_neigh[k] < max_d) {
+            // This is a boundary, check all outer indices that are not in the set already
+            auto cur = this->get(k);
+            for (uint32 i=0;i<max_d;i++){
+                cur.step(i, 1);
+                if (!this->is_ind_admissible(cur)) {
+                    pout[k] = true;
+                    break;
+                }
+                cur.step(i, -1);
+            }
+        }
+    }
+}
+
+double VarSizeList::estimate_bias(const double *err_contributions,
+                                  uint32 count,
+                                  const double *rates, uint32 rates_size) const {
+    ind_t max_d = this->max_dim();
+    assert(count >= this->count && rates_size >= max_d);
+    std::vector<ind_t> bnd_neigh = this->count_neighbors();
+
+    std::map<mul_ind_t, double> map_contrib;
+    //------------- Calculate outer boundary
+    for (uint32 k=0;k<this->count();k++){
+        if (bnd_neigh[k] < max_d) {
+            // This is a boundary, check all outer indices that are
+            // not in the set already
+            auto cur = this->get(k);
+            for (uint32 i=0;i<max_d;i++){
+                cur.step(i, 1);
+                if (!this->has_ind(cur) && this->is_ind_admissible(cur)) {
+                    double prev = std::numeric_limits<double>::infinity();
+                    auto itr = map_contrib.find(cur);
+                    if (itr != map_contrib.end()) prev = std::abs(itr->second);
+                    //map_contrib[cur] = std::min(prev, rates[i]*err_contributions[k]);
+                    if (prev > std::abs(rates[i]*err_contributions[k]))
+                        map_contrib[cur] = rates[i]*err_contributions[k];
+                }
+                cur.step(i, -1);
+            }
+        }
+    }
+    double bias=0;
+    for (auto itr=map_contrib.begin();itr!=map_contrib.end();itr++)
+        bias += itr->second;
+    return bias;
 }

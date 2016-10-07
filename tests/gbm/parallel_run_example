@@ -25,4 +25,15 @@ do so by typincg ctrl+c repeatedly in terminal or through a killsignal.
 We wish you a pleasant day of simulations.\
 "
 
-make && ./echo_test_cmd.py -multi 1  $@ | parallel -j 11
+make
+
+COMMON='-db_engine sqlite -db_name mimc -tries 200 '
+
+./echo_test_cmd.py -mimc_bayesian False $COMMON -db_tag GBM_std_real -qoi_type real  | parallel -j12
+./echo_test_cmd.py -mimc_bayesian True $COMMON -db_tag GBM_bayes_real -qoi_type real | parallel -j12
+
+./echo_test_cmd.py -mimc_bayesian False $COMMON -db_tag GBM_std_arr -qoi_type arr  | parallel -j12
+./echo_test_cmd.py -mimc_bayesian True $COMMON -db_tag GBM_bayes_arr -qoi_type arr | parallel -j12
+
+./echo_test_cmd.py -mimc_bayesian False $COMMON -db_tag GBM_std_obj -qoi_type obj | parallel -j12
+./echo_test_cmd.py -mimc_bayesian True $COMMON -db_tag GBM_bayes_obj -qoi_type obj | parallel -j12
