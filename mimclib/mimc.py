@@ -556,10 +556,10 @@ Not needed if fnHierarchy is provided.")
     def __str__(self):
         output = "Eg={}\n\
 Bias={:.12e}\nStatErr={:.12e}\
-\nTotalErrEst={:.12e}\n".format(str(self.last_itr.calcEg()),
-                                self.bias,
-                                self.stat_error,
-                                self.totalErrorEst())
+\nTotalErrEst={:.12e} | {:.12e}\n".format(str(self.last_itr.calcEg()),
+                                          self.bias, self.stat_error,
+                                          self.totalErrorEst(),
+                                          self.last_itr.TOL)
         V = self.Vl_estimate
         Vl = self.fn.Norm(self.last_itr.calcDeltaVl())
         E = self.fn.Norm(self.last_itr.calcDeltaEl())
@@ -748,7 +748,8 @@ estimate optimal number of levels"
         lvls = self.last_itr.get_lvls()
         lvls_count = self.last_itr.lvls_count
         t = np.zeros(lvls_count)
-        active = totalM >= self.last_itr.M
+        active = totalM > self.last_itr.M
+        totalM[totalM <= self.last_itr.M] = 0    # No need to do any samples
         totalM[active] -= self.last_itr.M[active]
         if np.sum(totalM) == 0:
             return False
@@ -868,11 +869,12 @@ estimate optimal number of levels"
                 if samples_added:
                     if self.fn.ItrDone is not None:
                         self.fn.ItrDone()
-                    if self.params.bayesian or self.totalErrorEst() < TOL:
-                        break
                 else:
                     # remove last iteration since it is empty
+                    assert(self.params.bayesian or self.totalErrorEst() < TOL)
                     self.iters.pop()
+                if self.params.bayesian or self.totalErrorEst() < TOL:
+                    break
 
             print_info("MIMC iteration for TOL={} took {} seconds".format(TOL, timer.toc()))
             print_info("################################################")
