@@ -4,7 +4,7 @@
 echo "If all goes well, this script should plot the relevant plots of the
 parallel mimc run. Output will be produced to 'GBM_*.pdf'"
 
-COMMON='-db_engine sqlite -db_name db/mimc  -qoi_exact 2.7182818284590451 '
+COMMON='-db_engine sqlite -db_name ../db/mimc  -qoi_exact 2.7182818284590451 '
 
 echo "Plotting GBM_std_real"
 ../plot_prog.py -db_tag 'GBM_std_real' $COMMON &

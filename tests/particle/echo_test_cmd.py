@@ -36,7 +36,7 @@ if __name__ == "__main__":
         print(cmd_single.format(seed=0, bayesian=False, TOL=0.001))
     else:
         cmd_multi = "python " + base + " -mimc_verbose 0 -db True -db_tag {tag} "
-        TOL = 0.05*np.sqrt(2.)**-21
+        TOL = 1e-4
         for i in range(0, args.tries):
             print cmd_multi.format(bayesian=False,
                                    tag="particle_{}".format(dim), TOL=TOL,

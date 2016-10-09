@@ -27,7 +27,7 @@ We wish you a pleasant day of simulations.\
 
 make
 
-COMMON='-db_engine sqlite -db_name mimc -tries 200 '
+COMMON='-db_engine sqlite -db_name ../db/mimc -tries 200 '
 
 ./echo_test_cmd.py -mimc_bayesian False $COMMON -db_tag GBM_std_real -qoi_type real  | parallel -j12
 ./echo_test_cmd.py -mimc_bayesian True $COMMON -db_tag GBM_bayes_real -qoi_type real | parallel -j12
