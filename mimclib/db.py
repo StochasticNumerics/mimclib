@@ -5,7 +5,6 @@ from __future__ import print_function
 import numpy as np
 import cPickle
 from . import setutil
-from . import ipdb
 
 import hashlib
 __all__ = []

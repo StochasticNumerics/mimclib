@@ -5,7 +5,6 @@ from __future__ import print_function
 import numpy as np
 import matplotlib.pylab as plt
 from . import mimc
-from . import ipdb
 from matplotlib.ticker import MaxNLocator
 
 __all__ = []
@@ -361,7 +360,6 @@ def computeIterationStats(runs, work_bins, xi, filteritr, fnNorm=None,
         xy_binned[i, 5] = np.max(d[:, 7])  # max active dim
 
     xy_binned = xy_binned[xy_binned[:,0].argsort(), :]
-    #ipdb.embed()
     return xy_binned
 
 @public

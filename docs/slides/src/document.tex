@@ -306,8 +306,8 @@ the variance constraint then, we can obtain the optimal number of samples
     \texttt{libmysqlclient-dev} are installed on your data server.
   \item Create \texttt{mimclib} database on data server
 \begin{verbatim}
-> python -c 'from mimclib.db import MIMCDatabase ; \
-         print MIMCDatabase().DBCreationScript();' \
+> python -c 'from mimclib.db import MySQLDBConn ; \
+         print MySQLDBConn.DBCreationScript();' \
          | mysql -u root -p
 \end{verbatim}
 \item Create database user for \lib~(hint: you can use local username)

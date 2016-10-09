@@ -13,8 +13,7 @@ echo "Plotting GBM_arr"
 ../plot_prog.py -db_tag 'GBM_std_arr' $COMMON &
 
 echo "Plotting GBM_obj"
-python -c "import mimclib.ipdb; mimclib.ipdb.set_excepthook();\
-from mimc_run import CustomClass; \
+python -c "from mimc_run import CustomClass; \
 from mimclib.plot import run_program; \
 import numpy as np; \
 run_program()" -db_tag 'GBM_std_obj' $COMMON &

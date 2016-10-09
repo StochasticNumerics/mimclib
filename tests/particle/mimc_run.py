@@ -33,8 +33,6 @@ class ParticleField(object):
         return samples, time.time()-tStart
 
 if __name__ == "__main__":
-    from mimclib import ipdb
-    ipdb.set_excepthook()
     import mimclib.test
     field = ParticleField()
     mimclib.test.RunStandardTest(fnInit=field.Init,

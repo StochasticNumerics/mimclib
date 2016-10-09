@@ -6,7 +6,6 @@ import warnings
 import os.path
 import numpy as np
 import mimclib.test
-import mimclib.ipdb as ipdb
 import mimclib.misc as misc
 from matern import SField_Matern
 from mimclib import setutil
@@ -136,8 +135,6 @@ class MyRun:
 
 
 if __name__ == "__main__":
-    ipdb.set_excepthook()
-
     SField_Matern.Init()
     run = MyRun()
     mimclib.test.RunStandardTest(fnSampleLvl=run.mySampleQoI,

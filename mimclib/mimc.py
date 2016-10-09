@@ -9,7 +9,6 @@ import numpy as np
 import itertools
 import warnings
 from . import setutil
-from . import ipdb
 from scipy.stats import norm
 
 __all__ = []
