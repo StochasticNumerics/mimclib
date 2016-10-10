@@ -342,7 +342,6 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             runAll = cur.execute(
                         '''SELECT r.run_id, r.params, r.TOL, r.comment, r.fn, r.tag, r.totalTime
                         FROM tbl_runs r WHERE r.run_id in ?''', [run_ids]).fetchall()
-
             iterAll = cur.execute('''
 SELECT dr.run_id, dr.iter_id, dr.TOL, dr.creation_date,
         dr.totalTime, dr.bias, dr.stat_error, dr.Qparams, dr.userdata,
@@ -361,33 +360,28 @@ ORDER BY dr.run_id, dr.iteration_idx
 
         dictRuns = dict()
         import dill
-        for run in runAll:
-            dictRuns[run[0]] = {"params" : _unpickle(run[1]),
-                                "TOL" : run[2],
-                                "comment" : run[3],
-                                "fn" :  _unpickle(run[4], load=dill.load),
-                                "tag" : run[5],
-                                "totalTime" : run[6]}
-
         dictLvls = dict()
+        dictIters = dict()
         import itertools
         for iter_id, itr in itertools.groupby(lvlsAll, key=lambda x:x[0]):
             dictLvls[iter_id] = list(itr)
+        for run_id, itr in itertools.groupby(iterAll, key=lambda x: x[0]):
+            dictIters[run_id] = list(itr)
 
-        for run_id, iter_iterator in itertools.groupby(iterAll,
-                                                       key=lambda x: x[0]):
-            run_params = dictRuns[run_id]
-            run = mimc.MIMCRun(**run_params["params"].getDict())
+        for run_data in runAll:
+            run = mimc.MIMCRun(**_unpickle(run_data[1]).getDict())
             run.db_data = mimc.Bunch()
-            run.db_data.finalTOL = run_params["TOL"]
-            run.db_data.comment = run_params["comment"]
-            run.db_data.tag = run_params["tag"]
-            run.db_data.totalTime = run_params["totalTime"]
-            run.db_data.run_id = run_id
+            run.db_data.finalTOL = run_data[2]
+            run.db_data.comment = run_data[3]
+            run.db_data.tag = run_data[5]
+            run.db_data.totalTime = run_data[6]
+            run.db_data.run_id = run_data[0]
 
-            run.setFunctions(**run_params["fn"])
+            run.setFunctions(**_unpickle(run_data[4], load=dill.load))
             lstruns.append(run)
-            for i, data in enumerate(iter_iterator):
+            if run.db_data.run_id not in dictIters:
+                continue
+            for i, data in enumerate(dictIters[run.db_data.run_id]):
                 iter_id = data[1]
                 assert(i == data[9])  # Should be the same as the iteration index
                 if run.last_itr is not None:

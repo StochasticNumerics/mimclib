@@ -877,7 +877,7 @@ def plotThetaRefVsTOL(ax, runs, eta, chi, *args, **kwargs):
                             for _, itr in enum_iter(runs, filteritr)])
     else:
         summary = np.array([[itr.TOL,
-                             (1. + (1./(2.*eta))*(1.-chi)/(1.-chi**(L(r)+1.)))**-1]
+                             (1. + (1./(2.*eta))*(1.-chi)/(1.-chi**(L(itr)+1.)))**-1]
                             for _, itr in enum_iter(runs, filteritr)])
     TOL, thetaRef = __get_stats(summary, staton=1)
 
@@ -989,7 +989,6 @@ def __plot_except(ax):
     traceback.print_exc(limit=None)
     print('-----------------------------------------------------')
 
-    raise
 
 @public
 def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
@@ -1329,7 +1328,7 @@ def run_program():
     if args.verbose:
         print("Plotting data")
 
-    miplot.genPDFBooklet(run_data,
+    miplot.genPDFBooklet(filter(lambda r: len(r.iters) > 0, run_data),
                          fileName=args.o,
                          exact=args.qoi_exact, verbose=args.verbose,
                          filteritr = filteritr_all if args.all_itr

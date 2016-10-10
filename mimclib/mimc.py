@@ -580,7 +580,11 @@ Bias={:.12e}\nStatErr={:.12e}\
 
     def _estimateBias(self):
         if not self.params.bayesian:
-            return self.last_itr.get_lvls().estimate_bias(self.fn.Norm(self.last_itr.calcDeltaEl()))
+            bias = self.last_itr.get_lvls().estimate_bias(self.fn.Norm(self.last_itr.calcDeltaEl()))
+            tmp = self.fn.Norm(self.last_itr.calcDeltaEl())
+            L = np.sum(self.last_itr.get_lvls().to_dense_matrix(), axis=1)
+            assert(bias >= np.sum(tmp[L == np.max(L)]))
+            return bias
         return self._estimateBayesianBias()
 
     def estimateMonteCarloSampleCount(self, TOL):
