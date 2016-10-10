@@ -160,7 +160,9 @@ class SQLiteDBConn(object):
         new_params = []
         for p in params:
             prev = query.find('?', prev+1)
-            if type(p) in [list, tuple]:
+            if type(p) in [np.uint16, np.uint32, np.uint64]:
+                new_params.append(np.int64(p))  # sqlite is really fussy about this
+            elif type(p) in [list, tuple]:
                 rep = "(" + ",".join("?"*len(p)) + ")"
                 query = query[:prev] + rep + query[prev+1:]
                 prev += len(rep)

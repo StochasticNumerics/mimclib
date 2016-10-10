@@ -288,7 +288,7 @@ class VarSizeList(object):
     def to_sparse_matrix(self, d_start=0, d_end=None):
         # Assumes that the martix is base 0
         d_end = d_end or self.max_dim()
-        assert(d_end > d_start)
+        assert(d_end >= d_start)
         ind_count = np.sum(self.get_active_dim())
         ij = np.empty(int(ind_count*2), dtype=ind_t)
         data = np.empty(ind_count, dtype=ind_t)

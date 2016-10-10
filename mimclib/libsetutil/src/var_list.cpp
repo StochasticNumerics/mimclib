@@ -443,7 +443,8 @@ double VarSizeList::estimate_bias(const double *err_contributions,
         }
     }
     double bias=0;
-    for (auto itr=map_contrib.begin();itr!=map_contrib.end();itr++)
+    for (auto itr=map_contrib.begin();itr!=map_contrib.end();itr++){
         bias += itr->second;
+    }
     return bias;
 }

@@ -834,9 +834,23 @@ def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
     ax is in instance of matplotlib.axes
     """
     filteritr = kwargs.pop("filteritr", filteritr_all)
-    summary = np.array([[itr.TOL,
-                         np.max([np.sum(l) for l in itr.lvls_itr()])]
-                        for _, itr in enum_iter(runs, filteritr)])
+    summary = []
+    for r in runs:
+        prev = 0
+        prevMax = 0
+        for i in xrange(0, len(r.iters)):
+            if not filteritr(r, i):
+                continue
+            itr = r.iters[i]
+            stats = [np.sum(data) for j, data in itr.lvls_sparse_itr(prev)]
+            if len(stats) == 0:
+                assert(prev > 0)
+                summary.append([itr.TOL, prevMax])
+            else:
+                summary.append([itr.TOL, np.maximum(np.max(stats), prevMax)])
+            prev = itr.lvls_count
+
+    summary = np.array(summary)
 
     ax.set_xscale('log')
     ax.set_xlabel('TOL')
