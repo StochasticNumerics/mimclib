@@ -18,7 +18,7 @@ setup(
     # 1st is increased if it is not compatible with previous version.
     # 2nd is increased if new features are added.
     # 3rd is increased for small fixes.
-    version="1.0.2.dev2",
+    version="1.0.2.dev3",
     author="Abdul-Lateef Haji-Ali",
     author_email="abdullateef.hajiali@kaust.edu.sa",
     description="A library implementing the MIMC and CMLMC methods.",
