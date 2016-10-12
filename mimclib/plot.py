@@ -318,6 +318,7 @@ def computeIterationStats(runs, work_bins, xi, filteritr, fnNorm=None,
     val = []
     for r in runs:
         prev = 0
+        totalTime = 0
         for i in xrange(0, len(r.iters)):
             if not filteritr(r, i):
                 continue
@@ -334,7 +335,8 @@ def computeIterationStats(runs, work_bins, xi, filteritr, fnNorm=None,
                 if prev > 0:
                     stats = mymax(np.vstack((stats, xy[-1][5:])))
 
-            xy.append([itr.calcTotalWork(), itr.calcTotalTime(),
+            totalTime += itr.totalTime
+            xy.append([itr.calcTotalWork(), totalTime, # calcTotalTime(),
                        itr.TOL, 0, modifier*itr.totalErrorEst()]+stats)
             val.append(itr.calcEg())
             prev = itr.lvls_count
@@ -845,12 +847,17 @@ def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
             stats = [np.sum(data) for j, data in itr.lvls_sparse_itr(prev)]
             if len(stats) == 0:
                 assert(prev > 0)
-                summary.append([itr.TOL, prevMax])
+                newMax = prevMax
             else:
-                summary.append([itr.TOL, np.maximum(np.max(stats), prevMax)])
+                newMax = np.maximum(np.max(stats), prevMax)
+            summary.append([itr.TOL, newMax])
             prev = itr.lvls_count
+            prevMax = newMax
 
     summary = np.array(summary)
+
+    from mimclib import ipdb
+    ipdb.embed()
 
     ax.set_xscale('log')
     ax.set_xlabel('TOL')
@@ -1071,6 +1078,17 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
     try:
         plotWorkVsMaxError(ax, runs, exact=exact, filteritr=filteritr,
                            relative=True, fnNorm=fn.Norm, fmt='-*',
+                           ErrEst_kwargs={'fmt': '--*', 'label': 'Error Estimate'},
+                           Ref_kwargs={'ls': '--', 'c':'k', 'label': '{rate:.2g}'})
+    except:
+        __plot_except(ax)
+
+
+    print_msg("plotWorkVsMaxError")
+    ax = add_fig()
+    try:
+        plotWorkVsMaxError(ax, runs, exact=exact, filteritr=filteritr,
+                           x_axis='time', relative=True, fnNorm=fn.Norm, fmt='-*',
                            ErrEst_kwargs={'fmt': '--*', 'label': 'Error Estimate'},
                            Ref_kwargs={'ls': '--', 'c':'k', 'label': '{rate:.2g}'})
     except:

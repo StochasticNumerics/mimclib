@@ -553,13 +553,19 @@ for tolerance smaller than TOL. Not needed if TOLs is provided to doRun.")
 Not needed if fnHierarchy is provided.")
         return mimcgrp
 
-    def __str__(self):
-        output = "Eg={}\n\
+    def output(self, verbose):
+        output = ''
+        if verbose >= VERBOSE_INFO:
+            output += "Eg={}\n\
 Bias={:.12e}\nStatErr={:.12e}\
 \nTotalErrEst={:.12e} | {:.12e}\n".format(str(self.last_itr.calcEg()),
                                           self.bias, self.stat_error,
                                           self.totalErrorEst(),
                                           self.last_itr.TOL)
+        if verbose < VERBOSE_DEBUG:
+            print(output, end="")
+            return
+
         V = self.Vl_estimate
         Vl = self.fn.Norm(self.last_itr.calcDeltaVl())
         E = self.fn.Norm(self.last_itr.calcDeltaEl())
@@ -571,7 +577,7 @@ Bias={:.12e}\nStatErr={:.12e}\
             #,100 * np.sqrt(V[i]) / np.abs(E[i])
             output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
                 str(self.last_itr.lvls_get(i)), E[i], V[i], Vl[i], self.last_itr.M[i], T[i]))
-        return output
+        print(output, end="")
 
     def fnNorm1(self, x):
         """ Helper function to return norm of a single element
@@ -866,8 +872,8 @@ estimate optimal number of levels"
                     timer.ptoc()
                 samples_added = self._genSamples(todoM) or samples_added
                 self.last_itr.totalTime = timer.toc()
-                print_debug(self, end="")
-                print_debug("------------------------------------------------")
+                self.output(verbose=verbose)
+                print_info("------------------------------------------------")
                 if verbose > VERBOSE_INFO:
                     timer.ptoc()
                 if samples_added:

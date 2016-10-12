@@ -7,10 +7,11 @@ from . import setutil
 
 
 class MISCSampler(object):
-    def __init__(self, d, fnKnots, prevData=None, points_tol=1e-14):
+    def __init__(self, d, fnKnots, prevData=None, points_tol=1e-14, min_dim=0):
         self.d = d
         self.points_tol = points_tol
         self.fnKnots = fnKnots
+        self.min_dim = min_dim
         if prevData is not None:
             assert(self.d == prevData.d)
             self.sample_pool = prevData.sample_pool
@@ -37,14 +38,16 @@ class MISCSampler(object):
             output[i] = val
             if needsample[i]:
                 new_points.append(pt)
+
         if sum(needsample) > 0:
-            new_values = sf(alpha, new_points)
+            new_values = sf(alpha, self.inflatePoints(new_points))
             output[needsample] = new_values
             for i, pt in enumerate(new_points):
                 pdict.add_node(pt, new_values[i], eps=self.points_tol)
         return output#, points
 
     def collapsePoints(self, pts):
+        # Remove zeros at the end of each point
         for i in range(0, len(pts)):
             mask = np.abs(pts[i]) > self.points_tol
             # get last
@@ -55,6 +58,16 @@ class MISCSampler(object):
                 pts[i] = np.array([])  # No points are greater than zero
                 pass
         return pts
+
+    def inflatePoints(self, pts):
+        # Add zeros to the end of each point
+        new_pts = []
+        for i, pt in enumerate(pts):
+            if len(pt) >= self.min_dim:
+                new_pts.append(pt)
+            else:
+                new_pts.append(np.hstack((pt, np.zeros(self.min_dim-len(pt)))))
+        return new_pts
 
     def tensor_from_pool(self, beta):
         # generate the pattern that will be used for knots and weights matrices, e.g.
