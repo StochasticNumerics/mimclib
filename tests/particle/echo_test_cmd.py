@@ -36,7 +36,7 @@ if __name__ == "__main__":
         print(cmd_single.format(seed=0, bayesian=False, TOL=0.001))
     else:
         cmd_multi = "python " + base + " -mimc_verbose 0 -db True -db_tag {tag} "
-        TOL = 5e-5
+        TOL = 1e-4 * 2**-2
         for i in range(0, args.tries):
             print cmd_multi.format(bayesian=False,
                                    tag="mckean_{}".format(dim), TOL=TOL,

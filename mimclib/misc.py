@@ -279,8 +279,7 @@ def knots_uniform(n, x_a, x_b, whichrho='prob'):
         # calculates the values of the recursive relation
         [a, b] = coeflege(n)
         # builds the matrix
-        JacM = np.diag(a)+np.diag(np.sqrt(b[1:n]), 1.) + np.diag(
-            np.sqrt(b[1:n]), (-1.))
+        JacM = np.diag(a)+np.diag(np.sqrt(b[1:n]), 1) + np.diag(np.sqrt(b[1:n]), -1)
         # calculates points and weights from eigenvalues / eigenvectors of JacM
         [x, W] = np.linalg.eig(JacM)
         wt = W[0, :]**2.
@@ -317,10 +316,13 @@ def lev2knots_doubling(i):
     # Copyright (c) 2009-2014 L. Tamellini, F. Nobile
     # See LICENSE.txt for license
     # ----------------------------------------------------
-    i = np.array([i] if np.isscalar(i) else i, dtype=np.int)
+    scalar = np.isscalar(i)
+    i = np.array([i] if scalar else i, dtype=np.int)
     m = 2 ** (i-1)+1
     m[i==1] = 1
     m[i==0] = 0
+    if scalar:
+        return m[0]
     return m
 
 

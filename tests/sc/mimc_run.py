@@ -43,11 +43,18 @@ class MyRun:
         return self.misc.sample(inds, M, fnSample=self.func)
 
     def workModel(self, run, lvls):
-        return np.prod(2**lvls.to_dense_matrix(), axis=1)
+        mat = lvls.to_dense_matrix()
+        return np.prod(2**mat , axis=1) * 2.**np.sum(mat > 0, axis=1)
 
     def initRun(self, run):
-        fnKnots = lambda beta: misc.knots_CC(misc.lev2knots_doubling(1+beta),
-                                             0, 1, 'nonprob')
+        if run.params.qoi_knots.lower() == "uniform":
+            fnKnots = lambda beta: misc.knots_uniform(misc.lev2knots_linear(1+beta),
+                                                      0, 1, 'nonprob')
+        else:
+            assert(run.params.qoi_knots.lower() == "cc")
+            fnKnots = lambda beta: misc.knots_CC(misc.lev2knots_doubling(1+beta),
+                                                 0, 1, 'nonprob')
+
         self.misc = misc.MISCSampler(d=0, fnKnots=fnKnots, min_dim=run.params.min_dim)
 
         b = [9.0, 7.25, 1.85, 7.03, 2.04, 4.3]
@@ -60,6 +67,9 @@ class MyRun:
         run.params.qoi_w = 1./np.arange(1.,run.params.qoi_dim+1, dtype=np.float)#np.random.random(size=run.params.qoi_dim)
         run.params.qoi_c = np.arange(1,run.params.qoi_dim+1, dtype=np.float) #np.random.random(size=run.params.qoi_dim)
         run.params.qoi_c *= b[run.params.qoi_func-1] / np.sum(run.params.qoi_c)
+
+        run.params.qoi_c = np.array([2.71,0.16,3.42,2.71])
+        run.params.qoi_w = np.array([0.42,0.72,0.01,0.3])
 
         run.setFunctions(ExtendLvls=lambda lvls, r=run: self.extendLvls(run, lvls),
                          WorkModel=lambda lvls, r=run: self.workModel(run, lvls),
@@ -101,12 +111,13 @@ class MyRun:
                 setattr(namespace, self.dest, np.array(values))
 
         parser.add_argument("-qoi_dim", type=int, default=10, action="store")
+        parser.add_argument("-qoi_knots", type=str, default="cc", action="store")
         parser.add_argument("-qoi_func", type=int, default=1, action="store")
 
 
 if __name__ == "__main__":
-    import mimclib.ipdb
-    mimclib.ipdb.set_excepthook()
+    from mimclib import ipdb
+    ipdb.set_excepthook()
 
     run = MyRun()
     mimclib.test.RunStandardTest(fnSampleLvl=run.mySampleQoI,
