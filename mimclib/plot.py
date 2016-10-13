@@ -856,9 +856,6 @@ def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
 
     summary = np.array(summary)
 
-    from mimclib import ipdb
-    ipdb.embed()
-
     ax.set_xscale('log')
     ax.set_xlabel('TOL')
     ax.set_ylabel(r'$L$')
