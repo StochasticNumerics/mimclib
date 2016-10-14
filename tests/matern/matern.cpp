@@ -12,23 +12,26 @@ typedef const void *CSField;
 
 #pragma GCC visibility push(default)
 extern "C"{
-void SFieldCreate(SField *_sf,
-                         int problem_arg,
-                         uint d,
-                         double a0,
-                         double f0,
-                         double df_nu,
-                         double df_L,
-                         double df_sig,
-                         double qoi_scale,
-                         double *qoi_x0,
-                         double qoi_sigma);
-int SFieldBeginRuns(SField sfv,
-                    unsigned int N,
-                    const unsigned int *nelem);
-double SFieldSolveFor(SField sfv, double *Y, unsigned int yCount);
-void SFieldEndRuns(SField sfv);
-void SFieldDestroy(SField *_sf);
+    void SFieldCreate(SField *_sf,
+                      int problem_arg,
+                      uint d,
+                      double a0,
+                      double f0,
+                      double df_nu,
+                      double df_L,
+                      double df_sig,
+                      double qoi_scale,
+                      double *qoi_x0,
+                      double qoi_sigma);
+    int SFieldBeginRuns(SField sfv,
+                        unsigned int N,
+                        const unsigned int *nelem);
+    double SFieldSolveFor(SField sfv, double *Y, unsigned int yCount);
+    void SFieldGetSolution(SField sfv, double *Y, unsigned int yCount,
+                           double *out_x, double *out_y, unsigned int out_size);
+
+    void SFieldEndRuns(SField sfv);
+    void SFieldDestroy(SField *_sf);
 }
 #pragma GCC visibility pop
 
@@ -316,8 +319,7 @@ void JacobianOnD(Mat J, Vec F, unsigned int i, int* pt, myCSField sf){
     VecSetValue(F, r, -forcing, INSERT_VALUES);
 }
 
-double SFieldSolveFor(SField sfv, double *Y, unsigned int yCount) {
-    mySField sf = static_cast<mySField>(sfv);
+PetscErrorCode SolveFor(mySField sf, double *Y, unsigned int yCount){
     assert(yCount <= sf->maxN);
     assert(Y);
     assert(sf->running);
@@ -345,8 +347,44 @@ double SFieldSolveFor(SField sfv, double *Y, unsigned int yCount) {
     ierr = KSPSolve(sf->ksp,sf->F,sf->U); CHKERRQ(ierr);
     PetscTime(&toc);
     sf->timeSolver  += toc-tic;
+    return 0;
+}
+
+double SFieldSolveFor(SField sfv, double *Y, unsigned int yCount) {
+    mySField sf = static_cast<mySField>(sfv);
+    SolveFor(sf, Y, yCount);
+    int pt[sf->d];
     return Integrate(sf->U,pt,0,sf);
 }
+
+void SFieldGetSolution(SField sfv, double *Y, unsigned int yCount,
+                       double* out_x, double *out_y,
+                       unsigned int out_size){
+    mySField sf = static_cast<mySField>(sfv);
+    SolveFor(sf, Y, yCount);
+
+    PetscInt size;
+    VecGetSize(sf->U, &size);
+    assert(size > 0 && static_cast<unsigned int>(size) <= out_size);
+
+    PetscScalar *arr;
+    VecGetArray(sf->U, &arr);
+    double x[sf->d];
+    for (unsigned int j=0;j<sf->d;j++)
+        x[j] = 0;
+
+    for (PetscInt i=0;i<size;i++){
+        out_y[i] = arr[i];
+        for (unsigned int j=0;j<sf->d;j++){
+            out_x[j] = x[j];
+            x[j] += dx(j, sf);
+        }
+        out_x += sf->d;
+    }
+
+    VecRestoreArray(sf->U, &arr);
+}
+
 
 void SFieldEndRuns(SField sfv) {
     mySField sf = static_cast<mySField>(sfv);

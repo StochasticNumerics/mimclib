@@ -131,7 +131,8 @@ class MyRun:
         parser.add_argument("-qoi_scale", type=float, default=1., action="store")
         parser.add_argument("-qoi_sigma", type=float, default=1., action="store")
         parser.add_argument("-qoi_x0", type=float, nargs='+',
-                            default=[0.4,0.2,0.6], action=store_as_array)
+                            default=np.array([0.4,0.2,0.6]),
+                            action=store_as_array)
 
 
 if __name__ == "__main__":

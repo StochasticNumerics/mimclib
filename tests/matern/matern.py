@@ -23,6 +23,11 @@ __lib__.SFieldBeginRuns.argtypes = [ct.c_voidp, ct.c_uint32, __arr_uint32_1__]
 __lib__.SFieldSolveFor.restype = ct.c_double
 __lib__.SFieldSolveFor.argtypes = [ct.c_voidp, __arr_double_1__, ct.c_uint32]
 
+__lib__.SFieldGetSolution.restype = None
+__lib__.SFieldGetSolution.argtypes = [ct.c_voidp, __arr_double_1__,
+                                      ct.c_uint32, __arr_double_1__,
+                                      __arr_double_1__, ct.c_uint32]
+
 # __lib__.SFieldEndRuns.restype = None
 # __lib__.SFieldEndRuns.argtypes = [ct.c_voidp]
 
@@ -31,8 +36,9 @@ __lib__.SFieldSolveFor.argtypes = [ct.c_voidp, __arr_double_1__, ct.c_uint32]
 
 
 class SField_Matern(object):
-    def __init__(self, params):
+    def __init__(self, params, nested=False):
         self.ref = ct.c_voidp()
+        self.nested = nested
         self.params = params
         assert(len(params.qoi_x0) >= params.qoi_dim), "x0 should have d dimension"
         #print("---------", d, a0, f0, nu, L, x0, sigma)
@@ -46,14 +52,19 @@ class SField_Matern(object):
                              params.qoi_x0,
                              params.qoi_sigma)
 
+
     def BeginRuns(self, ind, N):
-        nelem = np.array(self.params.h0inv * self.params.beta**(np.array(ind)), dtype=np.uint32)
-        __lib__.SFieldBeginRuns(self.ref, N, nelem)
+        self.nelem = np.array(self.params.h0inv * self.params.beta**(np.array(ind)), dtype=np.uint32)
+        if self.nested:
+            self.nelem -= 1   # Making it nested
+        assert(len(self.nelem) == self.GetDim())
+        __lib__.SFieldBeginRuns(self.ref, N, self.nelem)
 
     def SolveFor(self, Y):
         return __lib__.SFieldSolveFor(self.ref, Y, Y.shape[0])
 
     def EndRuns(self):
+        self.nelem = None
         __lib__.SFieldEndRuns(self.ref)
 
 
@@ -67,6 +78,14 @@ class SField_Matern(object):
                 val[m, i] = self.SolveFor(sample_rand[m, :])
             self.EndRuns()
         return val
+
+    def GetSolution(self, Y):
+        size = np.prod(self.nelem)
+        x = np.empty(int(self.GetDim() * size))
+        y = np.empty(size)
+        __lib__.SFieldGetSolution(self.ref, Y, len(Y),
+                                  x, y, len(y))
+        return x.reshape((self.GetDim(), size)), y
 
     def destroy(self):
         __lib__.SFieldDestroy(ct.byref(self.ref))
