@@ -7,7 +7,7 @@ Please try out running the single sequential run first, as it depends
 on much fewer dependencies. In case you face problems running the
 parallel example, but not the single example, make sure that:
 
-1. You have MySQL running on your machine with appropriate access rights
+1. You have liteSQL installed
 2. You have GNU parallel installed
 
 In case you have problems, please consult the issue tracker at:
