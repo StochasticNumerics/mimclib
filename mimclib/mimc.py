@@ -735,7 +735,7 @@ estimate optimal number of levels"
         # the time estimate
         calcM = 0
         total_time = 0
-        p = np.arange(1, self.last_itr.computedMoments()+1)
+        p = self.last_itr.computedMoments()
         psums_delta = _empty_obj()
         psums_fine = _empty_obj()
         while calcM < M:
@@ -749,11 +749,10 @@ estimate optimal number of levels"
                            axis=1)
             # TODO: We should optimize to use the fact that p is integer with
             # specific numbers. Use cumprod
-            A1 = np.tile(delta, (len(p),) + (1,)*len(delta.shape) )
-            A2 = np.tile(values[:, 0], (len(p),) + (1,)*len(delta.shape) )
-            B = _expand(p, 0, A1.shape)
-            psums_delta += np.sum(A1**B, axis=1)
-            psums_fine += np.sum(A2**B, axis=1)
+            A1 = np.tile(delta, (p,) + (1,)*len(delta.shape) )
+            A2 = np.tile(values[:, 0], (p,) + (1,)*len(delta.shape) )
+            psums_delta += np.sum(np.cumprod(A1, axis=0), axis=1)
+            psums_fine += np.sum(np.cumprod(A2, axis=0), axis=1)
             calcM += values.shape[0]
 
         return calcM, psums_delta, psums_fine, total_time
