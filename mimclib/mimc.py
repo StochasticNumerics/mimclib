@@ -389,6 +389,10 @@ class MIMCRun(object):
     def stat_error(self):
         return self.last_itr.stat_error
 
+    @property
+    def iter_total_times(self):
+        return np.cumsum([itr.totalTime for itr in self.iters])
+
     def calcEg(self):
         return self.last_itr.calcEg()
 
@@ -586,10 +590,9 @@ Bias={:.12e}\nStatErr={:.12e}\
 
     def _estimateBias(self):
         if not self.params.bayesian:
-            bias = self.last_itr.get_lvls().estimate_bias(self.fn.Norm(self.last_itr.calcDeltaEl()))
-            # tmp = self.fn.Norm(self.last_itr.calcDeltaEl())
-            # L = np.sum(self.last_itr.get_lvls().to_dense_matrix(), axis=1)
-            # assert(bias >= np.sum(tmp[L == np.max(L)]))
+            El = self.last_itr.calcDeltaEl()
+            bias = self.last_itr.get_lvls().estimate_bias(self.fn.Norm(El))
+            #bias = np.abs(np.sum(El[self.last_itr.get_lvls().is_boundary()]))
             return bias
         return self._estimateBayesianBias()
 
@@ -744,6 +747,8 @@ estimate optimal number of levels"
             delta = np.sum(values * \
                            _expand(mods, 1, values.shape),
                            axis=1)
+            # TODO: We should optimize to use the fact that p is integer with
+            # specific numbers. Use cumprod
             A1 = np.tile(delta, (len(p),) + (1,)*len(delta.shape) )
             A2 = np.tile(values[:, 0], (len(p),) + (1,)*len(delta.shape) )
             B = _expand(p, 0, A1.shape)
@@ -942,6 +947,7 @@ def get_optimal_hl(mimc):
 
 @public
 def calcMIMCRate(w, s, gamma):
+    w, s, gamma = np.array(w), np.array(s), np.array(gamma)
     d = len(w)
     if len(s) != d or len(gamma) != d:
         raise ValueError("w,s and gamma must have the same size")

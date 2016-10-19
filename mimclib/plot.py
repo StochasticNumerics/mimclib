@@ -216,6 +216,13 @@ def enum_iter(runs, fnFilter):
             if fnFilter(r, i):
                 yield r, r.iters[i]
 
+def enum_iter_i(runs, fnFilter):
+    for r in runs:
+        for i in xrange(0, len(r.iters)):
+            if fnFilter(r, i):
+                yield i, r, r.iters[i]
+
+
 def estimate_exact(runs):
     minErr = np.min([r.totalErrorEst() for r in runs])
     exact = np.mean([r.calcEg() for r in runs if
@@ -240,7 +247,7 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     run_data[i].data is an instance of mimc.MIMCData
     """
 
-    fnNorm = kwargs.pop('fnNorm')
+    fnNorm = kwargs.pop('fnNorm', np.abs)
     num_kwargs = kwargs.pop('num_kwargs', None)
     exact = kwargs.pop('exact')
     relative_error = kwargs.pop('relative', True)
@@ -256,11 +263,11 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     plotObj = []
 
     ax.set_xlabel('TOL')
-    ax.set_ylabel('Errors')
+    ax.set_ylabel('Relative error' if relative_error else 'Error')
     ax.set_yscale('log')
     ax.set_xscale('log')
 
-    ErrEst_kwargs = kwargs.pop('ErrEst_kwargs')
+    ErrEst_kwargs = kwargs.pop('ErrEst_kwargs', None)
     Ref_kwargs = kwargs.pop('Ref_kwargs')
     sel = np.logical_and(np.isfinite(xy[:, 1]), xy[:, 1] >=
                          np.finfo(float).eps)
@@ -280,7 +287,7 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
 
     if num_kwargs is not None:
         import itertools
-        xy = xy[xy[:,0].argsort()]
+        xy = xy[xy[:,0].argsort(), :]
         for TOL, itr in itertools.groupby(xy, key=lambda x: x[0]):
             curItr = np.array(list(itr))
             invalid = np.sum(curItr[:, 0]*modifier <= curItr[:, 1])
@@ -354,12 +361,12 @@ def computeIterationStats(runs, work_bins, xi, filteritr, fnNorm=None,
     for i, b in enumerate(ubins):
         d = xy[bins==b, :]
         xy_binned[i, 0] = np.mean(d[:, xi])  # Mean work
-        xy_binned[i, 1] = np.max(d[:, 3])  # Max exact error
-        xy_binned[i, 2] = np.min(d[:, 4])  # min error estimate
+        xy_binned[i, 1] =  np.max(d[:, 3])   # Max exact error
+        xy_binned[i, 2] =  np.min(d[:, 4])   # min error estimate
 
-        xy_binned[i, 3] = np.max(d[:, 5])  # Max dimension
-        xy_binned[i, 4] = np.max(d[:, 6])  # max level in all dim
-        xy_binned[i, 5] = np.max(d[:, 7])  # max active dim
+        xy_binned[i, 3] =  np.max(d[:, 5])   # Max dimension
+        xy_binned[i, 4] =  np.max(d[:, 6])   # max level in all dim
+        xy_binned[i, 5] =  np.max(d[:, 7])   # max active dim
 
     xy_binned = xy_binned[xy_binned[:,0].argsort(), :]
     return xy_binned
@@ -417,7 +424,7 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
 
 @public
 def plotWorkVsMaxError(ax, runs, *args, **kwargs):
-    fnNorm = kwargs.pop('fnNorm')
+    fnNorm = kwargs.pop('fnNorm', np.abs)
     exact = kwargs.pop('exact')
     relative = kwargs.pop('relative', True)
     work_bins = kwargs.pop('work_bins', 50)
@@ -509,16 +516,16 @@ def __calc_moments(runs, seed=None, direction=None, fnNorm=None):
 
             tmp = Vl_estimate.shape[0]
             Vl_estimate.resize((L, len(runs)), refcheck=False)
-            Vl_estimate[tmp:] = np.nan
+            Vl_estimate[tmp:, :] = np.nan
 
             tmp = Tl.shape[0]
             Tl.resize((L, len(runs)), refcheck=False)
-            Tl[tmp:] = np.nan
+            Tl[tmp:, :] = np.nan
 
         Vl_estimate[:L, i] = curRun.Vl_estimate[inds]
         Vl_estimate[(L+1):, i] = np.nan
         Tl[:L, i] = curRun.last_itr.tT[inds]/curRun.last_itr.M[inds]
-        Tl[(L+1):, i] = np.nan
+        Tl[L:, i] = np.nan
 
     central_delta_moments = np.empty((psums_delta.shape[0],
                                       psums_delta.shape[1]), dtype=float)
@@ -610,7 +617,7 @@ def plotExpectVsLvls(ax, runs, *args, **kwargs):
     ax.set_ylabel(r'$E_\ell$')
     ax.set_yscale('log')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    fnNorm = kwargs.pop("fnNorm")
+    fnNorm = kwargs.pop("fnNorm", np.abs)
     if "__calc_moments" in kwargs:
         central_delta_moments, central_fine_moments, _, M, _ = kwargs.pop("__calc_moments")
     else:
@@ -651,7 +658,7 @@ def plotVarVsLvls(ax, runs, *args, **kwargs):
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
-    fnNorm = kwargs.pop("fnNorm")
+    fnNorm = kwargs.pop("fnNorm", np.abs)
     if "__calc_moments" in kwargs:
         central_delta_moments, central_fine_moments, \
             _, M, Vl_estimate = kwargs.pop("__calc_moments")
@@ -710,7 +717,7 @@ def plotKurtosisVsLvls(ax, runs, *args, **kwargs):
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$\textnormal{Kurt}_\ell$')
     ax.set_yscale('log')
-    fnNorm = kwargs.pop("fnNorm")
+    fnNorm = kwargs.pop("fnNorm", np.abs)
     if "__calc_moments" in kwargs:
         central_delta_moments, _,  _, _, _ = kwargs.pop("__calc_moments")
     else:
@@ -736,7 +743,7 @@ def plotSkewnessVsLvls(ax, runs, *args, **kwargs):
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$\textnormal{Skew}_\ell$')
     ax.set_yscale('log')
-    fnNorm = kwargs.pop("fnNorm")
+    fnNorm = kwargs.pop("fnNorm", np.abs)
     if "__calc_moments" in kwargs:
         central_delta_moments, _, _, _, _ = kwargs.pop("__calc_moments")
     else:
@@ -762,7 +769,7 @@ def plotTimeVsLvls(ax, runs, *args, **kwargs):
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel('Time (s)')
     ax.set_yscale('log')
-    fnNorm = kwargs.pop("fnNorm")
+    fnNorm = kwargs.pop("fnNorm", np.abs)
     if "__calc_moments" in kwargs:
         _, _, Tl, M, _ = kwargs.pop("__calc_moments")
     else:
@@ -772,10 +779,10 @@ def plotTimeVsLvls(ax, runs, *args, **kwargs):
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     min_tl = np.nanpercentile(Tl, 5, axis=1)
-    med = np.nanmean(Tl, axis=1)
+    med    = np.nanpercentile(Tl, 50, axis=1)
     max_tl = np.nanpercentile(Tl, 95, axis=1)
-    line = ax.errorbar(np.arange(0, len(Tl)),
-                       med, yerr=[med-min_tl, max_tl-med],
+    line = ax.errorbar(np.arange(0, len(Tl)), med,
+                       yerr=[med-min_tl, max_tl-med],
                        *args, **kwargs)
     return line[0].get_xydata(), [line]
 
@@ -788,13 +795,17 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
     """
     filteritr = kwargs.pop("filteritr", filteritr_all)
     work_estimate = kwargs.pop("work_estimate", False)
-    if kwargs.pop("real_time", False):
+    MC_kwargs = kwargs.pop("MC_kwargs", None)
+    real_time = kwargs.pop("real_time", False)
+    if real_time:
         if work_estimate:
             raise ValueError("real_time and work_estimate cannot be both True")
-        if 'MC_kwargs' in kwargs:
+        if MC_kwargs is not None:
             raise ValueError("Cannot estimate real time of Monte Carlo")
 
-        xy = [[r.db_data.finalTOL, r.db_data.totalTime] for r in runs]
+        xy = [[itr.TOL, r.iter_total_times[i],
+               np.max(itr.Wl_estimate) * r.estimateMonteCarloSampleCount(itr.TOL)]
+              for i, r, itr in enum_iter_i(runs, filteritr)]
     elif work_estimate:
         xy = [[itr.TOL, np.sum(itr.M*itr.Wl_estimate),
                np.max(itr.Wl_estimate) * r.estimateMonteCarloSampleCount(itr.TOL)]
@@ -808,13 +819,13 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
     ax.set_xlabel('TOL')
     if work_estimate:
         ax.set_ylabel('Work estimate')
+    elif real_time:
+        ax.set_ylabel('Wall clock time (s)')
     else:
-        ax.set_ylabel('Average Time (s)')
+        ax.set_ylabel('Running time (s)')
 
     plotObj = []
     TOLs, times = __get_stats(xy)
-    MC_kwargs = kwargs.pop("MC_kwargs", None)
-
     plotObj.append(ax.errorbar(TOLs, times[:, 1], *args,
                                yerr=[times[:, 1]-times[:, 0],
                                      times[:, 2]-times[:, 1]],
@@ -926,7 +937,7 @@ def plotErrorsQQ(ax, runs, *args, **kwargs):
         tol = unTOLs[np.argmax(np.bincount(np.digitize(TOLs, unTOLs)))-1]
     else:
         tol = kwargs.pop("tol")
-    fnNorm = kwargs.pop('fnNorm')
+    fnNorm = kwargs.pop('fnNorm', np.abs)
     from scipy.stats import norm
     x_data = np.array([itr.calcEg() for _, itr in enum_iter(runs, filteritr) if
                        itr.TOL == tol])
@@ -1010,12 +1021,12 @@ def __plot_except(ax):
 @public
 def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
     import matplotlib.pyplot as plt
+    if len(runs) == 0:
+        raise Exception("No runs!!!")
 
-
-    filteritr = kwargs.pop("filteritr", filteritr_convergent)
-
+    filteritr = kwargs.pop("filteritr", filteritr_all)
     TOLs_count = len(np.unique([itr.TOL for _, itr in enum_iter(runs, filteritr)]))
-    convergent_count = len(np.unique([itr.TOL for _, itr in enum_iter(runs, filteritr_convergent)]))
+    convergent_count = len([itr.TOL for _, itr in enum_iter(runs, filteritr_convergent)])
     iters_count = np.sum([len(r.iters) for r in runs])
     verbose = kwargs.pop('verbose', False)
     if verbose:
@@ -1115,6 +1126,14 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
     if (TOLs_count > 1):
         print_msg("plotTimeVsTOL")
         ax_time = add_fig()
+        print_msg("plotTimeVsTOL")
+        try:
+            _, _ = plotTimeVsTOL(ax_time, runs, fmt='-.', label="Wall clock",
+                                 filteritr=filteritr, real_time=True,
+                                 MC_kwargs=None)
+        except:
+            __plot_except(ax_time)
+
         try:
             data_time, _ = plotTimeVsTOL(ax_time, runs, label="MIMC",
                                          filteritr=filteritr,
@@ -1351,8 +1370,6 @@ def run_program():
         print("Reading data")
 
     run_data = db.readRuns(tag=args.db_tag, done_flag=args.done_flag)
-    if len(run_data) == 0:
-        raise Exception("No runs!!!")
     if args.verbose:
         print("Plotting data")
 

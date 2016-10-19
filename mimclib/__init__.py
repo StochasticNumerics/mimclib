@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from .mimc import MIMCRun, MIMCItrData
+from .mimc import MIMCRun, MIMCItrData, Bunch
 from . import plot
 from .db import MIMCDatabase
 
