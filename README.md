@@ -7,11 +7,6 @@ error tolerance efficiently.
 
 ## Installing
 
-### On Debian
-
-Command:
-`wget https://raw.githubusercontent.com/StochasticNumerics/mimclib/master/mimc_install.sh && bash mimc_install.sh`
-
 ### On a generic GNU/Linux system
 
 1. Install Dependencies: python-pip mysql-server mysql-client libmysqlclient-dev build-essential ipython libpng-dev libfreetype6-dev libxft-dev libpython-dev liblapack-dev libblas-dev gfortran parallel numpy matplotlib scipy mysql-python (Package names may be slightly different in your particular platform)

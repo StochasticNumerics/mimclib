@@ -7,7 +7,7 @@ Please try out running the single sequential run first, as it depends
 on much fewer dependencies. In case you face problems running the
 parallel example, but not the single example, make sure that:
 
-1. You have MySQL running on your machine with appropriate access rights
+1. You have SQLite installed
 2. You have GNU parallel installed
 
 In case you have problems, please consult the issue tracker at:
@@ -25,9 +25,9 @@ do so by typincg ctrl+c repeatedly in terminal or through a killsignal.
 We wish you a pleasant day of simulations.\
 "
 
-make
+make -q
 
-COMMON='-db_engine sqlite -db_name ../db/mimc -tries 200 '
+COMMON='-db_engine sqlite -db_name mimc -tries 200 '
 
 ./echo_test_cmd.py -mimc_bayesian False $COMMON -db_tag GBM_std_real -qoi_type real  | parallel -j12
 ./echo_test_cmd.py -mimc_bayesian True $COMMON -db_tag GBM_bayes_real -qoi_type real | parallel -j12
