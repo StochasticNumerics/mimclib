@@ -9,7 +9,7 @@ error tolerance efficiently.
 
 ### On a generic GNU/Linux system
 
-1. Install Dependencies: python-pip mysql-server mysql-client libmysqlclient-dev build-essential ipython libpng-dev libfreetype6-dev libxft-dev libpython-dev liblapack-dev libblas-dev gfortran parallel numpy matplotlib scipy mysql-python (Package names may be slightly different in your particular platform)
+1. Install Dependencies: python-pip (version 6 or greater) mysql-server mysql-client libmysqlclient-dev build-essential ipython libpng-dev libfreetype6-dev libxft-dev libpython-dev liblapack-dev libblas-dev gfortran parallel numpy matplotlib scipy mysql-python (Package names may be slightly different in your particular platform) 
 2. Clone this repository `https://github.com/StochasticNumerics/mimclib.git`
 3. In the downloaded folder run `make` and `make pip`
 4. Create the database `python -c 'from mimclib.db import MIMCDatabase; print MIMCDatabase().DBCreationScript();' | mysql -u root -p`
