@@ -146,7 +146,7 @@ std::vector<array> RunKuramoto(unsigned int dim,
     // disorder: P*dim
     // wiener: P*N*dim
     for (unsigned int n=0;n<N;n++){
-        array couple[dim];
+        std::vector<array> couple(dim);
         for (unsigned int d=0;d<dim;d++)
             couple[d] = array(P, 0);
         for (unsigned int j=0;j<P;j++){
