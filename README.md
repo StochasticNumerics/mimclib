@@ -7,13 +7,23 @@ error tolerance efficiently.
 
 ## Installing
 
-### On a generic GNU/Linux system
+### On a GNU/Linux system
 
 1. Install Dependencies: python-pip (version 6 or greater) mysql-server mysql-client libmysqlclient-dev build-essential ipython libpng-dev libfreetype6-dev libxft-dev libpython-dev liblapack-dev libblas-dev gfortran parallel numpy matplotlib scipy mysql-python (Package names may be slightly different in your particular platform) 
 2. Clone this repository `https://github.com/StochasticNumerics/mimclib.git`
 3. In the downloaded folder run `make` and `make pip`
 4. Create the database `python -c 'from mimclib.db import MIMCDatabase; print MIMCDatabase().DBCreationScript();' | mysql -u root -p`
 5. If you don't have a mySQL user, create one and give it appropriate privileges `echo -e "CREATE USER '$USER'@'%';\nGRANT ALL PRIVILEGES ON mimc.* TO '$USER'@'%' WITH GRANT OPTION;" | mysql -u root -p`
+
+### On OSX
+
+1. Install required packages (list possible incomplete, report [here](https://github.com/StochasticNumerics/mimclib/issues/77)) if something is missing) using your favorite package manager such as [Macports](https://www.macports.org/) or [Homebrew](http://brew.sh/):
+Python 2.7, Numpy, Scipy, Matplotlib MySQL-python, Parallel, git
+2. Clone this repository `https://github.com/StochasticNumerics/mimclib.git`
+3. In the downloaded folder run `make` and `make pip`
+4. Create the database `python -c 'from mimclib.db import MIMCDatabase; print MIMCDatabase().DBCreationScript();' | mysql -u root -p`
+5. If you don't have a mySQL user, create one and give it appropriate privileges `echo -e "CREATE USER '$USER'@'%';\nGRANT ALL PRIVILEGES ON mimc.* TO '$USER'@'%' WITH GRANT OPTION;" | mysql -u root -p`
+
 
 ## Running the GBM Example
 
