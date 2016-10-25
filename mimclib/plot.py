@@ -253,6 +253,11 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     relative_error = kwargs.pop('relative', True)
     filteritr = kwargs.pop("filteritr", filteritr_all)
 
+    Xax.set_xlabel('TOL')
+    ax.set_ylabel('Relative error' if relative_error else 'Error')
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+
     modifier = (1./fnNorm(np.array([exact]))[0]) if relative_error else 1.
     val = np.array([itr.calcEg() for _, itr in enum_iter(runs, filteritr)])
     xy = np.array([[itr.TOL, 0, itr.totalErrorEst()] for _, itr in enum_iter(runs, filteritr)])
@@ -261,11 +266,6 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
 
     TOLs, error_est = __get_stats(xy, staton=2)
     plotObj = []
-
-    ax.set_xlabel('TOL')
-    ax.set_ylabel('Relative error' if relative_error else 'Error')
-    ax.set_yscale('log')
-    ax.set_xscale('log')
 
     ErrEst_kwargs = kwargs.pop('ErrEst_kwargs', None)
     Ref_kwargs = kwargs.pop('Ref_kwargs')
@@ -384,15 +384,14 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
     elif xi == 'tol':
         x_label = "Avg. tolerance"
     else:              raise ValueError('x_axis')
+    ax.set_xlabel(x_label)
+    ax.set_xscale('log')
 
     xy_binned = computeIterationStats(runs, xi=xi,
                                       work_bins=work_bins,
                                       filteritr=filteritr)
 
     plotObj = []
-    ax.set_xlabel(x_label)
-    #ax.set_ylabel('??')
-    ax.set_xscale('log')
 
     maxrefine_kwargs = kwargs.pop('maxrefine_kwargs', None)
     active_kwargs = kwargs.pop('active_kwargs', None)
@@ -438,6 +437,10 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
     elif xi == 'tol':
         x_label = "Avg. tolerance"
     else:              raise ValueError('x_axis')
+    ax.set_xlabel(x_label)
+    ax.set_ylabel('Max Relative Error' if relative else 'Max Error')
+    ax.set_yscale('log')
+    ax.set_xscale('log')
 
     xy_binned = computeIterationStats(runs, xi=xi,
                                       work_bins=work_bins,
@@ -446,11 +449,6 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
                                       filteritr=filteritr,
                                       exact=exact)
     plotObj = []
-
-    ax.set_xlabel(x_label)
-    ax.set_ylabel('Max Relative Error' if relative else 'Max Error')
-    ax.set_yscale('log')
-    ax.set_xscale('log')
 
     ErrEst_kwargs = kwargs.pop('ErrEst_kwargs')
     Ref_kwargs = kwargs.pop('Ref_kwargs')
@@ -797,6 +795,10 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
     work_estimate = kwargs.pop("work_estimate", False)
     MC_kwargs = kwargs.pop("MC_kwargs", None)
     real_time = kwargs.pop("real_time", False)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlabel('TOL')
+
     if real_time:
         if work_estimate:
             raise ValueError("real_time and work_estimate cannot be both True")
@@ -814,9 +816,6 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
         xy = [[itr.TOL, np.sum(itr.tT),
                np.max(itr.calcTl()) * r.estimateMonteCarloSampleCount(itr.TOL)]
               for r, itr in enum_iter(runs, filteritr)]
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_xlabel('TOL')
     if work_estimate:
         ax.set_ylabel('Work estimate')
     elif real_time:
@@ -846,6 +845,11 @@ def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
+    ax.set_xscale('log')
+    ax.set_xlabel('TOL')
+    ax.set_ylabel(r'$L$')
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
     filteritr = kwargs.pop("filteritr", filteritr_all)
     summary = []
     for r in runs:
@@ -866,10 +870,6 @@ def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
             prevMax = newMax
 
     summary = np.array(summary)
-    ax.set_xscale('log')
-    ax.set_xlabel('TOL')
-    ax.set_ylabel(r'$L$')
-    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     scatter = ax.scatter(summary[:, 0], summary[:, 1], *args, **kwargs)
     return summary, [scatter]
 
@@ -880,14 +880,15 @@ def plotThetaVsTOL(ax, runs, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
-    filteritr = kwargs.pop("filteritr", filteritr_all)
-    summary = np.array([[itr.TOL, itr.Q.theta]
-                        for _, itr in enum_iter(runs, filteritr)])
-
     ax.set_xscale('log')
     ax.set_xlabel('TOL')
     ax.set_ylabel(r'$\theta$')
     ax.set_ylim([0, 1.])
+
+    filteritr = kwargs.pop("filteritr", filteritr_all)
+    summary = np.array([[itr.TOL, itr.Q.theta]
+                        for _, itr in enum_iter(runs, filteritr)])
+
     scatter = ax.scatter(summary[:, 0], summary[:, 1], *args, **kwargs)
     return summary, [scatter]
 
@@ -898,6 +899,11 @@ def plotThetaRefVsTOL(ax, runs, eta, chi, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
+    ax.set_xscale('log')
+    ax.set_xlabel('TOL')
+    ax.set_ylabel(r'$\theta$')
+    ax.set_ylim([0, 1.])
+
     filteritr = kwargs.pop("filteritr", filteritr_all)
     L = lambda itr: np.max([np.sum(l) for l in itr.lvls_itr()])
     if chi == 1:
@@ -910,10 +916,6 @@ def plotThetaRefVsTOL(ax, runs, eta, chi, *args, **kwargs):
     TOL, thetaRef = __get_stats(summary, staton=1)
 
     #plotObj.append(ax.add_line(FunctionLine2D(lambda x: 1, *args, **kwargs)))
-    ax.set_xscale('log')
-    ax.set_xlabel('TOL')
-    ax.set_ylabel(r'$\theta$')
-    ax.set_ylim([0, 1.])
     line = ax.errorbar(TOL, thetaRef[:, 1],
                        yerr=[thetaRef[:, 1]-thetaRef[:, 0],
                              thetaRef[:, 2]-thetaRef[:, 1]],
@@ -928,6 +930,11 @@ def plotErrorsQQ(ax, runs, *args, **kwargs):
     """
     # Use TOL instead of finalTOL. The normality is proven w.r.t. to TOL of MLMC
     # not the finalTOL of MLMC (might be different sometimes)
+    ax.set_xlabel(r'Empirical CDF')
+    ax.set_ylabel("Normal CDF")
+    ax.set_xlim([0, 1.])
+    ax.set_ylim([0, 1.])
+
     filteritr = kwargs.pop("filteritr", filteritr_convergent)
 
     if "tol" not in kwargs:
@@ -954,12 +961,7 @@ def plotErrorsQQ(ax, runs, *args, **kwargs):
 
     x /= np.std(x)
     ec = ECDF(x)
-    ax.set_xlabel(r'Empirical CDF')
-    ax.set_ylabel("Normal CDF")
-
     plotObj = []
-    ax.set_xlim([0, 1.])
-    ax.set_ylim([0, 1.])
     Ref_kwargs = kwargs.pop('Ref_kwargs', None)
     plotObj.append(ax.scatter(norm.cdf(x), ec(x), *args, **kwargs))
     if Ref_kwargs is not None:
@@ -1045,6 +1047,7 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
         fn = next(r.fn for r in runs if r.db_data.finalTOL == maxTOL)
 
     max_dim = np.max([np.max(r.last_itr.lvls_max_dim()) for r in runs])
+    label_MIMC = "MIMC" if max_dim > 1 else "MLMC"
     any_bayesian = np.any([r.params.bayesian for r in runs])
 
     legend_outside = kwargs.pop("legend_outside", 5)
@@ -1135,7 +1138,7 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
             __plot_except(ax_time)
 
         try:
-            data_time, _ = plotTimeVsTOL(ax_time, runs, label="MIMC",
+            data_time, _ = plotTimeVsTOL(ax_time, runs, label=label_MIMC,
                                          filteritr=filteritr,
                                          MC_kwargs=None if max_dim > 1
                                          else {"label": "MC Estimate", "fmt": "--r"})
@@ -1145,7 +1148,7 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
         print_msg("plotTimeVsTOL")
         ax_est = add_fig()
         try:
-            data_est, _ = plotTimeVsTOL(ax_est, runs, label="MIMC",
+            data_est, _ = plotTimeVsTOL(ax_est, runs, label=label_MIMC,
                                         work_estimate=True,
                                         MC_kwargs= None if max_dim > 1 else {"label": "MC Estimate", "fmt":
                                                                              "--r"})
