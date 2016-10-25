@@ -253,7 +253,7 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     relative_error = kwargs.pop('relative', True)
     filteritr = kwargs.pop("filteritr", filteritr_all)
 
-    Xax.set_xlabel('TOL')
+    ax.set_xlabel('TOL')
     ax.set_ylabel('Relative error' if relative_error else 'Error')
     ax.set_yscale('log')
     ax.set_xscale('log')
@@ -1059,7 +1059,7 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
 
     if exact is None:
         exact = estimate_exact(runs)
-        print("Estimated exact value is {:.14f}".format(exact))
+        print("Estimated exact value is {}".format(exact))
 
     import matplotlib as mpl
     mpl.rc('text', usetex=True)
