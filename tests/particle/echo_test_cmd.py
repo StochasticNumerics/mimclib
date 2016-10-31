@@ -23,7 +23,7 @@ if __name__ == "__main__":
                                        seed="{seed}")
     elif dim == 2:
         base = "mimc_run.py -mimc_TOL {TOL} -mimc_max_TOL 0.01  -mimc_min_dim 2 -qoi_seed {seed} \
-    -mimc_theta 0.5 -mimc_M0 25 -mimc_h0inv 5 5 \
+    -mimc_theta 0.5 -mimc_M0 25 -mimc_h0inv 5 4 \
     -mimc_w 1 1 -mimc_s 2 2 -mimc_gamma 2 1 -mimc_beta 2 2 \
     -mimc_bayes_fit_lvls 3 -mimc_moments 4 \
     -mimc_bayesian {bayesian} ".format(bayesian="{bayesian}", TOL="{TOL}", seed="{seed}")

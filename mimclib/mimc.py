@@ -361,6 +361,13 @@ class MIMCRun(object):
         # else:
         #     self.Q = Bunch(theta=np.nan)
 
+    def _get_dim(self):
+        dims = np.array([len(getattr(self.params, a))
+                for a in ["w", "s", "gamma", "beta"] if hasattr(self.params, a)])
+        if len(dims) > 0 and np.any(dims != dims[0]):
+            raise ValueError("Size of beta, w, s and gamma must be of size dim")
+        return dims[0] if len(dims) > 0 else None
+
     @property
     def last_itr(self):
         return self.iters[-1] if len(self.iters) > 0 else None
@@ -392,6 +399,10 @@ class MIMCRun(object):
     @property
     def iter_total_times(self):
         return np.cumsum([itr.totalTime for itr in self.iters])
+
+    @property
+    def _Ca(self):
+        return norm.ppf((1+self.params.confidence)/2)   # TODO: TEMP. UNCOMMENT
 
     def calcEg(self):
         return self.last_itr.calcEg()
@@ -427,10 +438,19 @@ are the same as the argument ones")
             raise ValueError("Must set the sampling functions fnSampleLvl")
 
         if not hasattr(self.fn, "ExtendLvls"):
-            weights = self.params.beta * (self.params.w +
-                                          (self.params.s -
-                                           self.params.gamma)/2.)
-            weights /= np.sum(weights, axis=0)
+            if np.all(np.array([hasattr(self.params, a) for a in ["w", "s", "gamma", "beta"]])):
+                weights = self.params.beta * (self.params.w +
+                                              (self.params.s -
+                                               self.params.gamma)/2.)
+                weights /= np.sum(weights, axis=0)
+            elif self._get_dim() is not None or self.params.min_dim > 0:
+                d = self._get_dim()
+                if d is None:
+                    d = self.params.min_dim
+                weights = np.ones(d) / d
+            else:
+                raise ValueError("No default ExtendLvls for ")
+
             profCalc = setutil.TDProfCalculator(weights)
             self.fn.ExtendLvls = lambda lvls: extend_prof_lvls(lvls, profCalc,
                                                                self.params.min_lvls)
@@ -545,7 +565,7 @@ the first iteration. Not needed if a profit calculator is provided.")
                       help="Maximum number of additonal iterations\
 to run when the MIMC is expected to but is not converging.\
 Not needed if TOLs is provided to doRun.")
-            add_store('r1', type=float, default=2,
+            add_store('r1', type=float, default=np.sqrt(2),
                       help="A parameters to control to tolerance sequence \
 for tolerance larger than TOL. Not needed if TOLs is provided to doRun.")
             add_store('r2', type=float, default=1.1,
@@ -589,6 +609,10 @@ Bias={:.12e}\nStatErr={:.12e}\
         return self.fn.Norm(np.array([x]))[0]
 
     def _estimateBias(self):
+        if self.last_itr.lvls_count <= 1:
+            # Cannot estimate bias with only one level
+            return np.inf
+
         if not self.params.bayesian:
             El = self.last_itr.calcDeltaEl()
             bias = self.last_itr.get_lvls().estimate_bias(self.fn.Norm(El))
@@ -601,9 +625,8 @@ Bias={:.12e}\nStatErr={:.12e}\
         V = self.Vl_estimate[self.last_itr.lvls_find([])]
         if np.isnan(V):
             return np.nan
-        Ca = norm.ppf(self.params.confidence)
         return np.maximum(np.reshape(self.params.M0, (1,))[-1],
-                          int(np.ceil((theta * TOL / Ca)**-2 * V)))
+                          int(np.ceil((theta * TOL / self._Ca)**-2 * V)))
 
     ################## Bayesian specific functions
     def _estimateBayesianBias(self, L=None):
@@ -707,9 +730,8 @@ estimate optimal number of levels"
                                         else self._estimateBayesianVl()
         self.iters[-1].Wl_estimate = self.fn.WorkModel(lvls=self.last_itr.get_lvls())
         self.iters[-1].bias = self._estimateBias()
-        Ca = norm.ppf(self.params.confidence)
         self.iters[-1].stat_error = np.inf if np.any(self.last_itr.M == 0) \
-                                    else Ca * \
+                                    else self._Ca * \
                                          np.sqrt(np.sum(self.Vl_estimate / self.last_itr.M))
 
     def _extendLevels(self, new_lvls=None):
@@ -787,8 +809,7 @@ estimate optimal number of levels"
         return self.params.theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
-        Ca = norm.ppf(self.params.confidence)
-        M = (theta * TOL / Ca)**-2 *\
+        M = (theta * TOL / self._Ca)**-2 *\
             np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
         M = np.maximum(M, minM)
         M[np.isnan(M)] = minM

@@ -25,10 +25,13 @@ class ParticleField(object):
         import time
         tStart = time.time()
         Ps = meshes[:, 0]
-        Ns = meshes[:, 1] if run.params.min_dim == 2 else meshes[:, 0]
+        Ns = meshes[:, 1] if run.params.min_dim == 2 \
+                          else (4*meshes[:, 0]/run.params.h0inv[0]).astype(np.int)
         samples = kuramoto.SampleKuramoto(self.gen, Ns=Ns, Ps=Ps, M=M,
-                                          T=run.params.qoi_T, K=run.params.qoi_K,
-                                          sig=run.params.qoi_sig, var_sig=False,
+                                          T=run.params.qoi_T,
+                                          K=run.params.qoi_K,
+                                          sig=run.params.qoi_sig,
+                                          var_sig=False,
                                           antithetic=True, dim=1)
         return samples, time.time()-tStart
 

@@ -1241,10 +1241,18 @@ def genPDFBooklet(runs, fileName=None, exact=None, **kwargs):
 
                 line_data, _ = plotFunc(fnNorm=fn.Norm, **cur_kwargs)
                 if rate is None:
-                    continue
-                ind = np.nonzero(np.array(direction) != 0)[0]
-                if np.all(ind < len(rate)):
-                    add_rates[np.sum(rate[ind])] = line_data
+                    # Fit rate
+                    if has_beta:
+                        rate = np.polyfit(np.log(params.beta[0]) * line_data[1:, 0],
+                                          np.log(line_data[1:, 1]), 1)[0]
+                    else:
+                        rate = np.polyfit(line_data[1:, 0],
+                                          np.log(line_data[1:, 1]), 1)[0]
+                    add_rates[rate] = line_data
+                else:
+                    ind = np.nonzero(np.array(direction) != 0)[0]
+                    if np.all(ind < len(rate)):
+                        add_rates[np.sum(rate[ind])] = line_data
 
             for j, r in enumerate(sorted(add_rates.keys(), key=lambda x:
                                          np.abs(x))):
