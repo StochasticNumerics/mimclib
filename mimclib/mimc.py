@@ -143,6 +143,7 @@ class MIMCItrData(object):
         self.psums_delta = None
         self.psums_fine = None
         self.tT = np.zeros(0)      # Time of lvls
+        self.tW = np.zeros(0)      # Time of lvls
         self.M = np.zeros(0, dtype=np.int)      # Number of samples in each lvl
         self.bias = np.inf           # Approximation of the discretization error
         self.stat_error = np.inf     # Sampling error (based on M)
@@ -161,6 +162,7 @@ class MIMCItrData(object):
         ret.psums_delta = self.psums_delta.copy() if self.psums_delta is not None else None
         ret.psums_fine = self.psums_fine.copy() if self.psums_fine is not None else None
         ret.tT = self.tT.copy()
+        ret.tW = self.tW.copy()
         ret.M = self.M.copy()
         ret.bias = self.bias
         ret.stat_error = self.stat_error
@@ -216,10 +218,16 @@ class MIMCItrData(object):
         val[idx] = self.tT[idx] / self.M[idx]
         return val
 
+    def calcWl(self):
+        idx = self.M != 0
+        val = np.zeros_like(self.M, dtype=np.float)
+        val[idx] = self.tW[idx] / self.M[idx]
+        return val
+
     def calcTotalTime(self, ind=None):
         return np.sum(self.tT, axis=0)
 
-    def addSamples(self, lvl_idx, M, psums_delta, psums_fine, tT):
+    def addSamples(self, lvl_idx, M, psums_delta, psums_fine, tT, tW):
         assert psums_delta.shape == psums_fine.shape and \
             psums_fine.shape[0] == self.computedMoments(), "Inconsistent arguments "
         #assert lvl_idx is not None, "Level was not found"
@@ -236,11 +244,13 @@ class MIMCItrData(object):
             self.psums_fine[lvl_idx] = psums_fine
             self.M[lvl_idx] = M
             self.tT[lvl_idx] = tT
+            self.tW[lvl_idx] = tW
         else:
             self.psums_delta[lvl_idx] += psums_delta
             self.psums_fine[lvl_idx] += psums_fine
             self.M[lvl_idx] += M
             self.tT[lvl_idx] += tT
+            self.tW[lvl_idx] += tW
         if psums_delta.dtype != self.psums_delta.dtype:
             self.psums_delta = self.psums_delta.astype(psums_delta.dtype)
         if psums_fine.dtype != self.psums_fine.dtype:
@@ -260,6 +270,7 @@ class MIMCItrData(object):
         self.Vl_estimate.resize(new_count, refcheck=False)
         self.Wl_estimate.resize(new_count, refcheck=False)
         self.tT.resize(new_count, refcheck=False)
+        self.tW.resize(new_count, refcheck=False)
         self.M.resize(new_count, refcheck=False)
 
     def calcTotalWork(self):
@@ -272,6 +283,7 @@ class MIMCItrData(object):
         if ind is None:
             self.M = np.zeros_like(self.M)
             self.tT = np.zeros_like(self.tT)
+            self.tW = np.zeros_like(self.tW)
             if self.psums_delta is not None:
                 self.psums_delta = np.zeros_like(self.psums_delta)
             if self.psums_fine is not None:
@@ -279,6 +291,7 @@ class MIMCItrData(object):
         else:
             self.M[ind] = 0
             self.tT[ind] = 0
+            self.tW[ind] = 0
             if self.psums_delta is not None:
                 self.psums_delta[ind, :] = np.zeros_like(self.psums_delta[ind, :])
             if self.psums_fine is not None:
@@ -428,11 +441,7 @@ class MIMCRun(object):
 supported with a given work model")
 
         if not hasattr(self.fn, "WorkModel"):
-            # ADDING WORK MODEL B
-            warnings.warn("fnWorkModel is not provided, using run-time estimates.")
-            raise NotImplemented("Need to check that the lvls \
-are the same as the argument ones")
-            self.fn.WorkModel = lambda lvls: self.Tl()
+            self.fn.WorkModel = lambda lvls: self.last_itr.calcWl()
 
         if self.fn.SampleLvl is None:
             raise ValueError("Must set the sampling functions fnSampleLvl")
@@ -591,16 +600,26 @@ Bias={:.12e}\nStatErr={:.12e}\
             return
 
         V = self.Vl_estimate
-        Vl = self.fn.Norm(self.last_itr.calcDeltaVl())
+        Wl = self.Wl_estimate
+        sample_V = self.fn.Norm(self.last_itr.calcDeltaVl())
         E = self.fn.Norm(self.last_itr.calcDeltaEl())
         T = self.last_itr.calcTl()
 
-        output += ("{:<8}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
-            "Level", "E", "V", "sampleV", "M", "Time"))
+        if self.params.bayesian:
+            output += ("{:<8}{:^20}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
+                "Level", "E", "V", "sampleV", "W", "M", "Time"))
+        else:
+            output += ("{:<8}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
+                "Level", "E", "V", "W", "M", "Time"))
         for i in range(0, self.last_itr.lvls_count):
             #,100 * np.sqrt(V[i]) / np.abs(E[i])
-            output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
-                str(self.last_itr.lvls_get(i)), E[i], V[i], Vl[i], self.last_itr.M[i], T[i]))
+            if self.params.bayesian:
+                output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
+                    str(self.last_itr.lvls_get(i)), E[i], V[i], Wl[i], sample_V[i], self.last_itr.M[i], T[i]))
+            else:
+                output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
+                    str(self.last_itr.lvls_get(i)), E[i], V[i], Wl[i], self.last_itr.M[i], T[i]))
+
         print(output, end="")
 
     def fnNorm1(self, x):
@@ -757,15 +776,23 @@ estimate optimal number of levels"
         # the time estimate
         calcM = 0
         total_time = 0
+        total_work = 0
         p = self.last_itr.computedMoments()
         psums_delta = _empty_obj()
         psums_fine = _empty_obj()
         while calcM < M:
             curM = np.minimum(M-calcM, self.params.maxM)
-            values, samples_time = self.fn.SampleLvl(inds=inds, M=curM)
-            total_time += samples_time
-            # psums_delta_j = \sum_{i} (\sum_{k} mod_k values_{i,k})**p_j
+            ret = self.fn.SampleLvl(inds=inds, M=curM)
+            values = ret[0]
+            samples_time = ret[1]
+            if len(ret) < 3:  # Backward compatibility
+                samples_work = samples_time
+            else:
+                samples_work = ret[2]
 
+            total_time += samples_time
+            total_work += samples_work
+            # psums_delta_j = \sum_{i} (\sum_{k} mod_k values_{i,k})**p_j
             delta = np.sum(values * \
                            _expand(mods, 1, values.shape),
                            axis=1)
@@ -777,7 +804,7 @@ estimate optimal number of levels"
             psums_fine += np.sum(np.cumprod(A2, axis=0), axis=1)
             calcM += values.shape[0]
 
-        return calcM, psums_delta, psums_fine, total_time
+        return calcM, psums_delta, psums_fine, total_time, total_work
 
     #@profile
     def _genSamples(self, totalM):
