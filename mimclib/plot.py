@@ -384,7 +384,7 @@ def estimate_exact(runs):
     minErr = np.min([r.totalErrorEst() for r in runs])
     exact = np.mean([r.calcEg() for r in runs if
                      r.totalErrorEst() == minErr], axis=0)
-    return exact
+    return exact, minErr
 
 
 @public
@@ -1088,7 +1088,7 @@ def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
     has_beta = hasattr(params, 'beta')
 
     if exact is None:
-        exact = estimate_exact(runs)
+        exact, _ = estimate_exact(runs)
         print("Estimated exact value is {}".format(exact))
 
     import matplotlib as mpl

@@ -783,6 +783,7 @@ estimate optimal number of levels"
         while calcM < M:
             curM = np.minimum(M-calcM, self.params.maxM)
             ret = self.fn.SampleLvl(inds=inds, M=curM)
+            assert isinstance(ret, tuple), "Must return a tuple of (solves, time, work)"
             values = ret[0]
             samples_time = ret[1]
             if len(ret) < 3:  # Backward compatibility

@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     Wl            REAL,
     tT            REAL,
     tW            REAL,
-    Ml            INTEGER,
+    Ml            BIGINT,
     psums_delta   mediumblob,
     psums_fine    mediumblob,
     FOREIGN KEY (iter_id) REFERENCES tbl_iters(iter_id) ON DELETE CASCADE,
