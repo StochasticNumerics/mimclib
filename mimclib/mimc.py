@@ -936,10 +936,11 @@ estimate optimal number of levels"
                     # remove last iteration since it is empty
                     assert(self.params.bayesian or self.totalErrorEst() < TOL)
                     self.iters.pop()
-                if self.params.bayesian or self.totalErrorEst() < TOL:
+                if self.params.bayesian or self.totalErrorEst() < TOL \
+                   or (TOL < finalTOL and self.totalErrorEst() < finalTOL):
                     break
 
-            print_info("MIMC iteration for TOL={} took {} seconds".format(TOL, timer.toc()))
+            print_info("MIMC iteration for TOL={} took {} seconds (time since start {})".format(TOL, timer.toc(), self.iter_total_times[-1]))
             print_info("################################################")
             if less(TOL, finalTOL) and self.totalErrorEst() <= finalTOL:
                 break

@@ -426,7 +426,7 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     plotObj = []
 
     ErrEst_kwargs = kwargs.pop('ErrEst_kwargs', None)
-    Ref_kwargs = kwargs.pop('Ref_kwargs')
+    Ref_kwargs = kwargs.pop('Ref_kwargs', None)
     sel = np.logical_and(np.isfinite(xy[:, 1]), xy[:, 1] >=
                          np.finfo(float).eps)
     if np.sum(sel) == 0:

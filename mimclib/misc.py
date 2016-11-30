@@ -374,33 +374,3 @@ def estimate_misc_error_rates(d, lvls, errs,
     else:
         raise NotImplementedError("This needs to be implemented as a non-linear optimization problem")
     return d_err_rates, s_err_rates
-
-def knots_CC_delta(nn, d=0):
-    k = np.arange(-nn/2, nn/2+1, dtype=np.int);
-    w = np.zeros(nn)
-
-    def abar(k, d):
-        val = np.empty(len(k))
-        i = np.abs(k) > 1
-        val[i] = - (1 + (-1)**k[i])* np.cos(d * k[i]) / (k[i]**2 - 1)
-        val[k == 0] = 2
-        val[k == 1] = val[k == -1] = 0.5 * np.pi * np.sin(d)
-        return val
-
-    def bbar(k, d):
-        val = np.empty(len(k))
-        i = np.abs(k) > 1
-        val[i] = (1 + (-1)**k[i])* np.sin(d * k[i]) / (k[i]**2 - 1)
-        val[k == 0] = 0
-        val[k == 1] = 0.5 * np.pi * np.cos(d)
-        val[k == -1] = -0.5 * np.pi * np.cos(d)
-        return val
-
-    ab = abar(k, d=0)
-    bb = bbar(k, d=0)
-    for i in range(0, nn):
-        xi = 2 * k * i * np.pi / nn
-        w[i] = np.sum(np.cos(xi) * ab + np.sin(xi) * bb) / nn
-
-    x = np.cos(d + np.arange(0, nn) * 2 * np.pi / nn)
-    return x, w
