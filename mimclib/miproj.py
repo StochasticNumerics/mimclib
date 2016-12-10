@@ -257,36 +257,6 @@ def sample_optimal_pts(N, fnBasis, bases_indices, interval=(-1, 1)):
         W = len(bases_indices) / np.sum(np.power(B, 2), axis=1)
     return X, W
 
-
-@public
-def sample_optimal_pts(N, fnBasis, bases_indices, interval=(-1, 1)):
-    max_dim = bases_indices.max_dim()
-    acceptanceratio = 1./(4*np.exp(1))
-    X = np.zeros((N, max_dim))
-    for i in range(N):
-        pol = np.random.randint(0, len(bases_indices))
-        base_pol = bases_indices.get_item(pol, max_dim)
-        for dim in range(max_dim):
-            accept=False
-            while not accept:
-                Xnext = (np.cos(np.pi * np.random.rand()) + 1) / 2
-                dens_prop_Xnext = 1 / (np.pi * np.sqrt(Xnext*(1 - Xnext)))   # TODO: What happens if Xnext is 0
-                Xreal = interval[0] + Xnext *(interval[1] - interval[0])
-                dens_goal_Xnext = fnBasis(np.array([Xreal]), 1+base_pol[dim])[0,-1] ** 2
-                alpha = acceptanceratio * dens_goal_Xnext / dens_prop_Xnext
-                U = np.random.rand()
-                accept = (U < alpha)
-                if accept:
-                    X[i,dim] = Xreal
-
-    if X.shape[0] == 0:
-        W = np.zeros(0)
-    else:
-        B = TensorExpansion.evaluate_basis(fnBasis, bases_indices, X)
-        W = len(bases_indices) / np.sum(np.power(B, 2), axis=1)
-    return X, W
-
-
 @public
 def default_basis_from_level(beta, C=2):
     # beta is zero indexed
