@@ -339,7 +339,7 @@ def computeIterationStats(runs, work_bins, xi, filteritr, fnNorm=None,
     xy = np.array(xy)
     val = np.array(val)
     if exact is not None:
-        xy[:, 3] = modifier*fnNorm(val-exact)
+        xy[:, 3] = modifier*fnNorm(val + exact*-1)
 
     lxy = np.log(xy[:, xi])
     bins = np.digitize(lxy, np.linspace(np.min(lxy), np.max(lxy), work_bins))
@@ -382,9 +382,8 @@ def enum_iter_i(runs, fnFilter):
 
 def estimate_exact(runs):
     minErr = np.min([r.totalErrorEst() for r in runs])
-    exact = np.mean([r.calcEg() for r in runs if
-                     r.totalErrorEst() == minErr], axis=0)
-    return exact, minErr
+    d = [r.calcEg() for r in runs if r.totalErrorEst() == minErr]
+    return np.sum(d, axis=0) * (1./ len(d)), minErr
 
 
 @public
@@ -1043,6 +1042,7 @@ def __plot_except(ax):
     traceback.print_exc(limit=None)
     print('-----------------------------------------------------')
 
+    raise
 
 @public
 def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
@@ -1089,7 +1089,7 @@ def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
 
     if exact is None:
         exact, _ = estimate_exact(runs)
-        print("Estimated exact value is {}".format(exact))
+        print_msg("Estimated exact value is {}".format(exact))
 
     import matplotlib as mpl
     mpl.rc('text', usetex=True)
@@ -1285,13 +1285,14 @@ def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
                 line_data, _ = plotFunc(fnNorm=fn.Norm, **cur_kwargs)
                 if rate is None:
                     # Fit rate
-                    if has_beta:
-                        rate = np.polyfit(np.log(params.beta[0]) * line_data[1:, 0],
-                                          np.log(line_data[1:, 1]), 1)[0]
-                    else:
-                        rate = np.polyfit(line_data[1:, 0],
-                                          np.log(line_data[1:, 1]), 1)[0]
-                    add_rates[rate] = line_data
+                    if len(line_data[1:, :]) > 0:
+                        if has_beta:
+                            cur_rate = np.polyfit(np.log(params.beta[0]) * line_data[1:, 0],
+                                                  np.log(line_data[1:, 1]), 1)[0]
+                        else:
+                            cur_rate = np.polyfit(line_data[1:, 0],
+                                              np.log(line_data[1:, 1]), 1)[0]
+                        add_rates[cur_rate] = line_data
                 else:
                     ind = np.nonzero(np.array(direction) != 0)[0]
                     if np.all(ind < len(rate)):

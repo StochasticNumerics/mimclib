@@ -10,6 +10,7 @@ typedef unsigned short ind_t;
 #include <map>
 #include <list>
 #include <algorithm>
+#include <iostream>
 
 class Node {
 public:
@@ -90,10 +91,21 @@ public:
     typedef std::list<Index>::const_iterator const_iterator;
     typedef std::list<Index>::iterator iterator;
 
-SparseMIndex() : m_max_size(0){ }
-SparseMIndex(const SparseMIndex& rhs) :
-    m_indices(rhs.m_indices), m_max_size(rhs.m_max_size){ }
-SparseMIndex(const ind_t *ind, ind_t d) : m_max_size(0){
+    SparseMIndex() : m_max_size(0){ }
+    SparseMIndex(const SparseMIndex& rhs) :
+        m_indices(rhs.m_indices), m_max_size(rhs.m_max_size){ }
+
+    SparseMIndex(const SparseMIndex& rhs, ind_t d_start, ind_t d_end) : m_max_size(0)
+    {
+        for (auto itr=rhs.begin();itr!=rhs.end();itr++) {
+            if (itr->ind < d_start || itr->ind >= d_end)
+                continue;
+            m_indices.push_back(Index(itr->ind-d_start, itr->value));
+            m_max_size = std::max(m_max_size, itr->ind-d_start+1);
+        }
+    }
+
+    SparseMIndex(const ind_t *ind, ind_t d) : m_max_size(0){
         for (ind_t i=0;i<d;i++)
             if (ind[i] != SET_BASE){
                 assert(ind[i] > SET_BASE);
@@ -102,7 +114,7 @@ SparseMIndex(const ind_t *ind, ind_t d) : m_max_size(0){
             }
     }
 
-SparseMIndex(const ind_t *j, const ind_t *ind, ind_t d) : m_max_size(0){
+    SparseMIndex(const ind_t *j, const ind_t *ind, ind_t d) : m_max_size(0){
         for (ind_t i=0;i<d;i++)
             if (ind[i] != SET_BASE){
                 assert(ind[i] > SET_BASE);
@@ -268,13 +280,23 @@ typedef ProfitCalculator* PProfitCalculator;
 class VarSizeList {
 public:
  VarSizeList(uint32 reserve=1) : m_max_dim(0) { m_ind_set.reserve(1); }
-    VarSizeList(const VarSizeList &set, const uint32 *idx, uint32 _count) :
+    VarSizeList(const VarSizeList &set,
+                ind_t d_start, ind_t d_end,
+                const uint32 *idx, uint32 _count) :
         m_max_dim(0)
     {
         for (uint32 i=0;i<_count;i++){
             if (idx[i] >= set.m_ind_set.size())
                 throw std::out_of_range("Index larger than size");
-            push_back(set.m_ind_set[idx[i]]);
+            if (d_start > 0 ||
+                d_end < set.m_ind_set[idx[i]].size()) {
+                auto new_ind = mul_ind_t(set.m_ind_set[idx[i]], d_start, d_end);
+                // if (this->has_ind(new_ind))
+                //     continue;
+                push_back(new_ind);
+            }
+            else // No need for a copy
+                push_back(set.m_ind_set[idx[i]]);
         }
     }
  VarSizeList(const VarSizeList &set) : m_ind_set(set.m_ind_set) , m_ind_map(set.m_ind_map), m_max_dim(set.m_max_dim)
@@ -375,6 +397,10 @@ public:
         return false;
     }
 
+    void expand_set(const double *error,
+                    const double *work,
+                    uint32 count, ind_t dimLookahead);
+
     double get_min_outer_profit(const PProfitCalculator profCalc) const;
     void check_admissibility(ind_t d_start, ind_t d_end,
                             unsigned char *admissible, uint32 count) const;
@@ -395,9 +421,6 @@ public:
     DECLARE_ARR_ACCESSOR(count_neighbors, ind_t);
     DECLARE_ARR_ACCESSOR(is_parent_of_admissible, unsigned char);  // std::vector<bool> is broken
 
-    VarSizeList expand_set(const double *error,
-                           const double *work,
-                           uint32 count, ind_t dimLookahead) const;
     bool is_ind_admissible(const mul_ind_t& ind) const;
     VarSizeList set_diff(const VarSizeList& rhs) const;
     VarSizeList set_union(const VarSizeList& rhs) const;

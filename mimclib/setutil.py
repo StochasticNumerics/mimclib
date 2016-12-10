@@ -117,8 +117,9 @@ __lib__.VarSizeList_count.restype = ct.c_uint32
 __lib__.VarSizeList_count.argtypes = [ct.c_voidp]
 
 __lib__.VarSizeList_sublist.restype = ct.c_voidp
-__lib__.VarSizeList_sublist.argtypes = [ct.c_voidp, __arr_uint32__,
-                                        ct.c_uint32]
+__lib__.VarSizeList_sublist.argtypes = [ct.c_voidp,
+                                        __ct_ind_t__, __ct_ind_t__,
+                                        __arr_uint32__, ct.c_uint32]
 
 
 __lib__.VarSizeList_all_dim.restype = None
@@ -150,7 +151,7 @@ __lib__.VarSizeList_find.restype = ct.c_int32
 __lib__.VarSizeList_find.argtypes = [ct.c_voidp, __arr_ind_t__,
                                      __arr_ind_t__, __ct_ind_t__]
 
-__lib__.VarSizeList_expand_set.restype = ct.c_voidp
+__lib__.VarSizeList_expand_set.restype = None
 __lib__.VarSizeList_expand_set.argtypes = [ct.c_voidp, __arr_double__,
                                            __arr_double__,
                                            ct.c_uint32, __ct_ind_t__]
@@ -210,6 +211,17 @@ class VarSizeList(object):
             self._handle = _handle
         assert len(kwargs) == 0, "Unrecognized options {}".format(kwargs)
 
+    # Pickle override
+    def __getstate__(self):
+        data, ind = self.to_list()
+        return self.min_dim, data, ind
+
+    def __setstate__(self, state):
+        assert(not hasattr(self, "_handle"))
+        self._handle = __lib__.VarSizeList_copy(0)
+        self.min_dim = state[0]
+        self.add_from_list(state[1], state[2])
+
     def copy(self):
         return VarSizeList(_handle=__lib__.VarSizeList_copy(self._handle),
                            min_dim=self.min_dim)
@@ -219,24 +231,24 @@ class VarSizeList(object):
             __lib__.FreeIndexSet(self._handle)
             self._handle = None
 
-    # def __inflate_ind(self, ind):
-    #     if len(ind) >= self.min_dim:
-    #         return ind
-    #     return np.concatenate((ind, np.ones(self.min_dim-len(ind),
-    #                                         dtype=ind.dtype)))
-
-    def sublist(self, sel):
-        sel = np.array(sel).reshape((-1,))
-        if sel.dtype == np.bool:
-            sel = np.nonzero(sel)[0]
-        sel[sel < 0] = len(self) + sel[sel < 0]
+    def sublist(self, sel=None, d_start=0, d_end=None):
+        if sel is not None:
+            sel = np.array(sel).reshape((-1,))
+            if sel.dtype == np.bool:
+                sel = np.nonzero(sel)[0]
+            sel[sel < 0] = len(self) + sel[sel < 0]
+            sel = sel.astype(dtype=np.uint32)
+        if d_end is None:
+            d_end = self.max_dim()
         new = __lib__.VarSizeList_sublist(self._handle,
-                                          np.array(sel, dtype=np.uint32),
-                                          len(sel))
+                                          d_start, d_end,
+                                          sel, len(sel))
         return VarSizeList(_handle=new, min_dim=self.min_dim)
 
-    def __getitem__(self, i):
-        item = np.empty(np.maximum(self.min_dim, self.get_dim(i)), dtype=ind_t)
+    def get_item(self, i, dim=None):
+        if dim is None:
+            dim = np.maximum(self.min_dim, self.get_dim(i))
+        item = np.empty(dim, dtype=ind_t)
         data = np.empty(self.get_active_dim(i), dtype=ind_t)
         j    = np.empty(len(data), dtype=ind_t)
         if i < 0:
@@ -245,6 +257,9 @@ class VarSizeList(object):
         item.fill(__lib__.GetDefaultSetBase())
         item[j] = data
         return item
+
+    def __getitem__(self, i):
+        return self.get_item(i)
 
     def __iter__(self):
         return self.dense_itr()
@@ -285,9 +300,24 @@ class VarSizeList(object):
     def max_active_dim(self):
         return np.max(self.get_active_dim()) if len(self) > 0 else 0
 
+    def to_list(self, d_start=0, d_end=None):
+        d_end = d_end or np.maximum(1, self.max_dim())
+        assert(d_end > d_start)
+        sizes = self.get_active_dim()
+        ind_count = np.sum(sizes)
+        ij = np.empty(int(ind_count*2), dtype=ind_t)
+        data = np.empty(ind_count, dtype=ind_t)
+        __lib__.VarSizeList_to_matrix(self._handle, ij, len(ij), data,
+                                      len(data))
+        # Partition data based on sizes
+        s = np.hstack((np.array([0], dtype=np.int), np.cumsum(sizes, dtype=np.int)))
+        ind = ij[1::2]
+        return [data[s[i]:s[i+1]] for i in xrange(0, len(s)-1)],\
+            [ind[s[i]:s[i+1]] for i in xrange(0, len(s)-1)]
+
     def to_sparse_matrix(self, d_start=0, d_end=None):
         # Assumes that the martix is base 0
-        d_end = d_end or self.max_dim()
+        d_end = d_end if d_end is not None else np.maximum(1, self.max_dim())
         assert(d_end >= d_start)
         ind_count = np.sum(self.get_active_dim())
         ij = np.empty(int(ind_count*2), dtype=ind_t)
@@ -318,17 +348,16 @@ class VarSizeList(object):
             return dim
         return __lib__.VarSizeList_get_active_dim(self._handle, i)
 
-    def CheckAdmissibility(self, d_start=0, d_end=-1):
-        if d_end < 0:
+    def check_admissibility(self, d_start=0, d_end=None):
+        if d_end is None:
             d_end = self.max_dim()
         admissible = np.empty(len(self), dtype=np.int8)
-        __lib__.CheckAdmissibility(self._handle, d_start, d_end,
-                                   admissible)
+        __lib__.CheckAdmissibility(self._handle, d_start, d_end, admissible)
         return admissible.astype(np.bool)
 
-    def MakeProfitsAdmissible(self, profits, d_start=0, d_end=-1):
+    def make_profits_admissible(self, profits, d_start=0, d_end=None):
         assert(len(profits) == len(self))
-        if d_end < 0:
+        if d_end is None:
             d_end = self.max_dim()
         pro = profits.copy()
         __lib__.MakeProfitsAdmissible(self._handle, d_start, d_end, pro)
@@ -372,16 +401,6 @@ class VarSizeList(object):
     #     real_lvls = np.zeros(len(lvls), dtype=np.bool)
     #     __lib__.GetLevelBoundaries(C._handle, lvls, len(lvls), inner_bnd, real_lvls)
     #     return inner_bnd, real_lvls
-
-    # def expand_set(self, error, work, seedLookahead=5):
-    #     assert(len(error) == len(self))
-    #     assert(len(work) == len(self))
-    #     return VarSizeList(_handle=__lib__.VarSizeList_expand_set(self._handle,
-    #                                                       np.array(error, dtype=np.float),
-    #                                                       np.array(work, dtype=np.float),
-    #                                                       len(error),
-    #                                                       seedLookahead),
-    #                        min_dim=self.min_dim)
 
     def set_diff(self, rhs):
         return VarSizeList(_handle=__lib__.VarSizeList_set_diff(self._handle, rhs._handle),
@@ -429,6 +448,17 @@ class VarSizeList(object):
         if max_prof is None:
             max_prof = self.get_min_outer_prof(profCalc)
         __lib__.GetIndexSet(self._handle, profCalc._handle, np.float(max_prof), None)
+
+    def expand_set_adaptive(self, error, work, seedLookahead=5):
+        assert(len(error) == len(self))
+        assert(len(work) == len(self))
+        return VarSizeList(_handle=__lib__.VarSizeList_expand_set(self._handle,
+                                                          np.array(error, dtype=np.float),
+                                                          np.array(work, dtype=np.float),
+                                                          len(error),
+                                                          seedLookahead),
+                           min_dim=self.min_dim)
+
 
     def get_min_outer_prof(self, profCalc):
         return __lib__.GetMinOuterProfit(self._handle, profCalc._handle)

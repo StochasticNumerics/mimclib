@@ -40,6 +40,16 @@ class Timer():
         assert(len(self._tics) > 0)
         print(msg.format(self.toc(pop=pop)))
 
+class LevelSample(object):
+    def __init__(self):
+        self.M = None
+        self.psums_fine = None
+        self.psums_fine = None
+        self.total_work = None
+        self.total_time = None
+
+    def add_samples(sample_values, moments):
+        self.M += len(sample_values)
 
 
 @public
@@ -77,7 +87,7 @@ def compute_raw_moments(psums, M):
     '''
     idx = M != 0
     val = np.empty_like(psums)
-    val[idx] = psums[idx] / _expand(M[idx], 0, val[idx].shape)
+    val[idx] = psums[idx] * (1./ _expand(M[idx], 0, val[idx].shape))
     #np.tile(M[idx].reshape((-1,1)), (1, psums.shape[1]))
     val[M == 0, :] = None
     return val
@@ -139,7 +149,7 @@ class MIMCItrData(object):
 
     def __init__(self, min_dim=0, moments=None, lvls=None):
         self.moments = moments
-        self._lvls = lvls or setutil.VarSizeList(min_dim=min_dim)
+        self._lvls = lvls if lvls is not None else setutil.VarSizeList(min_dim=min_dim)
         self.psums_delta = None
         self.psums_fine = None
         self.tT = np.zeros(0)      # Time of lvls
@@ -185,10 +195,6 @@ class MIMCItrData(object):
         return self.moments
 
     def calcDeltaVl(self):
-        if self.moments < 2:
-            vl = np.empty(self.lvls_count)
-            vl.fill(np.nan)
-            return vl
         return self.calcDeltaCentralMoment(2)
 
     def calcDeltaEl(self, moment=1):
@@ -196,21 +202,28 @@ class MIMCItrData(object):
         Returns the sample estimators for moments
         for each level.
         '''
+        if self.psums_delta is None:
+            return np.array([])
+
         if moment > self.psums_delta.shape[1]:
             raise ValueError("The {}'th moment was not computed".format(moment))
         assert(moment > 0)
         idx = self.M != 0
         val = np.empty_like(self.psums_delta[:, moment-1])
-        val[idx] = self.psums_delta[idx, moment-1] / \
-                   _expand(self.M[idx], 0 ,self.psums_delta[idx, moment-1].shape)
+        val[idx] = self.psums_delta[idx, moment-1] * \
+                   (1./_expand(self.M[idx], 0 ,self.psums_delta[idx, moment-1].shape))
         val[np.logical_not(idx)] = None
         return val
 
     def calcDeltaCentralMoment(self, moment):
+        if self.psums_delta is None:
+            return np.array([])
         return compute_central_moment(self.psums_delta, self.M, moment)
 
     def calcFineCentralMoment(self, moment):
-        return compute_central_moment(self.psums_delta, self.M, moment)
+        if self.psums_delta is None:
+            return np.array([])
+        return compute_central_moment(self.psums_fine, self.M, moment)
 
     def calcTl(self):
         idx = self.M != 0
@@ -357,7 +370,7 @@ class MIMCRun(object):
     """
     def __init__(self, **kwargs):
         self.fn = Bunch(# Hierarchy=None, ExtendLvls=None,
-                        # WorkModel=None, SampleLvl=None,
+                        # WorkModel=None, SampleAll=None,
                         # ItrDone=None,
                         Norm=np.abs)
         self.params = Bunch(**kwargs)
@@ -443,8 +456,8 @@ supported with a given work model")
         if not hasattr(self.fn, "WorkModel"):
             self.fn.WorkModel = lambda lvls: self.last_itr.calcWl()
 
-        if self.fn.SampleLvl is None:
-            raise ValueError("Must set the sampling functions fnSampleLvl")
+        if self.fn.SampleAll is None:
+            raise ValueError("Must set the sampling functions fnSampleAll")
 
         if not hasattr(self.fn, "ExtendLvls"):
             if np.all(np.array([hasattr(self.params, a) for a in ["w", "s", "gamma", "beta"]])):
@@ -474,11 +487,19 @@ supported with a given work model")
         # fnHierarchy(lvls): Returns associated hierarchy of lvls
         for k in kwargs.keys():
             kk = k[2:] if k.startswith('fn') else k
-            if kk not in ["SampleLvl", "ExtendLvls",
-                         "ItrDone", "WorkModel",
-                         "Hierarchy", "SampleQoI", "Norm"]:
+            if kk not in ["SampleLvl",
+                          "SampleAll",
+                          "ExtendLvls",
+                          "ItrDone", "WorkModel",
+                          "Hierarchy", "SampleQoI", "Norm"]:
                 raise KeyError("Invalid function name")
-            setattr(self.fn, kk, kwargs[k])
+            if kk == "SampleLvl":
+                assert self.fn.SampleAll is None, \
+                    "SampleAll is already set, cannot set SampleLvl"
+                self.fn.SampleAll = lambda lvls, M, moments: \
+                                    default_sample_all(lvls, M, moments, kwargs[k])
+            else:
+                setattr(self.fn, kk, kwargs[k])
 
     @staticmethod
     def addOptionsToParser(parser, pre='-mimc_', additional=True, default_bayes=True):
@@ -599,26 +620,41 @@ Bias={:.12e}\nStatErr={:.12e}\
             print(output, end="")
             return
 
-        V = self.Vl_estimate
+        has_var = self.last_itr.moments >= 2
+
         Wl = self.Wl_estimate
-        sample_V = self.fn.Norm(self.last_itr.calcDeltaVl())
+        if has_var:
+            V = self.Vl_estimate
+        if has_var and self.params.bayesian:
+            sample_V = self.fn.Norm(self.last_itr.calcDeltaVl())
+
         E = self.fn.Norm(self.last_itr.calcDeltaEl())
         T = self.last_itr.calcTl()
 
-        if self.params.bayesian:
-            output += ("{:<8}{:^20}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
-                "Level", "E", "V", "sampleV", "W", "M", "Time"))
+        if has_var:
+            if self.params.bayesian:
+                output += ("{:<8}{:^20}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
+                    "Level", "E", "V", "sampleV", "W", "M", "Time"))
+            else:
+                output += ("{:<8}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
+                    "Level", "E", "V", "W", "M", "Time"))
         else:
-            output += ("{:<8}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
-                "Level", "E", "V", "W", "M", "Time"))
+            output += ("{:<8}{:^20}{:^20}{:>8}{:>15}\n".format(
+                "Level", "E", "W", "M", "Time"))
+
         for i in range(0, self.last_itr.lvls_count):
             #,100 * np.sqrt(V[i]) / np.abs(E[i])
-            if self.params.bayesian:
-                output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
-                    str(self.last_itr.lvls_get(i)), E[i], V[i], Wl[i], sample_V[i], self.last_itr.M[i], T[i]))
+            if has_var:
+                if self.params.bayesian:
+                    output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
+                        str(self.last_itr.lvls_get(i)), E[i], V[i], Wl[i], sample_V[i], self.last_itr.M[i], T[i]))
+                else:
+                    output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
+                        str(self.last_itr.lvls_get(i)), E[i], V[i], Wl[i], self.last_itr.M[i], T[i]))
             else:
-                output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
-                    str(self.last_itr.lvls_get(i)), E[i], V[i], Wl[i], self.last_itr.M[i], T[i]))
+                output += ("{:<8}{:>+20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
+                    str(self.last_itr.lvls_get(i)), E[i], Wl[i], self.last_itr.M[i], T[i]))
+
 
         print(output, end="")
 
@@ -635,7 +671,7 @@ Bias={:.12e}\nStatErr={:.12e}\
         if not self.params.bayesian:
             El = self.last_itr.calcDeltaEl()
             bias = self.last_itr.get_lvls().estimate_bias(self.fn.Norm(El))
-            #bias = np.abs(np.sum(El[self.last_itr.get_lvls().is_boundary()]))
+            #bias = self.fnNorm1(np.sum(El[self.last_itr.get_lvls().is_boundary()]))
             return bias
         return self._estimateBayesianBias()
 
@@ -744,9 +780,14 @@ estimate optimal number of levels"
     ################## END: Bayesian specific function
     def _estimateAll(self):
         self._estimateQParams()
-        self.iters[-1].Vl_estimate = self.fn.Norm(self.all_itr.calcDeltaVl()) \
-                                     if not self.params.bayesian \
-                                        else self._estimateBayesianVl()
+        if self.iters[-1].moments >= 2:
+            self.iters[-1].Vl_estimate = self.fn.Norm(self.all_itr.calcDeltaVl()) \
+                                         if not self.params.bayesian \
+                                            else self._estimateBayesianVl()
+        else:
+            self.iters[-1].Vl_estimate = np.empty(len(self.last_itr.get_lvls()))
+            self.iters[-1].Vl_estimate.fill(np.nan)
+
         self.iters[-1].Wl_estimate = self.fn.WorkModel(lvls=self.last_itr.get_lvls())
         self.iters[-1].bias = self._estimateBias()
         self.iters[-1].stat_error = np.inf if np.any(self.last_itr.M == 0) \
@@ -771,63 +812,30 @@ estimate optimal number of levels"
         return np.concatenate((self.last_itr.M[:prev], newTodoM[prev:self.last_itr.lvls_count]))
 
     #@profile
-    def SampleLvl(self, mods, inds, M):
-        # fnSampleLvl(inds, M) -> Returns a matrix of size (M, len(ind)) and
-        # the time estimate
-        calcM = 0
-        total_time = 0
-        total_work = 0
-        p = self.last_itr.computedMoments()
-        psums_delta = _empty_obj()
-        psums_fine = _empty_obj()
-        while calcM < M:
-            curM = np.minimum(M-calcM, self.params.maxM)
-            ret = self.fn.SampleLvl(inds=inds, M=curM)
-            assert isinstance(ret, tuple), "Must return a tuple of (solves, time, work)"
-            values = ret[0]
-            samples_time = ret[1]
-            if len(ret) < 3:  # Backward compatibility
-                samples_work = samples_time
-            else:
-                samples_work = ret[2]
-
-            total_time += samples_time
-            total_work += samples_work
-            # psums_delta_j = \sum_{i} (\sum_{k} mod_k values_{i,k})**p_j
-            delta = np.sum(values * \
-                           _expand(mods, 1, values.shape),
-                           axis=1)
-            # TODO: We should optimize to use the fact that p is integer with
-            # specific numbers. Use cumprod
-            A1 = np.tile(delta, (p,) + (1,)*len(delta.shape) )
-            A2 = np.tile(values[:, 0], (p,) + (1,)*len(delta.shape) )
-            psums_delta += np.sum(np.cumprod(A1, axis=0), axis=1)
-            psums_fine += np.sum(np.cumprod(A2, axis=0), axis=1)
-            calcM += values.shape[0]
-
-        return calcM, psums_delta, psums_fine, total_time, total_work
-
-    #@profile
     def _genSamples(self, totalM):
         lvls = self.last_itr.get_lvls()
         lvls_count = self.last_itr.lvls_count
+        assert(lvls_count == len(lvls))
         t = np.zeros(lvls_count)
         active = totalM > self.last_itr.M
         totalM[totalM <= self.last_itr.M] = 0    # No need to do any samples
         totalM[active] -= self.last_itr.M[active]
         if np.sum(totalM) == 0:
             return False
-        for i in range(0, lvls_count):
-            if totalM[i] <= 0:
-                continue
-            if self.params.verbose >= VERBOSE_DEBUG:
-                print("Doing", totalM[i], "of level", lvls[i])
-            mods, inds = expand_delta(lvls[i])
-            args = self.SampleLvl(mods, inds, totalM[i])
-            self.last_itr.addSamples(i, *args)
-            if self.last_itr != self.all_itr:
-                self.all_itr.addSamples(i, *args)
 
+        calcM, psums_delta, psums_fine, \
+            total_time, total_work = self.fn.SampleAll(lvls, totalM,
+                                                       self.last_itr.computedMoments())
+        for i in range(0, lvls_count):
+            if calcM[i] <= 0:
+                continue
+            self.last_itr.addSamples(i, calcM[i], psums_delta[i], \
+                                     psums_fine[i], total_time[i],
+                                     total_work[i])
+            if self.last_itr != self.all_itr:
+                self.all_itr.addSamples(i, calcM[i], psums_delta[i], \
+                                        psums_fine[i], total_time[i],
+                                        total_work[i])
         self._estimateAll()
         return True
 
@@ -837,8 +845,9 @@ estimate optimal number of levels"
         return self.params.theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
-        M = (theta * TOL / self._Ca)**-2 *\
-            np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            M = (theta * TOL / self._Ca)**-2 *\
+                np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
         M = np.maximum(M, minM)
         M[np.isnan(M)] = minM
         if ceil:
@@ -951,6 +960,7 @@ estimate optimal number of levels"
 def work_estimate(lvls, gamma):
     return np.prod(np.exp(lvls.to_dense_matrix(base=0)*gamma), axis=1)
 
+@public
 def expand_delta(lvl):
     """
     This routine takes a multi-index level and produces
@@ -1026,3 +1036,48 @@ def extend_prof_lvls(lvls, profCalc, min_lvls):
     while added < 1 or (len(lvls) < min_lvls):
         lvls.expand_set(profCalc)
         added += 1
+
+
+def default_sample_all(lvls, M, moments, fnSample):
+    # fnSampleLvl(inds, M) -> Returns a matrix of size (M, len(ind)) and
+    # the time estimate
+    lvls_count = len(lvls)
+    psums_delta = np.empty(lvls_count, dtype=object)
+    psums_fine = np.empty(lvls_count, dtype=object)
+    calcM = np.zeros(lvls_count, dtype=np.int)
+    total_time = np.zeros(lvls_count)
+    total_work = np.zeros(lvls_count)
+    for i in range(0, lvls_count):
+        if M[i] <= 0:
+            continue
+        mods, inds = expand_delta(lvls[i])
+        calcM[i] = 0
+        total_time[i] = 0
+        total_work[i] = 0
+        p = moments
+        psums_delta[i] = _empty_obj()
+        psums_fine[i] = _empty_obj()
+        while calcM[i] < M[i]:
+            curM = np.minimum(M-calcM, self.params.maxM)
+            ret = self.fn.SampleLvl(inds=inds, M=curM)
+            assert isinstance(ret, tuple), "Must return a tuple of (solves, time, work)"
+            values = ret[0]
+            samples_time = ret[1]
+            if len(ret) < 3:  # Backward compatibility
+                samples_work = samples_time
+            else:
+                samples_work = ret[2]
+            total_time[i] += samples_time
+            total_work[i] += samples_work
+            # psums_delta_j = \sum_{i} (\sum_{k} mod_k values_{i,k})**p_j
+            delta = np.sum(values * \
+                           _expand(mods, 1, values.shape),
+                           axis=1)
+            # TODO: We should optimize to use the fact that p is integer with
+            # specific numbers. Use cumprod
+            A1 = np.tile(delta, (p,) + (1,)*len(delta.shape) )
+            A2 = np.tile(values[:, 0], (p,) + (1,)*len(delta.shape) )
+            psums_delta[i] += np.sum(np.cumprod(A1, axis=0), axis=1)
+            psums_fine[i] += np.sum(np.cumprod(A2, axis=0), axis=1)
+            calcM[i] += values.shape[0]
+    return calcM, psums_delta, psums_fine, total_time, total_work

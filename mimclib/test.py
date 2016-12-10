@@ -32,6 +32,7 @@ def parse_known_args(parser, return_unknown=False):
 
 
 def RunStandardTest(fnSampleLvl=None,
+                    fnSampleAll=None,
                     fnAddExtraArgs=None,
                     fnInit=None,
                     fnSeed=np.random.seed, profCalc=None):
@@ -66,8 +67,14 @@ def RunStandardTest(fnSampleLvl=None,
         fnAddExtraArgs(parser)
     mimc.MIMCRun.addOptionsToParser(parser)
     mimcRun = mimc.MIMCRun(**vars(parse_known_args(parser)))
-    fnSampleLvl = lambda inds, M, fn=fnSampleLvl: fn(mimcRun, inds, M)
-    mimcRun.setFunctions(fnSampleLvl=fnSampleLvl)
+
+    if fnSampleLvl is not None:
+        fnSampleLvl = lambda inds, M, fn=fnSampleLvl: fn(mimcRun, inds, M)
+        mimcRun.setFunctions(fnSampleLvl=fnSampleLvl)
+    else:
+        fnSampleAll = lambda lvls, M, moments, fn=fnSampleAll: \
+                      fn(mimcRun, lvls, M, moments)
+        mimcRun.setFunctions(fnSampleAll=fnSampleAll)
 
     import time
     tStart = time.time()
@@ -109,4 +116,4 @@ def RunStandardTest(fnSampleLvl=None,
 
     if mimcRun.params.db:
         db.markRunSuccessful(run_id, totalTime=time.time()-tStart)
-    return mimcRun.last_itr.calcEg()
+    return mimcRun

@@ -1,4 +1,4 @@
-all: clean deluser inplace user
+all: clean deluser pip
 
 user:
 	python setup.py install --user

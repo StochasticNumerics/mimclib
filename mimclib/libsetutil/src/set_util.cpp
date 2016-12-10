@@ -273,14 +273,12 @@ void MakeProfitsAdmissible(const PVarSizeList pset, ind_t d_start, ind_t d_end,
     pset->make_profits_admissible(d_start, d_end, pProfits, pset->count());
 }
 
-PVarSizeList VarSizeList_expand_set(const PVarSizeList pset,
-                                    const double* error,
-                                    const double* work,
-                                    uint32 count,
-                                    ind_t dimLookahead){
-    PVarSizeList result = new VarSizeList();
-    *result = pset->expand_set(error, work, count, dimLookahead);
-    return result;
+void VarSizeList_expand_set(const PVarSizeList pset,
+                            const double* error,
+                            const double* work,
+                            uint32 count,
+                            ind_t dimLookahead) {
+    pset->expand_set(error, work, count, dimLookahead);
 }
 
 PVarSizeList VarSizeList_copy(const PVarSizeList lhs){
@@ -317,8 +315,8 @@ uint32 VarSizeList_count(const PVarSizeList pset){
     return pset->count();
 }
 
-PVarSizeList VarSizeList_sublist(const PVarSizeList pset, uint32* idx, uint32 _count){
-    return new VarSizeList(*pset, idx, _count);
+PVarSizeList VarSizeList_sublist(const PVarSizeList pset, ind_t d_start, ind_t d_end, uint32* idx, uint32 _count){
+    return new VarSizeList(*pset, d_start, d_end, idx, _count);
 }
 
 ind_t VarSizeList_max_dim(const PVarSizeList pset){

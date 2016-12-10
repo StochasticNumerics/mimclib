@@ -31,9 +31,9 @@ extern "C"{
     void MakeProfitsAdmissible(const PVarSizeList, ind_t d_start, ind_t d_end,
                                double *pProfits);
 
-    PVarSizeList VarSizeList_expand_set(const PVarSizeList pset,
-                                        const double* error, const double* work,
-                                        uint32 count, ind_t dimLookahead);
+    void VarSizeList_expand_set(const PVarSizeList pset,
+                                const double* error, const double* work,
+                                uint32 count, ind_t dimLookahead);
     PVarSizeList VarSizeList_copy(const PVarSizeList from);
     PVarSizeList VarSizeList_set_diff(const PVarSizeList lhs, const PVarSizeList rhs);
     PVarSizeList VarSizeList_set_union(const PVarSizeList lhs, const PVarSizeList rhs);
@@ -76,7 +76,9 @@ extern "C"{
                                      const double *rates, uint32 rates_size);
 
     uint32 VarSizeList_count(const PVarSizeList);
-    PVarSizeList VarSizeList_sublist(const PVarSizeList, uint32* idx, uint32 _count);
+    PVarSizeList VarSizeList_sublist(const PVarSizeList,
+                                     ind_t d_start, ind_t d_end,
+                                     uint32* idx, uint32 _count);
     void VarSizeList_all_dim(const PVarSizeList, uint32 *dim, uint32 size);
     void VarSizeList_all_active_dim(const PVarSizeList, uint32 *active_dim, uint32 size);
     void VarSizeList_to_matrix(const PVarSizeList,

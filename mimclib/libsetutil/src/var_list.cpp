@@ -10,7 +10,8 @@
 #include "var_list.hpp"
 
 #define DEBUG_ASSERT(x)
-static const int SET_BASE = SparseMIndex::SET_BASE;
+static const int SET_BASE = SparseMIndex
+    ::SET_BASE;
 
 template <typename T>
 std::vector<uint32> argsort(const T &v, size_t size) {
@@ -206,15 +207,15 @@ void VarSizeList::count_neighbors(ind_t* bnd_neigh, size_t size) const {
     }
 }
 
-uint32 add_children(const VarSizeList* pthis, uint32 k, VarSizeList &result,
-    uint32 max_add){
+uint32 add_children(PVarSizeList pthis,
+                    uint32 k,
+                    uint32 max_add){
     uint32 added = 0;
     auto cur = pthis->get(k);
     for (uint32 i=0;i<cur.size() && added < max_add;i++){
         cur.step(i, 1);
-        if (!pthis->has_ind(cur) && pthis->is_ind_admissible(cur)
-            && !result.has_ind(cur)){
-            result.push_back(cur);
+        if (!pthis->has_ind(cur) && pthis->is_ind_admissible(cur)){
+            pthis->push_back(cur);
             added++;
         }
         cur.step(i, -1);
@@ -222,12 +223,9 @@ uint32 add_children(const VarSizeList* pthis, uint32 k, VarSizeList &result,
     return added;
 }
 
-VarSizeList VarSizeList::expand_set(const double *error,
-                                    const double *work,
-                                    uint32 count,
-                                    ind_t seedLookahead) const{
+void VarSizeList::expand_set(const double *error, const double *work,
+                             uint32 count, ind_t seedLookahead) {
     // Sorted ind lists the indices in order of expansion (of decreasing profit).
-    VarSizeList result;
     assert(count == this->count());
     std::vector<double> profits(count);
     for (size_t i=0;i<profits.size();i++)
@@ -235,29 +233,30 @@ VarSizeList VarSizeList::expand_set(const double *error,
 
     std::vector<uint32> sorted_ind = argsort(profits);
     std::vector<ind_t> bnd_neigh = this->count_neighbors();
+    std::vector<uint32> sorted_work_ind = argsort(work, count);
 
-#define ADD_IND(ind) if (!this->has_ind(ind)) result.push_back(ind)
+#define ADD_IND(ind) if (!this->has_ind(ind)) this->push_back(ind)
+
     //------------- Calculate outer boundary
     ind_t max_dim = this->max_dim();
     uint32 added = 0;
-    for (uint32 j=0;j<count && added == 0;j++){
+    for (uint32 j=0;j<count && added == 0;j++) {
         uint32 k = sorted_ind[j];   // Start from the least -logprofit
         if (bnd_neigh[k] < max_dim) {
             // This is a boundary, check all outer indices that are
             // not in the set already
-            added += add_children(this, k, result, max_dim);
+            added += add_children(this, k, max_dim);
         }
     }
 
     // Expand set where on boundaries where there are exactly errors=0
     // The idea is that these indices might be a fluke and it is better
     // to explore these indices
-    std::vector<uint32> sorted_work_ind = argsort(work, count);
     added = 0;
     for (uint32 j=0;j<count && added == 0;j++){
         uint32 k = sorted_work_ind[j];   // Start from the least work
         if (bnd_neigh[k] < max_dim && error[k] == 0.0) {
-            added += add_children(this, k, result, 1);
+            added += add_children(this, k, 1);
         }
     }
 
@@ -265,8 +264,7 @@ VarSizeList VarSizeList::expand_set(const double *error,
     mul_ind_t cur;  // Set all to zeros
     ADD_IND(cur);
     if (!seedLookahead)
-        return result;
-
+        return;
     if (max_dim < seedLookahead)
     {
         uint32 diff = static_cast<uint32>(seedLookahead-max_dim);
@@ -279,7 +277,7 @@ VarSizeList VarSizeList::expand_set(const double *error,
             cur.step(i, -1);
         }
     }
-    for (ind_t i=0;i<seedLookahead;i++){
+    for (ind_t i=0;i<seedLookahead;i++) {
         // Count number of elements with exactly size=max_dim-i
         uint32 count = 0;
         for (auto itr=m_ind_set.begin();itr!=m_ind_set.end();itr++)
@@ -297,7 +295,6 @@ VarSizeList VarSizeList::expand_set(const double *error,
         }
     }
 #undef ADD_CUR
-    return result;
 }
 
 bool VarSizeList::is_ind_admissible(const mul_ind_t& ind) const{
@@ -350,12 +347,13 @@ void VarSizeList::get_adaptive_order(const double *error,
     std::vector<double> error_in_set;
     std::vector<double> work_in_set;
     while (1){
-        VarSizeList newList = curList.expand_set(&error_in_set[0],
-                                                 &work_in_set[0],
-                                                 curList.count(),
-                                                 seedLookahead);
+        size_t prev_count = curList.count();
+        curList.expand_set(&error_in_set[0], &work_in_set[0],
+                           curList.count(), seedLookahead);
         bool all_found = true;
-        for (auto itr=newList.m_ind_set.begin();itr!=newList.m_ind_set.end();itr++){
+        for (auto itr=curList.m_ind_set.begin()+prev_count;
+             itr!=curList.m_ind_set.end();
+             itr++){
             uint32 ii;
             if (!this->find_ind(*itr, ii)){
                 all_found = false;
@@ -367,7 +365,6 @@ void VarSizeList::get_adaptive_order(const double *error,
         }
         if (!all_found)
             break;
-        curList = curList.set_union(newList);
         cur_order++;
     }
 }
