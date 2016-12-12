@@ -43,10 +43,23 @@ class MyRun:
         run.setFunctions(ExtendLvls=lambda lvls, r=run: self.extendLvls(run, lvls),
                          fnNorm=lambda arr: np.array([x.norm() for x in arr]))
 
+        self.profit_calc = None
+        if not run.params.qoi_set_adaptive:
+            self.profit_calc = setutil.MIProfCalculator([run.params.qoi_set_dexp] * run.params.qoi_dim,
+                                                        run.params.qoi_set_xi,
+                                                        run.params.qoi_set_sexp)
+
     def extendLvls(self, run, lvls):
-        lvls.expand_set_adaptive(error=run.fn.Norm(run.last_itr.calcDeltaEl()),
-                                 work=run.last_itr.Wl_estimate,
-                                 seedLookahead=2)
+        if self.profit_calc is None:
+            error = run.fn.Norm(run.last_itr.calcDeltaEl())
+            work = run.last_itr.Wl_estimate
+            prof = setutil.calc_log_prof_from_EW(error, work)
+        else:
+            prof = lvls.calc_log_prof(self.profit_calc)
+
+        lvls.expand_set(prof,
+                        seedLookahead=2, max_added=5,
+                        profCalc=self.profit_calc)
         self.proj.update_index_set(lvls)
 
     def addExtraArguments(self, parser):
@@ -66,6 +79,15 @@ class MyRun:
         parser.add_argument("-qoi_x0", type=float, nargs='+',
                             default=np.array([0.4,0.2,0.6]),
                             action=store_as_array)
+
+        parser.add_argument("-qoi_set_adaptive", type="bool",
+                            default=True, action="store")
+        parser.add_argument("-qoi_set_xi", type=float, default=2.,
+                            action="store")
+        parser.add_argument("-qoi_set_sexp", type=float, default=4.,
+                            action="store")
+        parser.add_argument("-qoi_set_dexp", type=float,
+                            default=np.log(2.), action="store")
 
 
 if __name__ == "__main__":

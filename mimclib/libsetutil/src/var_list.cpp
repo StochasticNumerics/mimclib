@@ -207,15 +207,15 @@ void VarSizeList::count_neighbors(ind_t* bnd_neigh, size_t size) const {
     }
 }
 
-uint32 add_children(PVarSizeList pthis,
-                    uint32 k,
-                    uint32 max_add){
+uint32 VarSizeList::add_admissible_children(mul_ind_t cur,
+                                            uint32 max_add,
+                                            VarSizeList &out) const{
     uint32 added = 0;
-    auto cur = pthis->get(k);
-    for (uint32 i=0;i<cur.size() && added < max_add;i++){
+    for (uint32 i=0;i<cur.size() && out.count() < max_add;i++){
         cur.step(i, 1);
-        if (!pthis->has_ind(cur) && pthis->is_ind_admissible(cur)){
-            pthis->push_back(cur);
+        if (!this->has_ind(cur) && this->is_ind_admissible(cur)
+            && !out.has_ind(cur)){
+            out.push_back_unsafe(cur);
             added++;
         }
         cur.step(i, -1);
@@ -223,48 +223,62 @@ uint32 add_children(PVarSizeList pthis,
     return added;
 }
 
-void VarSizeList::expand_set(const double *error, const double *work,
-                             uint32 count, ind_t seedLookahead) {
+VarSizeList VarSizeList::expand_set(const double *profits, uint32 count,
+                                    uint32 max_added,
+                                    ind_t seedLookahead,
+                                    PProfitCalculator pProfCalc // Can be NULL
+    ) const {
     // Sorted ind lists the indices in order of expansion (of decreasing profit).
     assert(count == this->count());
-    std::vector<double> profits(count);
-    for (size_t i=0;i<profits.size();i++)
-        profits[i] = log(work[i]) - log(fabs(error[i]));
-
-    std::vector<uint32> sorted_ind = argsort(profits);
+    // std::vector<double> profits(count);
+    // for (size_t i=0;i<profits.size();i++)
+    //     profits[i] = log(work[i]) - log(fabs(error[i]));
+    std::vector<uint32> sorted_ind = argsort(profits, count);
     std::vector<ind_t> bnd_neigh = this->count_neighbors();
-    std::vector<uint32> sorted_work_ind = argsort(work, count);
-
-#define ADD_IND(ind) if (!this->has_ind(ind)) this->push_back(ind)
 
     //------------- Calculate outer boundary
     ind_t max_dim = this->max_dim();
-    uint32 added = 0;
-    for (uint32 j=0;j<count && added == 0;j++) {
-        uint32 k = sorted_ind[j];   // Start from the least -logprofit
+    VarSizeList new_indices;
+    for (uint32 j=0;j<count && (pProfCalc != NULL || new_indices.count() < max_added);j++) {
+        uint32 k = sorted_ind[j];   // Start from the least -log profit
         if (bnd_neigh[k] < max_dim) {
             // This is a boundary, check all outer indices that are
             // not in the set already
-            added += add_children(this, k, max_dim);
+            add_admissible_children(this->get(k),
+                                    pProfCalc?static_cast<uint32>(-1):max_added,
+                                    new_indices);
         }
     }
 
-    // Expand set where on boundaries where there are exactly errors=0
-    // The idea is that these indices might be a fluke and it is better
-    // to explore these indices
-    added = 0;
-    for (uint32 j=0;j<count && added == 0;j++){
-        uint32 k = sorted_work_ind[j];   // Start from the least work
-        if (bnd_neigh[k] < max_dim && error[k] == 0.0) {
-            added += add_children(this, k, 1);
-        }
+    if (pProfCalc && new_indices.count() > max_added){
+        // Calculate profits and order new indices by them, then
+        // truncate to only add max_added
+        std::vector<double> profit(new_indices.count());
+        new_indices.calc_set_profit(pProfCalc, &profit[0],
+                                    profit.size());
+        std::vector<uint32> sorted_ind = argsort(profit);
+        new_indices = VarSizeList(new_indices, 0, -1,
+                                  &sorted_ind[0], max_added);
     }
+
+    // // Expand set on boundaries where there are exactly errors=0
+    // // The idea is that these indices might be a fluke and it is better
+    // // to explore these indices
+    // for (uint32 j=0;j<count && added == 0;j++){
+    //     uint32 k = sorted_work_ind[j];   // Start from the least work
+    //     if (bnd_neigh[k] < max_dim && error[k] == 0.0) {
+    //         added += add_children(this, k, 1);
+    //     }
+    // }
 
     // Now add at least seedLookahead + base element
+#define ADD_IND(ind) if (!this->has_ind(ind) && !new_indices.has_ind(ind)) \
+    { new_indices.push_back_unsafe(ind); }
+
     mul_ind_t cur;  // Set all to zeros
     ADD_IND(cur);
     if (!seedLookahead)
-        return;
+        return new_indices;
     if (max_dim < seedLookahead)
     {
         uint32 diff = static_cast<uint32>(seedLookahead-max_dim);
@@ -295,6 +309,7 @@ void VarSizeList::expand_set(const double *error, const double *work,
         }
     }
 #undef ADD_CUR
+    return new_indices;
 }
 
 bool VarSizeList::is_ind_admissible(const mul_ind_t& ind) const{
@@ -322,19 +337,17 @@ VarSizeList VarSizeList::set_diff(const VarSizeList& rhs) const {
     return result;
 }
 
-VarSizeList VarSizeList::set_union(const VarSizeList& rhs) const{
-    VarSizeList result = VarSizeList(*this);
+void VarSizeList::set_union(const VarSizeList& rhs) {
     for (auto itr=rhs.m_ind_set.begin();itr!=rhs.m_ind_set.end();itr++)
-        if (!result.has_ind(*itr))
-            result.push_back(*itr);
-    return result;
+        if (!this->has_ind(*itr))
+            this->push_back_unsafe(*itr);
 }
 
 
-void VarSizeList::get_adaptive_order(const double *error,
-                                     const double *work,
+void VarSizeList::get_adaptive_order(const double *profits,
                                      uint32 *adaptive_order,
                                      uint32 count,
+                                     uint32 max_added,
                                      ind_t seedLookahead) const
 {
     // Start with an empty index
@@ -344,12 +357,13 @@ void VarSizeList::get_adaptive_order(const double *error,
 
     VarSizeList curList;
     uint32 cur_order = 1;
-    std::vector<double> error_in_set;
-    std::vector<double> work_in_set;
+    std::vector<double> profits_in_set;
     while (1){
         size_t prev_count = curList.count();
-        curList.expand_set(&error_in_set[0], &work_in_set[0],
-                           curList.count(), seedLookahead);
+        curList.set_union(curList.expand_set(&profits_in_set[0],
+                                             curList.count(),
+                                             max_added, seedLookahead,
+                                             NULL));
         bool all_found = true;
         for (auto itr=curList.m_ind_set.begin()+prev_count;
              itr!=curList.m_ind_set.end();
@@ -360,8 +374,7 @@ void VarSizeList::get_adaptive_order(const double *error,
                 break;
             }
             adaptive_order[ii] = cur_order;
-            error_in_set.push_back(error[ii]);
-            work_in_set.push_back(work[ii]);
+            profits_in_set.push_back(profits[ii]);
         }
         if (!all_found)
             break;
@@ -415,7 +428,7 @@ double VarSizeList::estimate_bias(const double *err_contributions,
                                   uint32 count,
                                   const double *rates, uint32 rates_size) const {
     ind_t max_d = this->max_dim();
-    assert(count >= this->count && rates_size >= max_d);
+    assert(count >= this->count() && rates_size >= max_d);
     std::vector<ind_t> bnd_neigh = this->count_neighbors();
 
     std::map<mul_ind_t, double> map_contrib;

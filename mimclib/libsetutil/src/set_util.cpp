@@ -102,6 +102,41 @@ private:
     std::vector<double> weights;
 };
 
+// For an index alpha
+// Computes 2*(d_rates * alpha[:d]) * prod(exp(-log(xi * alpha[] ** exponent) * 2**(v-1) ))
+//
+// For (\alpha_0, \alpha_1, ...)  \in {0, 1, 2, ...}^d,
+//     (\beta_0, \beta_1, ...)  \in {0, 1, 2, 3, ...}^\infty
+// (\prod_{j} exp(-dexp_j alpha_j)) (\prod_{j} (\xi (j+1)^{sexp}) ^ {-2^{\beta_j} })
+class MIProfCalculator : public ProfitCalculator {
+public:
+    MIProfCalculator(ind_t d, const double* _dexp, double _xi, double _sexp) :
+        dexp(_dexp, _dexp+d), xi(_xi), sexp(_sexp) {
+    }
+
+    double calc_log_prof(const mul_ind_t &cur) {
+        double d_cont=0;
+        double s_cont=0;
+        unsigned int d = dexp.size();
+        for (auto itr=cur.begin();itr!=cur.end();itr++){
+            if (itr->ind < d)
+                d_cont += -(itr->value - SparseMIndex::SET_BASE)*dexp[itr->ind];
+            else{
+                s_cont += -pow(2, itr->value-SparseMIndex::SET_BASE)
+                           * (std::log(xi) + sexp*std::log(itr->ind+1));
+            }
+        }
+        return d_cont + s_cont;
+    }
+
+    ind_t max_dim() { return static_cast<ind_t>(-1); }
+private:
+    std::vector<double> dexp;
+    double xi;
+    double sexp;
+};
+
+
 ind_t* TensorGrid(ind_t d, uint32 td,
                   ind_t base, const ind_t *m, ind_t *cur, ind_t i,
                   ind_t* tensor_grid, uint32* pCount){
@@ -163,6 +198,7 @@ PVarSizeList GetIndexSet(PVarSizeList pRet,
                          const PProfitCalculator profCalc,
                          double max_prof,
                          double **p_profits) {
+    // TODO: This does not work for infinite dimensions
     ind_t max_d = profCalc->max_dim();
     ind_mul_ind_t ind_set;
     ind_set.push_back(setprof_t(mul_ind_t(), profCalc->calc_log_prof(mul_ind_t())));
@@ -273,12 +309,11 @@ void MakeProfitsAdmissible(const PVarSizeList pset, ind_t d_start, ind_t d_end,
     pset->make_profits_admissible(d_start, d_end, pProfits, pset->count());
 }
 
-void VarSizeList_expand_set(const PVarSizeList pset,
-                            const double* error,
-                            const double* work,
-                            uint32 count,
-                            ind_t dimLookahead) {
-    pset->expand_set(error, work, count, dimLookahead);
+PVarSizeList VarSizeList_expand_set(const PVarSizeList pset,
+                            const double* profits, uint32 count,
+                            uint32 max_added, ind_t dimLookahead,
+                            const PProfitCalculator profCalc) {
+    return new VarSizeList(pset->expand_set(profits, count, max_added, dimLookahead, profCalc));
 }
 
 PVarSizeList VarSizeList_copy(const PVarSizeList lhs){
@@ -292,10 +327,9 @@ PVarSizeList VarSizeList_set_diff(const PVarSizeList lhs, const PVarSizeList rhs
     *result = lhs->set_diff(*rhs);
     return result;
 }
-PVarSizeList VarSizeList_set_union(const PVarSizeList lhs, const PVarSizeList rhs){
-    PVarSizeList result = new VarSizeList();
-    *result = lhs->set_union(*rhs);
-    return result;
+
+void VarSizeList_set_union(PVarSizeList lhs, const PVarSizeList rhs){
+    lhs->set_union(*rhs);
 }
 
 
@@ -350,6 +384,11 @@ PProfitCalculator CreateMISCProfCalc(ind_t d, ind_t s, const double *d_w,
     return new MISCProfCalculator(d, s, d_w, s_err_w);
 }
 
+PProfitCalculator CreateMIProfCalc(ind_t d, const double *dexp,
+                                   double xi, double sexp){
+    return new MIProfCalculator(d, dexp, xi, sexp);
+}
+
 PProfitCalculator CreateTDProfCalc(ind_t d, const double *w){
     return new TDProfCalculator(d, w);
 }
@@ -393,12 +432,12 @@ int VarSizeList_find(const PVarSizeList pset, ind_t *j, ind_t *data,
 }
 
 void VarSizeList_get_adaptive_order(const PVarSizeList pset,
-                                    const double *error,
-                                    const double *work,
+                                    const double *profits,
                                     uint32 *adaptive_order,
                                     uint32 count,
-                                    ind_t seedLookahead){
-    pset->get_adaptive_order(error, work, adaptive_order, count, seedLookahead);
+                                    uint32 max_added, ind_t dimLookahead){
+    pset->get_adaptive_order(profits, adaptive_order, count, max_added,
+                             dimLookahead);
 }
 
 void VarSizeList_check_errors(const PVarSizeList pset, const double *errors, unsigned char* strange, uint32 count){

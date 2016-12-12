@@ -19,6 +19,8 @@ extern "C"{
 
     PProfitCalculator CreateMISCProfCalc(ind_t d, ind_t s,
                                          const double *d_rates, const double *s_err_rates);
+    PProfitCalculator CreateMIProfCalc(ind_t d, const double *dexp,
+                                       double xi, double sexp);
     PProfitCalculator CreateTDProfCalc(ind_t d, const double *w);
     PProfitCalculator CreateFTProfCalc(ind_t d, const double *w);
 
@@ -31,18 +33,19 @@ extern "C"{
     void MakeProfitsAdmissible(const PVarSizeList, ind_t d_start, ind_t d_end,
                                double *pProfits);
 
-    void VarSizeList_expand_set(const PVarSizeList pset,
-                                const double* error, const double* work,
-                                uint32 count, ind_t dimLookahead);
+    PVarSizeList VarSizeList_expand_set(const PVarSizeList pset,
+                                        const double* profit, uint32 count,
+                                        uint32 max_added, ind_t dimLookahead,
+                                        const PProfitCalculator profCalc);
     PVarSizeList VarSizeList_copy(const PVarSizeList from);
     PVarSizeList VarSizeList_set_diff(const PVarSizeList lhs, const PVarSizeList rhs);
-    PVarSizeList VarSizeList_set_union(const PVarSizeList lhs, const PVarSizeList rhs);
+    void VarSizeList_set_union(PVarSizeList lhs, const PVarSizeList rhs);
+
     void VarSizeList_get_adaptive_order(const PVarSizeList pset,
-                                        const double *error,
-                                        const double *work,
+                                        const double *profits,
                                         uint32 *adaptive_order,
                                         uint32 count,
-                                        ind_t seedLookahead);
+                                        uint32 max_added, ind_t dimLookahead);
     /* void GetLevelBoundaries(const PVarSizeList, const uint32 *levels, */
     /*                         uint32 levels_count, int32 *inner_bnd, */
     /*                         unsigned char *inner_real_lvls); */
@@ -54,10 +57,6 @@ extern "C"{
                              const PProfitCalculator profCalc,
                              double max_prof,
                              double **p_profits);
-
-    void GetAdaptiveOrder(const PVarSizeList,
-                          double *log_profits,
-                          uint32 *out_order);
 
     void GenTDSet(ind_t d, ind_t base, ind_t *td_set, uint32 count);
     void TensorGrid(ind_t d, ind_t base, const ind_t *m, ind_t* tensor_grid,

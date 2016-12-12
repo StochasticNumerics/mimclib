@@ -293,10 +293,10 @@ public:
                 auto new_ind = mul_ind_t(set.m_ind_set[idx[i]], d_start, d_end);
                 // if (this->has_ind(new_ind))
                 //     continue;
-                push_back(new_ind);
+                push_back_unsafe(new_ind);
             }
             else // No need for a copy
-                push_back(set.m_ind_set[idx[i]]);
+                push_back_unsafe(set.m_ind_set[idx[i]]);
         }
     }
  VarSizeList(const VarSizeList &set) : m_ind_set(set.m_ind_set) , m_ind_map(set.m_ind_map), m_max_dim(set.m_max_dim)
@@ -381,25 +381,23 @@ public:
     }
 
     void push_back(const mul_ind_t& ind){
-        // WARNING: Does not check uniqueness
         if (this->has_ind(ind))
             throw std::runtime_error("Index already in set");
-        m_ind_set.push_back(ind);
-        m_ind_map[ind] = m_ind_set.size()-1;
-        m_max_dim = std::max(m_max_dim, ind.size());
+        push_back_unsafe(ind);
     }
 
     bool push_back_admiss(const mul_ind_t& ind){
         if (!this->has_ind(ind) && this->is_ind_admissible(ind)){
-            push_back(ind);
+            push_back_unsafe(ind);
             return true;
         }
         return false;
     }
 
-    void expand_set(const double *error,
-                    const double *work,
-                    uint32 count, ind_t dimLookahead);
+    VarSizeList expand_set(const double *profits, uint32 count,
+                           uint32 max_added,
+                           ind_t seedLookahead,
+                           PProfitCalculator pProfCalc) const;
 
     double get_min_outer_profit(const PProfitCalculator profCalc) const;
     void check_admissibility(ind_t d_start, ind_t d_end,
@@ -422,19 +420,27 @@ public:
     DECLARE_ARR_ACCESSOR(is_parent_of_admissible, unsigned char);  // std::vector<bool> is broken
 
     bool is_ind_admissible(const mul_ind_t& ind) const;
+    void set_union(const VarSizeList& rhs);
     VarSizeList set_diff(const VarSizeList& rhs) const;
-    VarSizeList set_union(const VarSizeList& rhs) const;
 
-    void get_adaptive_order(const double *error,
-                            const double *work,
+    void get_adaptive_order(const double *profits,
                             uint32 *adaptive_order,
                             uint32 count,
+                            uint32 max_added,
                             ind_t seedLookahead) const;
+
 
     void check_errors(const double *errors, unsigned char* strange, uint32 count) const;
     double estimate_bias(const double *err_contributions,
                          uint32 count, const double *rates, uint32 rates_size) const;
 protected:
+    void push_back_unsafe(const mul_ind_t& ind){
+        m_ind_set.push_back(ind);
+        m_ind_map[ind] = m_ind_set.size()-1;
+        m_max_dim = std::max(m_max_dim, ind.size());
+    }
+    uint32 add_admissible_children(mul_ind_t cur, uint32 max_add,
+                                   VarSizeList &out) const;
     typedef std::vector<mul_ind_t> ind_vector;
     ind_vector  m_ind_set;
     std::map<mul_ind_t, unsigned int> m_ind_map;

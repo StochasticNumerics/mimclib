@@ -494,10 +494,9 @@ supported with a given work model")
                           "Hierarchy", "SampleQoI", "Norm"]:
                 raise KeyError("Invalid function name")
             if kk == "SampleLvl":
-                assert self.fn.SampleAll is None, \
-                    "SampleAll is already set, cannot set SampleLvl"
-                self.fn.SampleAll = lambda lvls, M, moments: \
-                                    default_sample_all(lvls, M, moments, kwargs[k])
+                if kwargs[k] is not None:
+                    self.fn.SampleAll = lambda lvls, M, moments: \
+                                        default_sample_all(lvls, M, moments, kwargs[k])
             else:
                 setattr(self.fn, kk, kwargs[k])
 
@@ -586,8 +585,6 @@ the first iteration. Not needed if TOLs is provided to doRun.")
                       help="Initial number of samples used to estimate the \
 sample variance on levels when not using the Bayesian estimators. \
 Not needed if a profit calculator is provided.")
-            add_store('maxM', type=int, default=100000, help="Maximum number of \
-samples to compute per call to user function")
             add_store('min_lvls', type=int, default=3,
                       help="The initial number of levels to run \
 the first iteration. Not needed if a profit calculator is provided.")
@@ -1034,7 +1031,7 @@ def extend_prof_lvls(lvls, profCalc, min_lvls):
         lvls.add_from_list([[]])
         added += 1
     while added < 1 or (len(lvls) < min_lvls):
-        lvls.expand_set(profCalc)
+        lvls.expand_set_finite(profCalc)
         added += 1
 
 
@@ -1058,8 +1055,7 @@ def default_sample_all(lvls, M, moments, fnSample):
         psums_delta[i] = _empty_obj()
         psums_fine[i] = _empty_obj()
         while calcM[i] < M[i]:
-            curM = np.minimum(M-calcM, self.params.maxM)
-            ret = self.fn.SampleLvl(inds=inds, M=curM)
+            ret = fnSample(inds=inds, M=M[i]-calcM[i])
             assert isinstance(ret, tuple), "Must return a tuple of (solves, time, work)"
             values = ret[0]
             samples_time = ret[1]

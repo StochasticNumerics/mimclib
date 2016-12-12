@@ -68,6 +68,9 @@ __lib__.CalculateSetProfit.argtypes = [ct.c_voidp, ct.c_voidp,
 __lib__.CreateMISCProfCalc.restype = ct.c_voidp
 __lib__.CreateMISCProfCalc.argtypes = [__ct_ind_t__, __ct_ind_t__,
                                        __arr_double__, __arr_double__]
+__lib__.CreateMIProfCalc.restype = ct.c_voidp
+__lib__.CreateMIProfCalc.argtypes = [__ct_ind_t__, __arr_double__,
+                                     ct.c_double, ct.c_double]
 
 __lib__.CreateTDProfCalc.restype = ct.c_voidp
 __lib__.CreateTDProfCalc.argtypes = [__ct_ind_t__, __arr_double__]
@@ -151,13 +154,13 @@ __lib__.VarSizeList_find.restype = ct.c_int32
 __lib__.VarSizeList_find.argtypes = [ct.c_voidp, __arr_ind_t__,
                                      __arr_ind_t__, __ct_ind_t__]
 
-__lib__.VarSizeList_expand_set.restype = None
+__lib__.VarSizeList_expand_set.restype = ct.c_voidp
 __lib__.VarSizeList_expand_set.argtypes = [ct.c_voidp, __arr_double__,
-                                           __arr_double__,
-                                           ct.c_uint32, __ct_ind_t__]
+                                           ct.c_uint32, ct.c_uint32,
+                                           __ct_ind_t__, ct.c_voidp]
 __lib__.VarSizeList_set_diff.restype = ct.c_voidp
 __lib__.VarSizeList_set_diff.argtypes = [ct.c_voidp, ct.c_voidp]
-__lib__.VarSizeList_set_union.restype = ct.c_voidp
+__lib__.VarSizeList_set_union.restype = None
 __lib__.VarSizeList_set_union.argtypes = [ct.c_voidp, ct.c_voidp]
 
 __lib__.VarSizeList_copy.restype = ct.c_voidp
@@ -166,9 +169,8 @@ __lib__.VarSizeList_copy.argtypes = [ct.c_voidp]
 __lib__.VarSizeList_get_adaptive_order.restype = None
 __lib__.VarSizeList_get_adaptive_order.argtypes = [ct.c_voidp,
                                                    __arr_double__,
-                                                   __arr_double__,
                                                    __arr_uint32__,
-                                                   ct.c_uint32,
+                                                   ct.c_uint32, ct.c_uint32,
                                                    __ct_ind_t__]
 
 __lib__.Tree_new.restype = ct.c_voidp
@@ -385,7 +387,7 @@ class VarSizeList(object):
                                         sizes, len(sizes),
                                         j, len(j), inds, len(inds))
 
-    def calc_log_prof(self, U):
+    def calc_log_prof(self, profCalc):
         log_prof = np.empty(len(self))
         __lib__.CalculateSetProfit(self._handle, profCalc._handle,
                                    log_prof, len(log_prof))
@@ -407,17 +409,16 @@ class VarSizeList(object):
                            min_dim=self.min_dim)
 
     def set_union(self, rhs):
-        return VarSizeList(_handle=__lib__.VarSizeList_set_union(self._handle, rhs._handle),
-                           min_dim=self.min_dim)
+        __lib__.VarSizeList_set_union(self._handle, rhs._handle)
+        return self
 
-    def get_adaptive_order(self, error, work, seedLookahead=5):
-        assert(len(self) == len(error))
-        assert(len(self) == len(work))
+    def get_adaptive_order(self, profits, max_added=5, seedLookahead=5):
+        assert(len(self) == len(profits))
         adaptive_order = np.empty(len(self), dtype=np.uint32)
         __lib__.VarSizeList_get_adaptive_order(self._handle,
-                                               error, work,
+                                               profits,
                                                adaptive_order,
-                                               len(self),
+                                               len(self), max_added,
                                                seedLookahead)
         return adaptive_order
 
@@ -444,20 +445,25 @@ class VarSizeList(object):
     def is_boundary(self):
         return self.count_neighbors() < self.max_dim()
 
-    def expand_set(self, profCalc, max_prof=None):
+    def expand_set_finite(self, profCalc, max_prof=None):
         if max_prof is None:
             max_prof = self.get_min_outer_prof(profCalc)
         __lib__.GetIndexSet(self._handle, profCalc._handle, np.float(max_prof), None)
 
-    def expand_set_adaptive(self, error, work, seedLookahead=5):
-        assert(len(error) == len(self))
-        assert(len(work) == len(self))
-        return VarSizeList(_handle=__lib__.VarSizeList_expand_set(self._handle,
-                                                          np.array(error, dtype=np.float),
-                                                          np.array(work, dtype=np.float),
-                                                          len(error),
-                                                          seedLookahead),
-                           min_dim=self.min_dim)
+    def expand_set(self, profits,
+                   profCalc=None,
+                   seedLookahead=5,
+                   max_added=5):
+        assert(len(profits) == len(self))
+        new_handle = __lib__.VarSizeList_expand_set(self._handle,
+                                       np.array(profits, dtype=np.float),
+                                       len(profits),
+                                       max_added,
+                                       seedLookahead,
+                                       profCalc._handle if profCalc is not None else 0)
+        # Add to current set
+        self.set_union(VarSizeList(_handle=new_handle, min_dim=self.min_dim))
+        return self
 
 
     def get_min_outer_prof(self, profCalc):
@@ -498,6 +504,12 @@ class MISCProfCalculator(ProfCalculator):
                                                   len(s_err_rates),
                                                   np.array(d_rates, dtype=np.float),
                                                   np.array(s_err_rates, dtype=np.float))
+class MIProfCalculator(ProfCalculator):
+    def __init__(self, dexp, xi, sexp):
+        self.d = len(dexp)
+        self._handle = __lib__.CreateMIProfCalc(len(dexp),
+                                                np.array(dexp, dtype=np.float),
+                                                xi, sexp)
 
 class TDProfCalculator(ProfCalculator):
     def __init__(self, w):
@@ -559,3 +571,7 @@ class Tree(object):
 
     def output(self):
         __lib__.Tree_print(self._handle)
+
+
+def calc_log_prof_from_EW(error, work):
+    return np.log(work) - np.log(np.abs(error))
