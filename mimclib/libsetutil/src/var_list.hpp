@@ -11,6 +11,7 @@ typedef unsigned short ind_t;
 #include <list>
 #include <algorithm>
 #include <iostream>
+#include <assert.h>
 
 class Node {
 public:

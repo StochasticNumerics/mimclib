@@ -145,6 +145,7 @@ class MIWProjSampler(object):
                                     np.array([self.alpha_dict[tuple(k)] for
                                               k in new_alpha])))
 
+    @profile
     def sample_all(self, run, lvls, M, moments, fnSample):
         assert np.all(moments == 1), "miproj only support first moments"
         assert np.all(M == 1), "miproj only supports M=1 exactly"
