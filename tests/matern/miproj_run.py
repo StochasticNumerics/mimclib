@@ -15,28 +15,6 @@ import argparse
 warnings.filterwarnings("error")
 warnings.filterwarnings("always", category=mimclib.test.ArgumentWarning)
 
-
-import os
-import ctypes as ct
-import numpy.ctypeslib as npct
-__lib__ = npct.load_library("_optimal_leg_pts.so", __file__)
-__lib__.sample_optimal_leg_pts.restype = None
-__lib__.sample_optimal_leg_pts.argtypes = [ct.c_uint32, ct.c_voidp,
-                                           npct.ndpointer(dtype=np.double, ndim=1, flags='CONTIGUOUS')]
-
-def sample_leg_pts(N, fnBasis, bases_indices):
-    max_dim = bases_indices.max_dim()
-    X = np.empty(max_dim*N)
-    __lib__.sample_optimal_leg_pts(N, bases_indices._handle, X)
-    X = X.reshape((N, max_dim))
-    if X.shape[0] == 0:
-        W = np.zeros(0)
-    else:
-        B = miproj.TensorExpansion.evaluate_basis(miproj.legendre_polynomials,
-                                                  bases_indices, X)
-        W = len(bases_indices) / np.sum(np.power(B, 2), axis=1)
-    return X, W
-
 class MyRun:
     def solveFor_seq(self, alpha, arrY):
         output = np.zeros(len(arrY))
@@ -58,7 +36,7 @@ class MyRun:
         self.qoi_problem = run.params.qoi_problem
         self.proj = miproj.MIWProjSampler(d=run.params.qoi_dim,
                                           fnBasis=miproj.legendre_polynomials,
-                                          fnSamplePoints=sample_leg_pts,
+                                          fnSamplePoints=miproj.sample_optimal_leg_pts,
                                           fnWorkModel=lambda lvls, r=run: self.workModel(run, lvls))
         self.proj.init_mimc_run(run)
         self.sf = SField_Matern(run.params)

@@ -16,6 +16,28 @@ def public(sym):
     __all__.append(sym.__name__)
     return sym
 
+import os
+import ctypes as ct
+import numpy.ctypeslib as npct
+__lib__ = npct.load_library("libset_util", __file__)
+__lib__.sample_optimal_leg_pts.restype = None
+__lib__.sample_optimal_leg_pts.argtypes = [ct.c_uint32, ct.c_voidp,
+                                           npct.ndpointer(dtype=np.double, ndim=1, flags='CONTIGUOUS')]
+
+@public
+def sample_optimal_leg_pts(N, bases_indices):
+    max_dim = bases_indices.max_dim()
+    X = np.empty(max_dim*N)
+    __lib__.sample_optimal_leg_pts(N, bases_indices._handle, X)
+    X = X.reshape((N, max_dim))
+    if X.shape[0] == 0:
+        W = np.zeros(0)
+    else:
+        B = miproj.TensorExpansion.evaluate_basis(miproj.legendre_polynomials,
+                                                  bases_indices, X)
+        W = len(bases_indices) / np.sum(np.power(B, 2), axis=1)
+    return X, W
+
 """
 TensorExpansion is a simple object representing a basis function and a list of
 coefficients. It assumes that the basis is orthonormal
@@ -145,7 +167,6 @@ class MIWProjSampler(object):
                                     np.array([self.alpha_dict[tuple(k)] for
                                               k in new_alpha])))
 
-    @profile
     def sample_all(self, run, lvls, M, moments, fnSample):
         assert np.all(moments == 1), "miproj only support first moments"
         assert np.all(M == 1), "miproj only supports M=1 exactly"
@@ -176,7 +197,7 @@ class MIWProjSampler(object):
 
             assert(np.all(basis.check_admissibility()))
 
-            X, W = self.fnSamplePoints(c_samples, self.fnBasis, basis)
+            X, W = self.fnSamplePoints(c_samples, basis)
             basis_values = TensorExpansion.evaluate_basis(self.fnBasis, basis, X)
             mods, inds = mimc.expand_delta(alpha)
             for i in xrange(0, len(inds)):
@@ -224,7 +245,7 @@ class MIWProjSampler(object):
             warnings.warn('Numerical instability encountered')
         return coefficients
 
-def sample_uniform_pts(N, fnBasis, bases_indices, interval=(-1, 1)):
+def sample_uniform_pts(N, bases_indices, interval=(-1, 1)):
     dim = bases_indices.max_dim()
     return np.random.uniform(interval[0], interval[1], size=(N, dim)),\
         np.ones(N)*(1./N)

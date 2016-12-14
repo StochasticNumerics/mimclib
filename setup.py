@@ -31,7 +31,8 @@ setup(
     ext_modules=[
         Extension('mimclib.libset_util',
                   ['mimclib/libsetutil/src/set_util.cpp',
-                   'mimclib/libsetutil/src/var_list.cpp',],
+                   'mimclib/libsetutil/src/var_list.cpp',
+                  'mimclib/libsetutil/src/utils.cpp',],
                   include_dirs=[''],
                   library_dirs=['/'],
                   libraries=[],

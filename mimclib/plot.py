@@ -50,7 +50,7 @@ class FunctionLine2D(plt.Line2D):
 
     def draw(self, renderer):
         import matplotlib.pylab as plt
-        ax = self.get_axes()
+        ax = self.axes
         if self.flip:
             y = self._linspace(ax.get_ylim(), ax.get_yscale())
             self.set_xdata(self.fn(y))
@@ -79,8 +79,10 @@ class FunctionLine2D(plt.Line2D):
                     rate = np.polyfit(x, y, 1)[0]
         if "label" in kwargs:
             kwargs["label"] = kwargs.pop("label").format(rate=rate)
-        return FunctionLine2D(*args, fn=lambda x, r=rate:
-                              const*np.array(x)**r, data=data,
+        def fnExp(x, r=rate):
+            with np.errstate(divide='ignore', invalid='ignore'):
+                return const*np.array(x)**r;
+        return FunctionLine2D(*args, fn=fnExp, data=data,
                               log_data=log_data, **kwargs)
 
 
