@@ -59,7 +59,7 @@ __lib__.MakeProfitsAdmissible.argtypes = [ct.c_voidp, __ct_ind_t__,
 #                                    __arr_int32__, __arr_bool__]
 
 __lib__.GetMinOuterProfit.restype = ct.c_double
-__lib__.GetMinOuterProfit.argtypes = [ct.c_voidp, ct.c_voidp]
+__lib__.GetMinOuterProfit.argtypes = [ct.c_voidp, ct.c_voidp, __ct_ind_t__]
 
 __lib__.CalculateSetProfit.restype = None
 __lib__.CalculateSetProfit.argtypes = [ct.c_voidp, ct.c_voidp,
@@ -84,9 +84,6 @@ __lib__.FreeProfitCalculator.argtypes = [ct.c_voidp]
 __lib__.FreeIndexSet.restype = None
 __lib__.FreeIndexSet.argtypes = [ct.c_voidp]
 
-__lib__.GetIndexSet.restype = ct.c_voidp
-__lib__.GetIndexSet.argtypes = [ct.c_voidp, ct.c_voidp, ct.c_double,
-                                ct.POINTER(ct.POINTER(ct.c_double))]
 __lib__.GenTDSet.restype = None
 __lib__.GenTDSet.argtypes = [__ct_ind_t__, __ct_ind_t__,
                              __arr_ind_t__, ct.c_uint32]
@@ -157,7 +154,13 @@ __lib__.VarSizeList_find.argtypes = [ct.c_voidp, __arr_ind_t__,
 __lib__.VarSizeList_expand_set.restype = ct.c_voidp
 __lib__.VarSizeList_expand_set.argtypes = [ct.c_voidp, __arr_double__,
                                            ct.c_uint32, ct.c_uint32,
-                                           __ct_ind_t__, ct.c_voidp]
+                                           __ct_ind_t__]
+
+__lib__.VarSizeList_expand_set_calc.restype = ct.c_voidp
+__lib__.VarSizeList_expand_set_calc.argtypes = [ct.c_voidp, ct.c_voidp,
+                                                ct.c_double, __ct_ind_t__,
+                                                ct.POINTER(ct.POINTER(ct.c_double))]
+
 __lib__.VarSizeList_set_diff.restype = ct.c_voidp
 __lib__.VarSizeList_set_diff.argtypes = [ct.c_voidp, ct.c_voidp]
 __lib__.VarSizeList_set_union.restype = None
@@ -233,7 +236,7 @@ class VarSizeList(object):
             __lib__.FreeIndexSet(self._handle)
             self._handle = None
 
-    def sublist(self, sel=None, d_start=0, d_end=None):
+    def sublist(self, sel=None, d_start=0, d_end=None, min_dim=None):
         if sel is not None:
             sel = np.array(sel).reshape((-1,))
             if sel.dtype == np.bool:
@@ -245,7 +248,8 @@ class VarSizeList(object):
         new = __lib__.VarSizeList_sublist(self._handle,
                                           d_start, d_end,
                                           sel, len(sel))
-        return VarSizeList(_handle=new, min_dim=self.min_dim)
+        return VarSizeList(_handle=new,
+                           min_dim=min_dim if min_dim is not None else self.min_dim)
 
     def get_item(self, i, dim=None):
         if dim is None:
@@ -445,29 +449,32 @@ class VarSizeList(object):
     def is_boundary(self):
         return self.count_neighbors() < self.max_dim()
 
-    def expand_set_finite(self, profCalc, max_prof=None):
-        if max_prof is None:
-            max_prof = self.get_min_outer_prof(profCalc)
-        __lib__.GetIndexSet(self._handle, profCalc._handle, np.float(max_prof), None)
-
-    def expand_set(self, profits,
-                   profCalc=None,
-                   seedLookahead=5,
-                   max_added=5):
-        assert(len(profits) == len(self))
-        new_handle = __lib__.VarSizeList_expand_set(self._handle,
-                                       np.array(profits, dtype=np.float),
-                                       len(profits),
-                                       max_added,
-                                       seedLookahead,
-                                       profCalc._handle if profCalc is not None else 0)
+    def expand_set(self, profits, max_dim, max_added=None):
+        assert max_dim >= self.max_dim(), "Set already has more than max_dim"
+        if isinstance(profits, ProfCalculator):
+            assert max_added is None, \
+                "Cannot provide max_added when using a profit calculator"
+            max_prof = self.get_min_outer_prof(profits, max_dim)
+            new_handle = __lib__.VarSizeList_expand_set_calc(self._handle,
+                                                             profits._handle,
+                                                             max_prof, max_dim,
+                                                             None)
+        else:
+            assert(len(profits) == len(self))
+            seedLookahead = max_dim-self.max_dim()
+            new_handle = __lib__.VarSizeList_expand_set(self._handle,
+                                                        np.array(profits, dtype=np.float),
+                                                        len(profits),
+                                                        max_added,
+                                                        seedLookahead)
         # Add to current set
-        self.set_union(VarSizeList(_handle=new_handle, min_dim=self.min_dim))
+        self.set_union(VarSizeList(_handle=new_handle))
         return self
 
 
-    def get_min_outer_prof(self, profCalc):
-        return __lib__.GetMinOuterProfit(self._handle, profCalc._handle)
+    def get_min_outer_prof(self, profCalc, max_dim):
+        return __lib__.GetMinOuterProfit(self._handle,
+                                         profCalc._handle, max_dim)
 
     def estimate_bias(self, err_contributions, rates=None):
         if rates is None:
@@ -499,24 +506,25 @@ class ProfCalculator(object):
 
 class MISCProfCalculator(ProfCalculator):
     def __init__(self, d_rates, s_err_rates):
-        self.d = len(d_rates)
+        self.max_dim = len(d.rates) + len(s_err_rates)
         self._handle = __lib__.CreateMISCProfCalc(len(d_rates),
                                                   len(s_err_rates),
                                                   np.array(d_rates, dtype=np.float),
                                                   np.array(s_err_rates, dtype=np.float))
 class MIProfCalculator(ProfCalculator):
     def __init__(self, dexp, xi, sexp):
-        self.d = len(dexp)
         self._handle = __lib__.CreateMIProfCalc(len(dexp),
                                                 np.array(dexp, dtype=np.float),
                                                 xi, sexp)
 
 class TDProfCalculator(ProfCalculator):
     def __init__(self, w):
+        self.max_dim = len(w)
         self._handle = __lib__.CreateTDProfCalc(len(w), w)
 
 class FTProfCalculator(ProfCalculator):
     def __init__(self, w):
+        self.max_dim = len(w)
         self._handle = __lib__.CreateFTProfCalc(len(w), w)
 
 @public

@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS tbl_iters (
     TOL                     REAL,
     bias                    REAL,
     stat_error              REAL,
+    exact_error              REAL,
     creation_date           DATETIME NOT NULL,
     totalTime               REAL,
     Qparams                 mediumblob,
@@ -102,7 +103,7 @@ CREATE TABLE IF NOT EXISTS tbl_iters (
     UNIQUE KEY idx_itr_idx (run_id, iteration_idx)
 );
 CREATE VIEW vw_iters AS SELECT iter_id, run_id, TOL,
-creation_date, bias, stat_error, totalTime, iteration_idx FROM tbl_iters;
+creation_date, bias, stat_error, exact_error, totalTime, iteration_idx FROM tbl_iters;
 
 CREATE TABLE IF NOT EXISTS tbl_lvls (
     iter_id       INTEGER NOT NULL,
@@ -206,6 +207,7 @@ CREATE TABLE IF NOT EXISTS tbl_iters (
     TOL                     REAL,
     bias                    REAL,
     stat_error              REAL,
+    exact_error              REAL,
     creation_date           DATETIME NOT NULL,
     totalTime               REAL,
     Qparams                 mediumblob,
@@ -215,7 +217,7 @@ CREATE TABLE IF NOT EXISTS tbl_iters (
     CONSTRAINT idx_itr_idx UNIQUE (run_id, iteration_idx)
 );
 CREATE VIEW vw_iters AS SELECT iter_id, run_id, TOL,
-creation_date, bias, stat_error, totalTime, iteration_idx FROM tbl_iters;
+creation_date, bias, stat_error, exact_error, totalTime, iteration_idx FROM tbl_iters;
 
 CREATE TABLE IF NOT EXISTS tbl_lvls (
     iter_id       INTEGER NOT NULL,
@@ -305,10 +307,11 @@ class MIMCDatabase(object):
         with self.DBConn(**self.connArgs) as cur:
             cur.execute('''
 INSERT INTO tbl_iters(creation_date, totalTime, TOL, bias, stat_error,
-Qparams, userdata, iteration_idx, run_id)
-VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?)''',
+exact_error, Qparams, userdata, iteration_idx, run_id)
+VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                         _nan2none([iteration.totalTime, iteration.TOL,
-                                   iteration.bias, iteration.stat_error])
+                                   iteration.bias, iteration.stat_error,
+                                   iteration.exact_error])
                         +[_pickle(iteration.Q), _pickle(userdata),
                           iteration_idx, run_id])
             iter_id = cur.getLastRowID()
@@ -351,7 +354,7 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             iterAll = cur.execute('''
 SELECT dr.run_id, dr.iter_id, dr.TOL, dr.creation_date,
         dr.totalTime, dr.bias, dr.stat_error, dr.Qparams, dr.userdata,
-        dr.iteration_idx FROM tbl_iters dr WHERE dr.run_id in ?
+        dr.iteration_idx, dr.exact_error FROM tbl_iters dr WHERE dr.run_id in ?
 ORDER BY dr.run_id, dr.iteration_idx
 ''', [run_ids]).fetchall()
 
@@ -393,7 +396,8 @@ ORDER BY dr.run_id, dr.iteration_idx
                 if run.last_itr is not None:
                     iteration = run.last_itr.next_itr()
                 else:
-                    iteration = mimc.MIMCItrData(min_dim=run.params.min_dim,
+                    iteration = mimc.MIMCItrData(parent=run,
+                                                 min_dim=run.params.min_dim,
                                                  moments=run.params.moments)
                 iteration.TOL = data[2]
                 iteration.db_data = mimc.Bunch()
@@ -403,6 +407,7 @@ ORDER BY dr.run_id, dr.iteration_idx
                 iteration.totalTime = data[4]
                 iteration.bias = _none2nan(data[5])
                 iteration.stat_error = _none2nan(data[6])
+                iteration.exact_error = _none2nan(data[10])
                 iteration.Q = _unpickle(data[7])
                 run.iters.append(iteration)
                 if iter_id not in dictLvls:
@@ -473,6 +478,21 @@ ORDER BY dr.run_id, dr.iteration_idx
         if len(runs_ids) == 0:
             return []
         return self.readRunsByID(runs_ids)
+
+    def update_exact_errors(self, runs, fnItrError=None):
+        if fnItrError is not None:
+            itrs = sum([[itr for itr in r.iters] for r in runs], [])
+            errs = fnItrError(itrs)
+            for i, itr in enumerate(itrs):
+                itr.exact_error = errs[i]
+
+        with self.DBConn(**self.connArgs) as cur:
+            for run in runs:
+                for itr in run.iters:
+                    cur.execute('''
+UPDATE tbl_iters SET exact_error = ? WHERE iter_id = ?''',
+                                _nan2none([itr.exact_error])
+                                +[itr.db_data.iter_id])
 
     def deleteRuns(self, run_ids):
         if len(run_ids) == 0:

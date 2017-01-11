@@ -24,7 +24,9 @@ extern "C"{
     PProfitCalculator CreateTDProfCalc(ind_t d, const double *w);
     PProfitCalculator CreateFTProfCalc(ind_t d, const double *w);
 
-    double GetMinOuterProfit(const PVarSizeList, const PProfitCalculator profCalc);
+    double GetMinOuterProfit(const PVarSizeList,
+                             const PProfitCalculator profCalc,
+                             ind_t max_dim);
     void CalculateSetProfit(const PVarSizeList,
                             const PProfitCalculator profCalc,
                             double *log_prof, uint32 size);
@@ -35,8 +37,11 @@ extern "C"{
 
     PVarSizeList VarSizeList_expand_set(const PVarSizeList pset,
                                         const double* profit, uint32 count,
-                                        uint32 max_added, ind_t dimLookahead,
-                                        const PProfitCalculator profCalc);
+                                        uint32 max_added, ind_t dimLookahead);
+    PVarSizeList VarSizeList_expand_set_calc(const PVarSizeList pset,
+                                             PProfitCalculator profCalc,
+                                             double max_prof, ind_t max_d,
+                                             double **p_profits);
     PVarSizeList VarSizeList_copy(const PVarSizeList from);
     PVarSizeList VarSizeList_set_diff(const PVarSizeList lhs, const PVarSizeList rhs);
     void VarSizeList_set_union(PVarSizeList lhs, const PVarSizeList rhs);
@@ -52,11 +57,6 @@ extern "C"{
     /* void GetBoundaryInd(uint32 setSize, uint32 l, int32 i, */
     /*                     int32* sel, int32* inner_bnd, unsigned char* bnd_ind); */
 
-
-    PVarSizeList GetIndexSet(PVarSizeList,
-                             const PProfitCalculator profCalc,
-                             double max_prof,
-                             double **p_profits);
 
     void GenTDSet(ind_t d, ind_t base, ind_t *td_set, uint32 count);
     void TensorGrid(ind_t d, ind_t base, const ind_t *m, ind_t* tensor_grid,

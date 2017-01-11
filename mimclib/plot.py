@@ -294,8 +294,8 @@ def __normalize_fmt(args, kwargs):
         args = (kwargs.pop('fmt'), ) + args
     return args, kwargs
 
-def computeIterationStats(runs, work_bins, xi, filteritr, fnNorm=None,
-                          exact=None, relative=False):
+def computeIterationStats(runs, work_bins, xi, filteritr,
+                          modifier=1.):
     if xi == 'work':
         xi = 0
     elif xi == 'time':
@@ -304,15 +304,10 @@ def computeIterationStats(runs, work_bins, xi, filteritr, fnNorm=None,
         xi = 2
     else:              raise ValueError('x_axis')
 
-    if exact is None:
-        modifier = 1
-    else:
-        modifier = (1./fnNorm(np.array([exact]))[0]) if relative else 1.
     val = np.array([itr.calcEg() for _, itr in enum_iter(runs, filteritr)])
 
     mymax = lambda A: [np.max(A[:, i]) for i in xrange(0, A.shape[1])] if len(A) > 0 else None
     xy = []
-    val = []
     for r in runs:
         prev = 0
         totalTime = 0
@@ -334,14 +329,12 @@ def computeIterationStats(runs, work_bins, xi, filteritr, fnNorm=None,
 
             totalTime += itr.totalTime
             xy.append([itr.calcTotalWork(), totalTime, # calcTotalTime(),
-                       itr.TOL, 0, modifier*itr.totalErrorEst()]+stats)
-            val.append(itr.calcEg())
+                       itr.TOL,
+                       itr.exact_error,
+                       modifier*itr.totalErrorEst()]+stats)
             prev = itr.lvls_count
 
     xy = np.array(xy)
-    val = np.array(val)
-    if exact is not None:
-        xy[:, 3] = modifier*fnNorm(val + exact*-1)
 
     lxy = np.log(xy[:, xi])
     bins = np.digitize(lxy, np.linspace(np.min(lxy), np.max(lxy), work_bins))
@@ -382,12 +375,6 @@ def enum_iter_i(runs, fnFilter):
             if fnFilter(r, i):
                 yield i, r, r.iters[i]
 
-def estimate_exact(runs):
-    minErr = np.min([r.totalErrorEst() for r in runs])
-    d = [r.calcEg() for r in runs if r.totalErrorEst() == minErr]
-    return np.sum(d, axis=0) * (1./ len(d)), minErr
-
-
 @public
 def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     """Plots Errors vs TOL of @runs, as
@@ -406,21 +393,19 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     run_data[i].data is an instance of mimc.MIMCData
     """
 
-    fnNorm = kwargs.pop('fnNorm', np.abs)
     num_kwargs = kwargs.pop('num_kwargs', None)
-    exact = kwargs.pop('exact')
-    relative_error = kwargs.pop('relative', True)
+    modifier = kwargs.pop('modifier', 1.)
+    relative = modifier != 1.
     filteritr = kwargs.pop("filteritr", filteritr_all)
 
     ax.set_xlabel('TOL')
-    ax.set_ylabel('Relative error' if relative_error else 'Error')
+    ax.set_ylabel('Relative error' if relative else 'Error')
     ax.set_yscale('log')
     ax.set_xscale('log')
 
-    modifier = (1./fnNorm(np.array([exact]))[0]) if relative_error else 1.
-    val = np.array([itr.calcEg() for _, itr in enum_iter(runs, filteritr)])
-    xy = np.array([[itr.TOL, 0, itr.totalErrorEst()] for _, itr in enum_iter(runs, filteritr)])
-    xy[:, 1] = fnNorm(val-exact)
+    xy = np.array([[itr.TOL,
+                    itr.exact_error,
+                    itr.totalErrorEst()] for _, itr in enum_iter(runs, filteritr)])
     xy[:, 1:3] = xy[:, 1:3] * modifier
 
     TOLs, error_est = __get_stats(xy, staton=2)
@@ -511,9 +496,8 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
 
 @public
 def plotWorkVsMaxError(ax, runs, *args, **kwargs):
-    fnNorm = kwargs.pop('fnNorm', np.abs)
-    exact = kwargs.pop('exact')
-    relative = kwargs.pop('relative', True)
+    modifier = kwargs.pop('modifier', 1.)
+    relative = modifier != 1.
     work_bins = kwargs.pop('work_bins', 50)
     xi = kwargs.pop('x_axis', 'work').lower()
     filteritr = kwargs.pop("filteritr", filteritr_all)
@@ -526,16 +510,14 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
         x_label = "Avg. tolerance"
     else:              raise ValueError('x_axis')
     ax.set_xlabel(x_label)
-    ax.set_ylabel('Max Relative Error' if relative else 'Max Error')
+    ax.set_ylabel('Max Relative Error' if relative != 1. else 'Max Error')
     ax.set_yscale('log')
     ax.set_xscale('log')
 
     xy_binned = computeIterationStats(runs, xi=xi,
                                       work_bins=work_bins,
-                                      fnNorm=fnNorm,
-                                      relative=relative,
-                                      filteritr=filteritr,
-                                      exact=exact)
+                                      modifier=modifier,
+                                      filteritr=filteritr)
     plotObj = []
 
     ErrEst_kwargs = kwargs.pop('ErrEst_kwargs')
@@ -968,7 +950,6 @@ def plotErrorsQQ(ax, runs, label_fmt='{TOL}', *args, **kwargs):
     else:
         tol = kwargs.pop("tol")
 
-    fnNorm = kwargs.pop('fnNorm', np.abs)
     from scipy.stats import norm
     x_data = np.array([itr.calcEg() for _, itr in enum_iter(runs, filteritr) if
                        itr.TOL == tol])
@@ -1047,12 +1028,13 @@ def __plot_except(ax):
     raise
 
 @public
-def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
+def genPDFBooklet(runs, add_legend=True, label_fmt=None, **kwargs):
     import matplotlib.pyplot as plt
     if len(runs) == 0:
         raise Exception("No runs!!!")
 
     filteritr = kwargs.pop("filteritr", filteritr_all)
+    modifier = kwargs.pop("modifier", 1.)
     TOLs_count = len(np.unique([itr.TOL for _, itr in enum_iter(runs, filteritr)]))
     convergent_count = len([itr.TOL for _, itr in enum_iter(runs, filteritr_convergent)])
     iters_count = np.sum([len(r.iters) for r in runs])
@@ -1066,11 +1048,12 @@ def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
 
     if "params" in kwargs:
         params = kwargs.pop("params")
-        fn = kwargs.pop("fn")
+        fnNorm = kwargs.pop("fn").Norm
     else:
         maxTOL = np.max([r.db_data.finalTOL for r in runs])
         params = next(r.params for r in runs if r.db_data.finalTOL == maxTOL)
         fn = next(r.fn for r in runs if r.db_data.finalTOL == maxTOL)
+        fnNorm = fn.Norm
 
     max_dim = np.max([np.max(r.last_itr.lvls_max_dim()) for r in runs])
 
@@ -1089,10 +1072,6 @@ def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
     has_s_rate = hasattr(params, 's')
     has_beta = hasattr(params, 'beta')
 
-    if exact is None:
-        exact, _ = estimate_exact(runs)
-        print_msg("Estimated exact value is {}".format(exact))
-
     import matplotlib as mpl
     mpl.rc('text', usetex=True)
     mpl.rc('font', **{'family': 'normal', 'weight': 'demibold',
@@ -1107,8 +1086,8 @@ def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
         print_msg("plotErrorsVsTOL")
         ax = add_fig()
         try:
-            plotErrorsVsTOL(ax, runs, exact=exact, filteritr=filteritr,
-                            relative=True, fnNorm=fn.Norm,
+            plotErrorsVsTOL(ax, runs, filteritr=filteritr,
+                            modifier=modifier,
                             ErrEst_kwargs={'label':
                                            label_fmt.format(label='Error Estimate')},
                             Ref_kwargs={'ls': '--', 'c':'k',
@@ -1120,8 +1099,9 @@ def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
     print_msg("plotWorkVsMaxError")
     ax = add_fig()
     try:
-        plotWorkVsMaxError(ax, runs, exact=exact, filteritr=filteritr,
-                           relative=True, fnNorm=fn.Norm, fmt='-*',
+        plotWorkVsMaxError(ax, runs,
+                           filteritr=filteritr,
+                           modifier=modifier, fmt='-*',
                            ErrEst_kwargs={'fmt': '--*',
                                           'label': label_fmt.format(label='Error Estimate')},
                            Ref_kwargs={'ls': '--', 'c':'k',
@@ -1133,8 +1113,8 @@ def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
     print_msg("plotWorkVsMaxError")
     ax = add_fig()
     try:
-        plotWorkVsMaxError(ax, runs, exact=exact, filteritr=filteritr,
-                           x_axis='time', relative=True, fnNorm=fn.Norm, fmt='-*',
+        plotWorkVsMaxError(ax, runs, filteritr=filteritr,
+                           x_axis='time', modifier=modifier, fmt='-*',
                            ErrEst_kwargs={'fmt': '--*', 'label':
                                           label_fmt.format(label='Error Estimate')},
                            Ref_kwargs={'ls': '--', 'c':'k',
@@ -1160,7 +1140,7 @@ def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
         try:
             # This plot only makes sense for convergent plots
             plotErrorsQQ(ax, runs, filteritr=filteritr_convergent,
-                         fnNorm=fn.Norm,
+                         fnNorm=fnNorm,
                          Ref_kwargs={'ls': '--', 'c': 'k'})
         except:
             __plot_except(ax)
@@ -1284,7 +1264,7 @@ def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
                                                      'marker' : mrk,
                                                      'label' : label_fmt.format(label='Corrected estimate')}
 
-                line_data, _ = plotFunc(fnNorm=fn.Norm, **cur_kwargs)
+                line_data, _ = plotFunc(fnNorm=fnNorm, **cur_kwargs)
                 if rate is None:
                     # Fit rate
                     if len(line_data[1:, :]) > 0:
@@ -1355,7 +1335,18 @@ def genPDFBooklet(runs, exact=None, add_legend=True, label_fmt=None, **kwargs):
                 __add_legend(ax, outside=legend_outside)
     return figures
 
-def run_program():
+def set_exact_errors(runs, fnExactErr, filteritr):
+    itrs = [itr for _, itr in enum_iter(runs, filteritr)]
+    errs = fnExactErr(itrs)
+    for i, itr in enumerate(itrs):
+        itr.exact_error = errs[i]
+
+def estimate_exact(runs):
+    minErr = np.min([r.totalErrorEst() for r in runs])
+    d = [r.calcEg() for r in runs if r.totalErrorEst() == minErr]
+    return np.sum(d, axis=0) * (1./ len(d)), minErr
+
+def run_program(fnExactErr=None, **kwargs):
     from . import db as mimcdb
     from . import plot as miplot
     from . import test
@@ -1400,12 +1391,19 @@ def run_program():
                             default=False)
         parser.add_argument("-all_itr", type='bool', action="store",
                             default=False)
+        parser.add_argument("-relative", type='bool', action="store",
+                            default=True)
         parser.add_argument("-done_flag", type=int, nargs='+',
                             action="store", default=None)
+        parser.add_argument("-qoi_exact_tag", type=str, action="store")
+
 
     parser = argparse.ArgumentParser(add_help=True)
     addExtraArguments(parser)
     args = test.parse_known_args(parser)
+    for k in kwargs.keys():
+        args.__dict__[k] = kwargs[k]
+
     db_args = dict()
     if args.db_name is not None:
         db_args["db"] = args.db_name
@@ -1425,13 +1423,38 @@ def run_program():
         print("Reading data")
 
     run_data = db.readRuns(tag=args.db_tag, done_flag=args.done_flag)
+    run_data = filter(lambda r: len(r.iters) > 0, run_data)
+    if len(run_data) == 0:
+        raise Exception("No runs!!!")
+    fnNorm = run_data[0].fn.Norm
     if args.verbose:
         print("Plotting data")
 
-    figures = miplot.genPDFBooklet(filter(lambda r: len(r.iters) > 0, run_data),
-                                   exact=args.qoi_exact, verbose=args.verbose,
-                                   filteritr = filteritr_all if args.all_itr
-                                   else filteritr_convergent,
+    if args.qoi_exact_tag is not None:
+        assert args.qoi_exact is None, "Multiple exact values given"
+        exact_runs = db.readRuns(tag=args.qoi_exact_tag, done_flag=args.done_flag)
+        args.qoi_exact, _ = estimate_exact(exact_runs)
+        if args.verbose:
+            print("Estimated exact value is {}".format(args.qoi_exact))
+    if args.qoi_exact is not None:
+        assert fnExactErr is None, "Multiple exact values given"
+        fnExactErr = lambda itrs, e=args.qoi_exact: \
+                     fnNorm([v.calcEg() + e*-1 for v in itrs])
+        modifer = 1./fnNorm(args.qoi_exact)
+    else:
+        # TODO: Need to somehow set it as relative
+        modifer = 1.
+
+    if fnExactErr is not None:
+        filteritr = filteritr_all if args.all_itr else filteritr_convergent
+        set_exact_errors(run_data, fnExactErr, filteritr=filteritr)
+
+    figures = miplot.genPDFBooklet(run_data,
+                                   modifier=modifer if args.relative else 1.,
+                                   fnExactErr=fnExactErr,
+                                   verbose=args.verbose,
+                                   fnNorm=fnNorm,
+                                   filteritr=filteritr,
                                    label_fmt=args.label_fmt)
 
     if args.verbose:
@@ -1440,7 +1463,6 @@ def run_program():
     with PdfPages(args.o) as pdf:
         for fig in figures:
             pdf.savefig(fig)
-
 
     if args.cmd is not None:
         os.system(args.cmd.format(args.o))

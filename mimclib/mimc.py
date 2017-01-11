@@ -147,7 +147,8 @@ class MIMCItrData(object):
 
     """
 
-    def __init__(self, min_dim=0, moments=None, lvls=None):
+    def __init__(self, parent=None, min_dim=0, moments=None, lvls=None):
+        self.parent = parent
         self.moments = moments
         self._lvls = lvls if lvls is not None else setutil.VarSizeList(min_dim=min_dim)
         self.psums_delta = None
@@ -157,6 +158,7 @@ class MIMCItrData(object):
         self.M = np.zeros(0, dtype=np.int)      # Number of samples in each lvl
         self.bias = np.inf           # Approximation of the discretization error
         self.stat_error = np.inf     # Sampling error (based on M)
+        self.exact_error = np.nan    # Sampling error (based on M)
         self.TOL = None              # Target tolerance
         self.totalTime = None
         self.Q = None
@@ -166,7 +168,8 @@ class MIMCItrData(object):
         self._levels_added()
 
     def next_itr(self):
-        ret = MIMCItrData(moments=self.moments,
+        ret = MIMCItrData(parent=self.parent,
+                          moments=self.moments,
                           lvls=self._lvls)
         ret._lvls_count = self._lvls_count
         ret.psums_delta = self.psums_delta.copy() if self.psums_delta is not None else None
@@ -317,11 +320,13 @@ class MIMCItrData(object):
     def lvls_itr(self, start=0, end=None):
         if end is None:
             end = self.lvls_count
+        assert(end <= self.lvls_count)
         return self._lvls.dense_itr(start, end)
 
     def lvls_sparse_itr(self, start=0, end=None):
         if end is None:
             end = self.lvls_count
+        assert(end <= self.lvls_count)
         return self._lvls.sparse_itr(start, end)
 
     def lvls_find(self, ind, j=None):
@@ -882,7 +887,8 @@ estimate optimal number of levels"
                 # Skip adding an iteration if the previous one is empty
                 timer.tic()
                 if len(self.iters) == 0:
-                    self.iters.append(MIMCItrData(min_dim=self.params.min_dim,
+                    self.iters.append(MIMCItrData(parent=self,
+                                                  min_dim=self.params.min_dim,
                                                   moments=self.params.moments))
                     if self.params.bayesian:
                         self.last_itr.Q = Bunch(S=np.inf, W=np.inf,
@@ -1031,7 +1037,10 @@ def extend_prof_lvls(lvls, profCalc, min_lvls):
         lvls.add_from_list([[]])
         added += 1
     while added < 1 or (len(lvls) < min_lvls):
-        lvls.expand_set_finite(profCalc)
+        if hasattr(profCalc, "max_dim"):
+            lvls.expand_set(profCalc, max_dim=profCalc.max_dim)
+        else:
+            lvls.expand_set(profCalc, -1)
         added += 1
 
 

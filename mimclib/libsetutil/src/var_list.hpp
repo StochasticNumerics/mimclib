@@ -268,12 +268,6 @@ class ProfitCalculator {
 public:
     virtual ~ProfitCalculator(){}
     virtual double calc_log_prof(const mul_ind_t &ind)=0;
-    virtual ind_t max_dim()=0;
-
-    void check_ind(const mul_ind_t &ind){
-        if (ind.size() > max_dim())
-            throw std::runtime_error("Index too large for profit calculator");
-    }
 };
 
 typedef ProfitCalculator* PProfitCalculator;
@@ -395,12 +389,14 @@ public:
         return false;
     }
 
+    VarSizeList expand_set(PProfitCalculator pProfCalc,
+                           double max_prof, ind_t max_d,
+                           double **p_profits) const;
     VarSizeList expand_set(const double *profits, uint32 count,
                            uint32 max_added,
-                           ind_t seedLookahead,
-                           PProfitCalculator pProfCalc) const;
+                           ind_t seedLookahead) const;
 
-    double get_min_outer_profit(const PProfitCalculator profCalc) const;
+    double get_min_outer_profit(const PProfitCalculator profCalc, ind_t max_dim) const;
     void check_admissibility(ind_t d_start, ind_t d_end,
                             unsigned char *admissible, uint32 count) const;
     void make_profits_admissible(ind_t d_start, ind_t d_end,

@@ -35,7 +35,9 @@ public:
         s_err_rates(s_err_rates, s_err_rates+s) { }
 
     double calc_log_prof(const mul_ind_t &cur) {
-        check_ind(cur);
+        if (cur.size() > d_rates.size() + s_err_rates.size())
+            throw std::runtime_error("Index too large for profit calculator");
+
         double d_cont=0;
         double s_cont=0;
         unsigned int d = d_rates.size();
@@ -56,7 +58,6 @@ public:
         return d_cont + s_cont;
     }
 
-    ind_t max_dim() { return d_rates.size() + s_err_rates.size(); }
 private:
     std::vector<double> d_rates;
     std::vector<double> s_err_rates;
@@ -69,14 +70,12 @@ public:
         weights(_weights, _weights+d) { }
 
     double calc_log_prof(const mul_ind_t &cur){
-        check_ind(cur);
+        if (cur.size() > weights.size())
+            throw std::runtime_error("Index too large for profit calculator");
         double prof=0;
         for (auto itr=cur.begin();itr!=cur.end();itr++)
             prof += (itr->value-SparseMIndex::SET_BASE)*weights[itr->ind];
         return prof;
-    }
-    ind_t max_dim(){
-        return weights.size();
     }
 private:
     std::vector<double> weights;
@@ -89,14 +88,12 @@ public:
         weights(_weights, _weights+d) { }
 
     double calc_log_prof(const mul_ind_t &cur){
-        check_ind(cur);
+        if (cur.size() > weights.size())
+            throw std::runtime_error("Index too large for profit calculator");
         double prof=0;
         for (auto itr=cur.begin();itr!=cur.end();itr++)
             prof = std::max(prof, (itr->value-SparseMIndex::SET_BASE)*weights[itr->ind]);
         return prof;
-    }
-    ind_t max_dim(){
-        return weights.size();
     }
 private:
     std::vector<double> weights;
@@ -119,17 +116,20 @@ public:
         double s_cont=0;
         unsigned int d = dexp.size();
         for (auto itr=cur.begin();itr!=cur.end();itr++){
+            auto v = itr->value-SparseMIndex::SET_BASE;
+            if (v == 0)
+                continue;  // Not activated
+
             if (itr->ind < d)
-                d_cont += -(itr->value - SparseMIndex::SET_BASE)*dexp[itr->ind];
+                d_cont += v*dexp[itr->ind];
             else{
-                s_cont += -pow(2, itr->value-SparseMIndex::SET_BASE)
-                           * (std::log(xi) + sexp*std::log(itr->ind+1));
+                // np.exp(-np.log(xi*(dim+1)**exponent)*(2.**(v-1)))
+                s_cont += v * std::log(2) + pow(2., v-1)
+                    * (std::log(xi) + sexp*std::log(itr->ind-d+1));
             }
         }
         return d_cont + s_cont;
     }
-
-    ind_t max_dim() { return static_cast<ind_t>(-1); }
 private:
     std::vector<double> dexp;
     double xi;
@@ -179,73 +179,6 @@ void FreeMemory(void **data)
     *data = 0;
 }
 
-
-struct setprof_t{
-    setprof_t(const mul_ind_t &i, double p): ind(i), profit(p), size(i.size()) {}
-    setprof_t(const mul_ind_t &i, double p, ind_t _size): ind(i), profit(p), size(_size) {}
-
-    mul_ind_t ind;
-    double profit;
-    ind_t size;
-};
-typedef std::list<setprof_t> ind_mul_ind_t;
-bool compare_setprof(const setprof_t& first, const setprof_t& second)
-{
-    return first.profit < second.profit;
-}
-
-PVarSizeList GetIndexSet(PVarSizeList pRet,
-                         const PProfitCalculator profCalc,
-                         double max_prof,
-                         double **p_profits) {
-    // TODO: This does not work for infinite dimensions
-    ind_t max_d = profCalc->max_dim();
-    ind_mul_ind_t ind_set;
-    ind_set.push_back(setprof_t(mul_ind_t(), profCalc->calc_log_prof(mul_ind_t())));
-
-    double cur_prof;
-    ind_mul_ind_t::iterator itrCur = ind_set.begin();
-    while (itrCur != ind_set.end()) {
-        if (itrCur->size < max_d) {
-            mul_ind_t cur_ind = itrCur->ind;
-            ind_set.push_back(setprof_t(cur_ind, -1, itrCur->size+1));
-
-            ind_t cur_size = itrCur->size;
-            cur_ind.step(cur_size);
-            while ((cur_prof=profCalc->calc_log_prof(cur_ind)) <= max_prof){
-                ind_set.push_back(setprof_t(cur_ind, cur_prof));
-                cur_ind.step(cur_size);
-            }
-            // if (added > 0)  // This assumes that dimensions are ordered!
-
-        }
-        // If this iterator has negative profit it means it's temporary and
-        //  can be deleted safely (since all derivatives are already added)
-        if (itrCur->profit < 0)
-            itrCur = ind_set.erase(itrCur); // erase returns the next iterator
-        else
-            itrCur++;
-    }
-
-    ind_set.sort(compare_setprof);
-
-    if (p_profits)
-        *p_profits = static_cast<double*>(malloc(sizeof(double) * ind_set.size()));
-
-    uint32 i=0;
-    if (!pRet)
-        pRet = new VarSizeList(ind_set.size());
-
-    for (auto itr=ind_set.begin();itr!=ind_set.end();itr++){
-        if (!pRet->has_ind(itr->ind))
-            pRet->push_back(itr->ind);
-        if (p_profits)
-            (*p_profits)[i++] = itr->profit;
-    }
-    return pRet;
-}
-
-
 std::vector<ind_t> TDSet(ind_t d, uint32 count, unsigned int base){
     assert(d>=1 && count>=1);
     std::vector<ind_t> res;
@@ -288,8 +221,8 @@ void GenTDSet(ind_t d, ind_t base, ind_t *td_set, uint32 count){
 //////// ------------------------------------------------
 /// C-Accessors to C++ methods
 double GetMinOuterProfit(const PVarSizeList pset,
-                         const PProfitCalculator profCalc){
-    return pset->get_min_outer_profit(profCalc);
+                         const PProfitCalculator profCalc, ind_t max_dim){
+    return pset->get_min_outer_profit(profCalc, max_dim);
 }
 
 void CalculateSetProfit(const PVarSizeList pset,
@@ -309,11 +242,18 @@ void MakeProfitsAdmissible(const PVarSizeList pset, ind_t d_start, ind_t d_end,
     pset->make_profits_admissible(d_start, d_end, pProfits, pset->count());
 }
 
+PVarSizeList VarSizeList_expand_set_calc(const PVarSizeList pset,
+                                         PProfitCalculator profCalc,
+                                         double max_prof, ind_t max_d,
+                                         double **p_profits) {
+    return new VarSizeList(pset->expand_set(profCalc, max_prof, max_d, p_profits));
+}
+
 PVarSizeList VarSizeList_expand_set(const PVarSizeList pset,
                             const double* profits, uint32 count,
-                            uint32 max_added, ind_t dimLookahead,
-                            const PProfitCalculator profCalc) {
-    return new VarSizeList(pset->expand_set(profits, count, max_added, dimLookahead, profCalc));
+                            uint32 max_added, ind_t dimLookahead) {
+    return new VarSizeList(pset->expand_set(profits, count, max_added,
+                                            dimLookahead));
 }
 
 PVarSizeList VarSizeList_copy(const PVarSizeList lhs){
@@ -462,7 +402,6 @@ double VarSizeList_estimate_bias(const PVarSizeList pset,
 ind_t GetDefaultSetBase(){
     return SparseMIndex::SET_BASE;
 }
-
 
 PTree Tree_new(){
     return new Node(0);

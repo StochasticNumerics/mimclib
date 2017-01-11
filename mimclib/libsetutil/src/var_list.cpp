@@ -83,11 +83,15 @@ void VarSizeList::make_profits_admissible(ind_t d_start,
 
 
 // Returns the minimum profit on the outer set
-double VarSizeList::get_min_outer_profit(const PProfitCalculator profCalc) const {
-    ind_t max_d = profCalc->max_dim();//set.max_dim();
+double VarSizeList::get_min_outer_profit(const PProfitCalculator profCalc,
+                                         ind_t max_d) const {
+    assert(max_d >= this->max_dim());
     std::vector<ind_t> bnd_neigh = this->count_neighbors();
 
     //------------- Calculate outer boundary
+    if (!this->count())
+        return profCalc->calc_log_prof(mul_ind_t());
+
     double minProf = std::numeric_limits<double>::infinity();
     unsigned int bnd_count = 0;
     for (uint32 k=0;k<this->count();k++){
@@ -223,11 +227,66 @@ uint32 VarSizeList::add_admissible_children(mul_ind_t cur,
     return added;
 }
 
+
+struct setprof_t{
+    setprof_t(const mul_ind_t &i, double p): ind(i), profit(p), size(i.size()) {}
+    setprof_t(const mul_ind_t &i, double p, ind_t _size): ind(i), profit(p), size(_size) {}
+
+    mul_ind_t ind;
+    double profit;
+    ind_t size;
+};
+
+VarSizeList VarSizeList::expand_set(PProfitCalculator profCalc,
+                                    double max_prof, ind_t max_d,
+                                    double **p_profits) const {
+    typedef std::list<setprof_t> ind_mul_ind_t;
+    ind_mul_ind_t ind_set;
+    ind_set.push_back(setprof_t(mul_ind_t(), profCalc->calc_log_prof(mul_ind_t())));
+
+    double cur_prof;
+    ind_mul_ind_t::iterator itrCur = ind_set.begin();
+    while (itrCur != ind_set.end()) {
+        if (itrCur->size < max_d) {
+            mul_ind_t cur_ind = itrCur->ind;
+            ind_set.push_back(setprof_t(cur_ind, -1, itrCur->size+1));
+
+            ind_t cur_size = itrCur->size;
+            cur_ind.step(cur_size);
+            while ((cur_prof=profCalc->calc_log_prof(cur_ind)) <= max_prof){
+                ind_set.push_back(setprof_t(cur_ind, cur_prof));
+                cur_ind.step(cur_size);
+            }
+            // if (added > 0)  // This assumes that dimensions are ordered!
+
+        }
+        // If this iterator has negative profit it means it's temporary and
+        //  can be deleted safely (since all derivatives are already added)
+        if (itrCur->profit < 0)
+            itrCur = ind_set.erase(itrCur); // erase returns the next iterator
+        else
+            itrCur++;
+    }
+
+    ind_set.sort([](const setprof_t& first, const setprof_t& second)
+                 {return first.profit < second.profit; });
+
+    if (p_profits)
+        *p_profits = static_cast<double*>(malloc(sizeof(double) * ind_set.size()));
+
+    uint32 i=0;
+    VarSizeList ret;
+    for (auto itr=ind_set.begin();itr!=ind_set.end();itr++){
+        ret.push_back_unsafe(itr->ind);
+        if (p_profits)
+            (*p_profits)[i++] = itr->profit;
+    }
+    return ret;
+}
+
 VarSizeList VarSizeList::expand_set(const double *profits, uint32 count,
                                     uint32 max_added,
-                                    ind_t seedLookahead,
-                                    PProfitCalculator pProfCalc // Can be NULL
-    ) const {
+                                    ind_t seedLookahead) const {
     // Sorted ind lists the indices in order of expansion (of decreasing profit).
     assert(count == this->count());
     // std::vector<double> profits(count);
@@ -239,26 +298,15 @@ VarSizeList VarSizeList::expand_set(const double *profits, uint32 count,
     //------------- Calculate outer boundary
     ind_t max_dim = this->max_dim();
     VarSizeList new_indices;
-    for (uint32 j=0;j<count && (pProfCalc != NULL || new_indices.count() < max_added);j++) {
+    for (uint32 j=0;j<count && new_indices.count() < max_added;j++) {
         uint32 k = sorted_ind[j];   // Start from the least -log profit
         if (bnd_neigh[k] < max_dim) {
             // This is a boundary, check all outer indices that are
             // not in the set already
             add_admissible_children(this->get(k),
-                                    pProfCalc?static_cast<uint32>(-1):max_added,
+                                    max_added,
                                     new_indices);
         }
-    }
-
-    if (pProfCalc && new_indices.count() > max_added){
-        // Calculate profits and order new indices by them, then
-        // truncate to only add max_added
-        std::vector<double> profit(new_indices.count());
-        new_indices.calc_set_profit(pProfCalc, &profit[0],
-                                    profit.size());
-        std::vector<uint32> sorted_ind = argsort(profit);
-        new_indices = VarSizeList(new_indices, 0, -1,
-                                  &sorted_ind[0], max_added);
     }
 
     // // Expand set on boundaries where there are exactly errors=0
@@ -362,8 +410,7 @@ void VarSizeList::get_adaptive_order(const double *profits,
         size_t prev_count = curList.count();
         curList.set_union(curList.expand_set(&profits_in_set[0],
                                              curList.count(),
-                                             max_added, seedLookahead,
-                                             NULL));
+                                             max_added, seedLookahead));
         bool all_found = true;
         for (auto itr=curList.m_ind_set.begin()+prev_count;
              itr!=curList.m_ind_set.end();

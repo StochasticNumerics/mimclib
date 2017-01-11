@@ -50,15 +50,18 @@ class MyRun:
                                                         run.params.qoi_set_sexp)
 
     def extendLvls(self, run, lvls):
+        max_added = None
         if self.profit_calc is None:
             error = run.fn.Norm(run.last_itr.calcDeltaEl())
             work = run.last_itr.Wl_estimate
             prof = setutil.calc_log_prof_from_EW(error, work)
+            max_added = 5
         else:
             prof = lvls.calc_log_prof(self.profit_calc)
 
         lvls.expand_set(prof,
-                        seedLookahead=2, max_added=5,
+                        seedLookahead=2,
+                        max_added=max_added,
                         profCalc=self.profit_calc)
         self.proj.update_index_set(lvls)
 

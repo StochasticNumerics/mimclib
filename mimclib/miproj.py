@@ -22,19 +22,22 @@ import numpy.ctypeslib as npct
 __lib__ = npct.load_library("libset_util", __file__)
 __lib__.sample_optimal_leg_pts.restype = None
 __lib__.sample_optimal_leg_pts.argtypes = [ct.c_uint32, ct.c_voidp,
-                                           npct.ndpointer(dtype=np.double, ndim=1, flags='CONTIGUOUS')]
+                                           npct.ndpointer(dtype=np.double, ndim=1, flags='CONTIGUOUS'),
+                                           ct.c_double, ct.c_double]
 
 @public
-def sample_optimal_leg_pts(N, bases_indices):
+def sample_optimal_leg_pts(N, bases_indices, interval=(-1, 1)):
     max_dim = bases_indices.max_dim()
     X = np.empty(max_dim*N)
-    __lib__.sample_optimal_leg_pts(N, bases_indices._handle, X)
+    __lib__.sample_optimal_leg_pts(N, bases_indices._handle, X,
+                                   interval[0], interval[1])
     X = X.reshape((N, max_dim))
     if X.shape[0] == 0:
         W = np.zeros(0)
     else:
-        B = miproj.TensorExpansion.evaluate_basis(miproj.legendre_polynomials,
-                                                  bases_indices, X)
+        B = TensorExpansion.evaluate_basis(lambda x, n, ii=interval:
+                                           legendre_polynomials(x, n, interval=ii),
+                                           bases_indices, X)
         W = len(bases_indices) / np.sum(np.power(B, 2), axis=1)
     return X, W
 
@@ -180,7 +183,7 @@ class MIWProjSampler(object):
             tStart = time.time()
             sel_lvls = self.alpha_ind == ind
             work_per_sample = self.fnWorkModel(setutil.VarSizeList([alpha]))
-            beta_indset = lvls.sublist(sel_lvls, d_start=self.d)
+            beta_indset = lvls.sublist(sel_lvls, d_start=self.d, min_dim=0)
             max_dim = beta_indset.max_dim()
             basis = setutil.VarSizeList()
             pols_to_beta = []
@@ -207,6 +210,9 @@ class MIWProjSampler(object):
                 projections = np.empty(len(beta_indset), dtype=TensorExpansion)
 
                 for j in xrange(0, len(beta_indset)):
+                    # if len(beta_indset[j]) == 0:
+                    #     sel_coeff = np.ones(len(coeffs), dtype=np.bool)
+                    # else:
                     sel_coeff = pols_to_beta == j
                     projections[j] = TensorExpansion(fnBasis=self.fnBasis,
                                                      base_indices=basis.sublist(sel_coeff),
@@ -251,7 +257,7 @@ def sample_uniform_pts(N, bases_indices, interval=(-1, 1)):
         np.ones(N)*(1./N)
 
 @public
-def sample_optimal_pts(N, fnBasis, bases_indices, interval=(-1, 1)):
+def sample_optimal_pts(fnBasis, N, bases_indices, interval=(-1, 1)):
     max_dim = bases_indices.max_dim()
     acceptanceratio = 1./(4*np.exp(1))
     X = np.zeros((N, max_dim))
