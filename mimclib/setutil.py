@@ -72,11 +72,8 @@ __lib__.CreateMIProfCalc.restype = ct.c_voidp
 __lib__.CreateMIProfCalc.argtypes = [__ct_ind_t__, __arr_double__,
                                      ct.c_double, ct.c_double]
 
-__lib__.CreateTDProfCalc.restype = ct.c_voidp
-__lib__.CreateTDProfCalc.argtypes = [__ct_ind_t__, __arr_double__]
-
-__lib__.CreateFTProfCalc.restype = ct.c_voidp
-__lib__.CreateFTProfCalc.argtypes = [__ct_ind_t__, __arr_double__]
+__lib__.CreateTDFTProfCalc.restype = ct.c_voidp
+__lib__.CreateTDFTProfCalc.argtypes = [__ct_ind_t__, __arr_double__, __arr_double__]
 
 __lib__.FreeProfitCalculator.restype = None
 __lib__.FreeProfitCalculator.argtypes = [ct.c_voidp]
@@ -496,8 +493,8 @@ class ProfCalculator(object):
     #                                         (count,)).copy().reshape(count)
     #     finally:
     #         __lib__.FreeMemory(ct.byref(ct.cast(mem_prof, ct.c_void_p)))
-
     #     return indSet, profits
+
     def __del__(self):
         if self._handle is not None:
             __lib__.FreeProfitCalculator(self._handle)
@@ -517,15 +514,15 @@ class MIProfCalculator(ProfCalculator):
                                                 np.array(dexp, dtype=np.float),
                                                 xi, sexp)
 
-class TDProfCalculator(ProfCalculator):
-    def __init__(self, w):
-        self.max_dim = len(w)
-        self._handle = __lib__.CreateTDProfCalc(len(w), w)
-
-class FTProfCalculator(ProfCalculator):
-    def __init__(self, w):
-        self.max_dim = len(w)
-        self._handle = __lib__.CreateFTProfCalc(len(w), w)
+class TDFTProfCalculator(ProfCalculator):
+    def __init__(self, td_w=None, ft_w=None):
+        ft_w = ft_w if ft_w is not None else np.zeros(len(td_w))
+        td_w = td_w if td_w is not None else np.zeros(len(ft_w))
+        assert len(td_w) == len(ft_w), "Argument mismatch"
+        self.max_dim = len(td_w)
+        self._handle = __lib__.CreateTDFTProfCalc(len(td_w),
+                                                  np.array(td_w),
+                                                  np.array(ft_w))
 
 @public
 def TensorGrid(m, base=1, count=None):

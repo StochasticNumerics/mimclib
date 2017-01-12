@@ -315,27 +315,26 @@ def computeIterationStats(runs, work_bins, xi, filteritr,
             if not filteritr(r, i):
                 continue
             itr = r.iters[i]
-            stats = mymax(np.array([[
+            lvl_stats = mymax(np.array([[
                 1+np.max(j) if len(j) > 0 else 0,
                 np.max(data) if len(data) > 0 else 0,
                 len(data)] for j, data in itr.lvls_sparse_itr(prev)]))
 
-            if stats is None:
+            if lvl_stats is None:
                 assert(prev > 0)
-                stats = xy[-1][5:]
+                lvl_stats = xy[-1][5:]
             else:
                 if prev > 0:
-                    stats = mymax(np.vstack((stats, xy[-1][5:])))
+                    lvl_stats = mymax(np.vstack((lvl_stats, xy[-1][5:])))
 
             totalTime += itr.totalTime
             xy.append([itr.calcTotalWork(), totalTime, # calcTotalTime(),
                        itr.TOL,
                        itr.exact_error,
-                       modifier*itr.totalErrorEst()]+stats)
+                       modifier*itr.totalErrorEst()]+lvl_stats)
             prev = itr.lvls_count
 
     xy = np.array(xy)
-
     lxy = np.log(xy[:, xi])
     bins = np.digitize(lxy, np.linspace(np.min(lxy), np.max(lxy), work_bins))
     bins[bins == work_bins] = work_bins-1
@@ -1431,22 +1430,26 @@ def run_program(fnExactErr=None, **kwargs):
         print("Plotting data")
 
     if args.qoi_exact_tag is not None:
-        assert args.qoi_exact is None, "Multiple exact values given"
-        exact_runs = db.readRuns(tag=args.qoi_exact_tag, done_flag=args.done_flag)
-        args.qoi_exact, _ = estimate_exact(exact_runs)
+        assert args.qoi_exact is None, "An exact value and exact tag are given"
+        if args.qoi_exact_tag == args.db_tag:
+            args.qoi_exact, _ = estimate_exact(run_data)
+        else:
+            exact_runs = db.readRuns(tag=args.qoi_exact_tag, done_flag=args.done_flag)
+            args.qoi_exact, _ = estimate_exact(exact_runs)
         if args.verbose:
             print("Estimated exact value is {}".format(args.qoi_exact))
+
     if args.qoi_exact is not None:
-        assert fnExactErr is None, "Multiple exact values given"
+        assert fnExactErr is None, "An exact value and an exact function are given"
         fnExactErr = lambda itrs, e=args.qoi_exact: \
                      fnNorm([v.calcEg() + e*-1 for v in itrs])
-        modifer = 1./fnNorm(args.qoi_exact)
+        modifer = 1./fnNorm([args.qoi_exact])
     else:
         # TODO: Need to somehow set it as relative
         modifer = 1.
 
+    filteritr = filteritr_all if args.all_itr else filteritr_convergent
     if fnExactErr is not None:
-        filteritr = filteritr_all if args.all_itr else filteritr_convergent
         set_exact_errors(run_data, fnExactErr, filteritr=filteritr)
 
     figures = miplot.genPDFBooklet(run_data,

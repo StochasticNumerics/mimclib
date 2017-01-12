@@ -288,8 +288,8 @@ def sample_optimal_pts(fnBasis, N, bases_indices, interval=(-1, 1)):
 @public
 def default_basis_from_level(beta, C=2):
     # beta is zero indexed
-    max_deg = 2 ** beta
-    prev_deg = np.maximum(0, 2 ** (beta.astype(np.int)-1))
+    max_deg = 2 ** (beta + 1) - 1
+    prev_deg = np.maximum(0, 2 ** beta - 1)
     l = len(beta)
     m = np.prod(max_deg)
     mprev = np.prod(prev_deg[prev_deg>0]) if np.any(prev_deg>0) else 0

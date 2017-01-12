@@ -63,40 +63,30 @@ private:
     std::vector<double> s_err_rates;
 };
 
-// Total Degree profit calculator
-class TDProfCalculator : public ProfitCalculator {
+// Total Degree, Full tensor profit calculator
+class TDFTProfCalculator : public ProfitCalculator {
 public:
-    TDProfCalculator(ind_t d, const double *_weights) :
-        weights(_weights, _weights+d) { }
+    TDFTProfCalculator(ind_t d, const double *_td_weights,
+                       const double *_ft_weights) :
+        td_weights(_td_weights, _td_weights+d),
+        ft_weights(_ft_weights, _ft_weights+d){ }
 
     double calc_log_prof(const mul_ind_t &cur){
-        if (cur.size() > weights.size())
+        if (cur.size() > td_weights.size())
             throw std::runtime_error("Index too large for profit calculator");
-        double prof=0;
-        for (auto itr=cur.begin();itr!=cur.end();itr++)
-            prof += (itr->value-SparseMIndex::SET_BASE)*weights[itr->ind];
-        return prof;
+        double td_prof=0;
+        uint i=0;
+        for (auto itr=cur.begin();itr!=cur.end();itr++, i++)
+            td_prof += (itr->value-SparseMIndex::SET_BASE)*td_weights[itr->ind];
+
+        double ft_prof=0;
+        for (auto itr=cur.begin();itr!=cur.end();itr++, i++)
+            ft_prof = std::max(ft_prof, (itr->value-SparseMIndex::SET_BASE)*ft_weights[itr->ind]);
+        return td_prof + ft_prof;
     }
 private:
-    std::vector<double> weights;
-};
-
-// Full tensor profit calculator
-class FTProfCalculator : public ProfitCalculator {
-public:
-    FTProfCalculator(ind_t d, const double *_weights) :
-        weights(_weights, _weights+d) { }
-
-    double calc_log_prof(const mul_ind_t &cur){
-        if (cur.size() > weights.size())
-            throw std::runtime_error("Index too large for profit calculator");
-        double prof=0;
-        for (auto itr=cur.begin();itr!=cur.end();itr++)
-            prof = std::max(prof, (itr->value-SparseMIndex::SET_BASE)*weights[itr->ind]);
-        return prof;
-    }
-private:
-    std::vector<double> weights;
+    std::vector<double> td_weights;
+    std::vector<double> ft_weights;
 };
 
 // For an index alpha
@@ -329,12 +319,9 @@ PProfitCalculator CreateMIProfCalc(ind_t d, const double *dexp,
     return new MIProfCalculator(d, dexp, xi, sexp);
 }
 
-PProfitCalculator CreateTDProfCalc(ind_t d, const double *w){
-    return new TDProfCalculator(d, w);
-}
-
-PProfitCalculator CreateFTProfCalc(ind_t d, const double *w){
-    return new FTProfCalculator(d, w);
+PProfitCalculator CreateTDFTProfCalc(ind_t d, const double *td_w,
+                                     const double *ft_w){
+    return new TDFTProfCalculator(d, td_w, ft_w);
 }
 
 void FreeProfitCalculator(PProfitCalculator profCalc){

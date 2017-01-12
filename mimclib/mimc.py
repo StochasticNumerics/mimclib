@@ -478,9 +478,9 @@ supported with a given work model")
             else:
                 raise ValueError("No default ExtendLvls for ")
 
-            profCalc = setutil.TDProfCalculator(weights)
+            profCalc = setutil.TDFTProfCalculator(weights)
             self.fn.ExtendLvls = lambda lvls: extend_prof_lvls(lvls, profCalc,
-                                                               self.params.min_lvls)
+                                                               self.params.min_lvl)
 
     def setFunctions(self, **kwargs):
         # fnSampleLvl(moments, mods, inds, M):
@@ -590,9 +590,12 @@ the first iteration. Not needed if TOLs is provided to doRun.")
                       help="Initial number of samples used to estimate the \
 sample variance on levels when not using the Bayesian estimators. \
 Not needed if a profit calculator is provided.")
-            add_store('min_lvls', type=int, default=3,
+            add_store('min_lvl', type=int, default=3,
                       help="The initial number of levels to run \
 the first iteration. Not needed if a profit calculator is provided.")
+            add_store('max_lvl', type=int, default=1000,
+                      help="Maximum number of levels to run. \
+The algorithm will terminate even if TOL is not reached")
             add_store('max_add_itr', type=int, default=2,
                       help="Maximum number of additonal iterations\
 to run when the MIMC is expected to but is not converging.\
@@ -805,6 +808,7 @@ estimate optimal number of levels"
             self.last_itr._levels_added()
 
         self.all_itr._levels_added()
+        # TODO: We should allow the user to not add any new levels!
         assert(prev != self.last_itr.lvls_count)
         newTodoM = self.params.M0
         if len(newTodoM) < self.last_itr.lvls_count:
@@ -952,6 +956,12 @@ estimate optimal number of levels"
                    or (TOL < finalTOL and self.totalErrorEst() < finalTOL):
                     break
 
+                data, _ = self.last_itr._lvls.to_list()
+                data = np.hstack(data)
+                if data.size > 0 and np.max(data) >= self.params.max_lvl:
+                    print_info("WARNING: MIMC did not converge with the maximum number of levels")
+                    break
+
             print_info("MIMC iteration for TOL={} took {} seconds (time since start {})".format(TOL, timer.toc(), self.iter_total_times[-1]))
             print_info("################################################")
             if less(TOL, finalTOL) and self.totalErrorEst() <= finalTOL:
@@ -1030,13 +1040,13 @@ def calcMIMCRate(w, s, gamma):
         log_rate = d-1 + 2*(dz-1)*(1+zeta)
     return rate, log_rate
 
-def extend_prof_lvls(lvls, profCalc, min_lvls):
+def extend_prof_lvls(lvls, profCalc, min_lvl):
     added = 0
     if len(lvls) == 0:
         # add seed
         lvls.add_from_list([[]])
         added += 1
-    while added < 1 or (len(lvls) < min_lvls):
+    while added < 1 or (len(lvls) < min_lvl):
         if hasattr(profCalc, "max_dim"):
             lvls.expand_set(profCalc, max_dim=profCalc.max_dim)
         else:
