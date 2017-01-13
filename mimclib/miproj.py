@@ -244,7 +244,7 @@ class MIWProjSampler(object):
         G = basisvalues.transpose().dot(basisvalues * W[:, None])
         #coefficients = np.linalg.solve(G, R)
         if np.linalg.cond(G) > 100:
-            warnings.warn('Ill conditioned Gramian matrix encountered')
+            warnings.warn('Ill conditioned Gramian matrix encountered, cond={}'.format(np.linalg.cond(G)))
         # Solving normal equations is faster than QR, because of good condition
         coefficients = solve(G, R, sym_pos=True)
         if not np.isfinite(coefficients).all():
@@ -300,7 +300,7 @@ def default_basis_from_level(beta, C=2):
 
 @public
 def default_samples_count(basis, C=2):
-    m = len(basis)
+    m = len(basis)+1
     return (4 if m == 1 else 0) + int(np.ceil(C * m * np.log2(m + 1)))
 
 @public

@@ -57,12 +57,9 @@ class MyRun:
             prof = setutil.calc_log_prof_from_EW(error, work)
             max_added = 5
         else:
-            prof = lvls.calc_log_prof(self.profit_calc)
-
-        lvls.expand_set(prof,
-                        seedLookahead=2,
-                        max_added=max_added,
-                        profCalc=self.profit_calc)
+            prof = self.profit_calc
+        max_dim = 2 + (0 if len(lvls) == 0 else np.max(lvls.get_dim()))
+        lvls.expand_set(prof, max_dim=max_dim, max_added=max_added)
         self.proj.update_index_set(lvls)
 
     def addExtraArguments(self, parser):
