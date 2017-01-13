@@ -362,13 +362,13 @@ def filteritr_convergent(run, iter_idx):
 def filteritr_all(run, iter_idx):
     return True
 
-def enum_iter(runs, fnFilter):
+def enum_iter(runs, fnFilter=filteritr_all):
     for r in runs:
         for i in xrange(0, len(r.iters)):
             if fnFilter(r, i):
                 yield r, r.iters[i]
 
-def enum_iter_i(runs, fnFilter):
+def enum_iter_i(runs, fnFilter=filteritr_all):
     for r in runs:
         for i in xrange(0, len(r.iters)):
             if fnFilter(r, i):
