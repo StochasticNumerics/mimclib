@@ -32,7 +32,7 @@ rc_params = {
     'legend.fontsize' : 14}
 mpl.rcParams.update(rc_params)
 
-def plotAll(o, tags=None, label=None, work_bins=50):
+def plotAll(o, tags=None, label=None, db=None, work_bins=50):
     if tags is None:
         tags = [o]
     if label is None:
@@ -47,8 +47,6 @@ def plotAll(o, tags=None, label=None, work_bins=50):
     color = ['b', 'r', 'g', 'm']
     marker = ['*', '+', 'o', 'x']
     linestyles = ['--', '-.', '-', ':', '-']
-
-    db = mimcdb.MIMCDatabase(engine='sqlite', db='data.sql')
 
     for i, tag in enumerate(tags):
         print("Plotting", tag)
@@ -118,5 +116,15 @@ def plotAll(o, tags=None, label=None, work_bins=50):
             pdf.savefig(fig)
             plt.close(fig)
 
-plotAll('cond_fixproj-1-3.5-optimal', ['fixproj-1-3.5-optimal'])
-plotAll('cond_fixproj-1-1.5-optimal', ['fixproj-1-1.5-optimal'])
+import argparse
+parser = argparse.ArgumentParser(add_help=True)
+parser.add_argument("-db_name", type=str, action="store",
+                    help="Database Name")
+parser.add_argument("-db_host", type=str, action="store",
+                    help="Database Host")
+parser.add_argument("-db_tag", type=str, action="store",
+                    help="Database Tags")
+args, _ = parser.parse_known_args()
+
+db = mimcdb.MIMCDatabase(db=args.db_name, host=args.db_host)
+plotAll(o='cond_'+args.db_tag, tags=[args.db_tag], db=db)

@@ -11,56 +11,55 @@ COMMON="python miproj_run.py -mimc_TOL 1e-10 -qoi_seed 0 -qoi_problem 0 -qoi_sig
 function run_cmd {
     # d max_lvl nu set extra_args
     echo $COMMON -mimc_max_lvl $3 -mimc_min_dim $2 -qoi_dim $2 -qoi_df_nu $4 \
-         -db_tag $1-$2-$4-$5 -miproj_reuse_samples True \
-         -miproj_pts_sampler $5 ${@:6}
+         -db_tag $1-$2-$4-optimal -miproj_reuse_samples True \
+         -miproj_pts_sampler optimal ${@:5}
+
+    echo $COMMON -mimc_max_lvl $3 -mimc_min_dim $2 -qoi_dim $2 -qoi_df_nu $4 \
+         -db_tag $1-$2-$4-arcsine -miproj_reuse_samples True \
+         -miproj_pts_sampler arcsine ${@:5}
 }
 
+HOST='129.67.187.118'
 function plot_cmd {
-    echo ../plot_prog.py -db_engine sqlite -db_name data.sql -db_tag $1 \
-         -o output/$1.pdf -verbose True -all_itr True \
-         -qoi_exact_tag $1  &
+    echo ../plot_prog.py -db_engine mysql -db_name miproj_matern -db_host $HOST \
+         -db_tag $1-optimal -o output/$1-optimal.pdf -verbose True -all_itr True \
+         -qoi_exact_tag $1-optimal
+
+    echo ../plot_prog.py -db_engine mysql -db_name miproj_matern -db_host $HOST \
+         -db_tag $1-arcsine -o output/$1-arcsine.pdf -verbose True -all_itr True \
+         -qoi_exact_tag $1-arcsine
+
+    echo ./plot_cond.py -db_name miproj_matern -db_host $HOST -db_tag $1-optimal
+    echo ./plot_cond.py -db_name miproj_matern -db_host $HOST -db_tag $1-arcsine
 }
 
-run_cmd fixproj 1 10 3.5 optimal -mimc_min_dim 0
-run_cmd fixproj 1 10 2.5 optimal -mimc_min_dim 0
-run_cmd fixproj 1 10 1.5 optimal -mimc_min_dim 0
-run_cmd fixproj 1 10 1.0 optimal -mimc_min_dim 0
+#################### RUNNING
+run_cmd fixproj 1 10 3.5 -mimc_min_dim 0
+run_cmd fixproj 1 10 2.5 -mimc_min_dim 0
+run_cmd fixproj 1 10 1.5 -mimc_min_dim 0
+run_cmd fixproj 1 10 1.0 -mimc_min_dim 0
 
-run_cmd fixproj 1 10 3.5 arcsine -mimc_min_dim 0
-run_cmd fixproj 1 10 2.5 arcsine -mimc_min_dim 0
-run_cmd fixproj 1 10 1.5 arcsine -mimc_min_dim 0
-run_cmd fixproj 1 10 1.0 arcsine -mimc_min_dim 0
+run_cmd miproj 1 10 1.0
+run_cmd miproj 1 10 1.5
+run_cmd miproj 1 10 2.5
+run_cmd miproj 1 10 3.5
 
+run_cmd fixproj 3 7 4.5 -mimc_min_dim 0
+run_cmd fixproj 3 7 3.0 -mimc_min_dim 0
 
-run_cmd miproj 1 10 1.0 optimal
-run_cmd miproj 1 10 1.5 optimal
-run_cmd miproj 1 10 2.5 optimal
-run_cmd miproj 1 10 3.5 optimal
+run_cmd miproj 3 7 3.0
+run_cmd miproj 3 7 4.5
 
-run_cmd miproj 1 10 1.0 arcsine
-run_cmd miproj 1 10 1.5 arcsine
-run_cmd miproj 1 10 2.5 arcsine
-run_cmd miproj 1 10 3.5 arcsine
+#################### PLOTTING
+# plot_cmd fixproj-1-1.0
+# plot_cmd fixproj-1-1.5
+# plot_cmd fixproj-1-2.5
+# plot_cmd fixproj-1-3.5
 
+# plot_cmd miproj-1-1.0
+# plot_cmd miproj-1-1.5
+# plot_cmd miproj-1-2.5
+# plot_cmd miproj-1-3.5
 
-run_cmd fixproj 3 7 4.5 optimal -mimc_min_dim 0
-run_cmd fixproj 3 7 3.0 optimal -mimc_min_dim 0
-run_cmd fixproj 3 7 4.5 arcsine -mimc_min_dim 0
-run_cmd fixproj 3 7 3.0 arcsine -mimc_min_dim 0
-
-run_cmd miproj 3 7 3.0 optimal
-run_cmd miproj 3 7 4.5 optimal
-run_cmd miproj 3 7 3.0 arcsine
-run_cmd miproj 3 7 4.5 arcsine
-
-# plot_cmd miproj1_1.0
-# plot_cmd miproj1_1.5
-# plot_cmd miproj1_2.5
-# plot_cmd miproj1_3.5
-# plot_cmd miproj3_4.5
-# plot_cmd miproj3_3.0
-
-# plot_cmd miproj1_20
-# plot_cmd miproj1_10
-# plot_cmd miproj1_20
-# plot_cmd miproj1_4.5
+# plot_cmd miproj-3-4.5
+# plot_cmd miproj-3-3.0

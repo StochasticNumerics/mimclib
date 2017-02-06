@@ -67,10 +67,10 @@ class MyRun:
             error = run.fn.Norm(run.last_itr.calcDeltaEl())
             work = run.last_itr.Wl_estimate
             prof = setutil.calc_log_prof_from_EW(error, work)
-            max_added = 5
+            max_added = 10
         else:
             prof = self.profit_calc
-        max_dim = 2 + (0 if len(lvls) == 0 else np.max(lvls.get_dim()))
+        max_dim = 5 + (0 if len(lvls) == 0 else np.max(lvls.get_dim()))
         lvls.expand_set(prof, max_dim=max_dim, max_added=max_added)
         self.proj.update_index_set(lvls)
 
