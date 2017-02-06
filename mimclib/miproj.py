@@ -80,13 +80,14 @@ class TensorExpansion(object):
         :return: Basis polynomials evaluated at X, (M, N)
         :rtype: `len(X) x len(mis)` np.array
         '''
-        dim = X.shape[1]
+        dim = np.max([len(x) for x in X])
         max_deg = np.max(base_indices.to_dense_matrix(), axis=0)
         rdim = np.minimum(dim, len(max_deg))
         values = np.ones((len(X), len(base_indices)))
         basis_values = np.empty(rdim, dtype=object)
         for d in xrange(0, rdim):
-            basis_values[d] = fnBasis(X[:, d], max_deg[d]+1)
+            vals = np.array([x[d] if d < len(x) else 0 for x in X])
+            basis_values[d] = fnBasis(vals, max_deg[d]+1)
 
         for i, mi in enumerate(base_indices):
             for d, j in enumerate(mi):
@@ -130,6 +131,29 @@ Supposed to take function and maintain polynomial coefficients
 """
 @public
 class MIWProjSampler(object):
+    class SamplesCollection(object):
+        def __init__(self):
+            self.X = []
+            self.W = np.empty(0)
+            self.Y = None
+
+        def add_points(self, fnSample, alphas, X, W):
+            assert(len(X) == len(W))
+            self.X.extend(X.tolist())
+            self.W = np.hstack((self.W, W))
+            if self.Y is None:
+                self.Y = [np.zeros(0) for i in xrange(len(alphas))]
+            assert(len(self.Y) == len(alphas))
+            for i in xrange(0, len(alphas)):
+                self.Y[i] = np.hstack((self.Y[i], fnSample(alphas[i], X)))
+
+        @property
+        def XWY(self):
+            return self.X, self.W, self.Y
+
+        def __len__(self):
+            return len(self.X)
+
     def __init__(self, d=0,  # d is the spatial dimension
                  fnBasis=None,
                  fnSamplesCount=None,
@@ -151,6 +175,10 @@ class MIWProjSampler(object):
         from collections import defaultdict
         self.alpha_dict = defaultdict(count(0).next)
         self.lvls = None
+
+        self.prev_samples = defaultdict(lambda: MIWProjSampler.SamplesCollection())
+        self.reuse_samples = reuse_samples
+        self.max_condition_number = 0
 
     def init_mimc_run(self, run):
         run.params.M0 = np.array([0])
@@ -199,14 +227,23 @@ class MIWProjSampler(object):
             c_samples = self.fnSamplesCount(basis)
 
             assert(np.all(basis.check_admissibility()))
-
-            X, W = self.fnSamplePoints(c_samples, basis)
-            basis_values = TensorExpansion.evaluate_basis(self.fnBasis, basis, X)
             mods, inds = mimc.expand_delta(alpha)
+            if self.reuse_samples:
+                if c_samples > len(self.prev_samples[ind]):
+                    X, W = self.fnSamplePoints(c_samples - len(self.prev_samples[ind]), basis)
+                    self.prev_samples[ind].add_points(fnSample, inds, X, W)
+                X, W, Y = self.prev_samples[ind].XWY
+            else:
+                assert(c_samples > 0)
+                X, W = self.fnSamplePoints(c_samples, basis)
+                Y = [fnSample(inds[i], X) for i in xrange(0, len(inds))]
+
+            basis_values = TensorExpansion.evaluate_basis(self.fnBasis, basis, X)
             for i in xrange(0, len(inds)):
                 # Add each element separately
-                Y = fnSample(inds[i], X)
-                coeffs = MIWProjSampler.weighted_least_squares(Y, W, basis_values)
+                coeffs, cond = MIWProjSampler.weighted_least_squares(Y[i], W, basis_values)
+                self.max_condition_number = np.maximum(self.max_condition_number,
+                                                       cond)
                 projections = np.empty(len(beta_indset), dtype=TensorExpansion)
 
                 for j in xrange(0, len(beta_indset)):
@@ -242,14 +279,14 @@ class MIWProjSampler(object):
         '''
         R = basisvalues.transpose().dot(Y * W)
         G = basisvalues.transpose().dot(basisvalues * W[:, None])
-        #coefficients = np.linalg.solve(G, R)
-        if np.linalg.cond(G) > 100:
+        cond = np.linalg.cond(G)
+        if cond > 100:
             warnings.warn('Ill conditioned Gramian matrix encountered, cond={}'.format(np.linalg.cond(G)))
         # Solving normal equations is faster than QR, because of good condition
         coefficients = solve(G, R, sym_pos=True)
         if not np.isfinite(coefficients).all():
             warnings.warn('Numerical instability encountered')
-        return coefficients
+        return coefficients, cond
 
 def sample_uniform_pts(N, bases_indices, interval=(-1, 1)):
     dim = bases_indices.max_dim()
@@ -284,6 +321,14 @@ def sample_optimal_pts(fnBasis, N, bases_indices, interval=(-1, 1)):
         B = TensorExpansion.evaluate_basis(fnBasis, bases_indices, X)
         W = len(bases_indices) / np.sum(np.power(B, 2), axis=1)
     return X, W
+
+@public
+def sample_arcsine_pts(N, bases_indices, interval=(-1, 1)):
+    max_dim = bases_indices.max_dim()
+    X_temp = (np.cos(np.pi * np.random.rand(N, max_dim)) + 1) / 2
+    X = interval[0]+X_temp*(interval[1]-interval[0])
+    W = np.prod(np.pi * np.sqrt((X-interval[0])*(interval[1] - X)), axis=1)
+    return (X,W)
 
 @public
 def default_basis_from_level(beta, C=2):

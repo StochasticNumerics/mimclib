@@ -26,19 +26,12 @@ def _format_latex_sci(x):
 class FunctionLine2D(plt.Line2D):
     def __init__(self, *args, **kwargs):
         self.flip = kwargs.pop('flip', False)
-        self.fn = fn = kwargs.pop('fn')
-        log_data = kwargs.pop('log_data', True)
+        self.orig_fn = fn = kwargs.pop('fn')
+        self.fn = self.orig_fn
         data = kwargs.pop('data', None)
+        log_data = kwargs.pop('log_data', True)
         if data is not None:
-            x = np.array([d[0] for d in data])
-            y = np.array([d[1] for d in data])
-            if len(x) > 0 and len(y) > 0:
-                if log_data:
-                    const = [np.mean(y/fn(x)), 0]
-                    self.fn = lambda x, cc=const, ff=fn: cc[0] * ff(x) + cc[1]
-                else:
-                    const = [np.mean(y-fn(x)), 0]
-                    self.fn = lambda x, cc=const, ff=fn: ff(x) + cc[0]
+            self.set_data(data, log_data)
 
         super(FunctionLine2D, self).__init__([], [], *args, **kwargs)
 
@@ -47,6 +40,18 @@ class FunctionLine2D(plt.Line2D):
             return np.exp(np.linspace(np.log(lim[0]), np.log(lim[1]), N))
         else:
             return np.linspace(lim[0], lim[1], N)
+
+    def set_data(self, data, log_data=True):
+        x = np.array([d[0] for d in data])
+        y = np.array([d[1] for d in data])
+        if len(x) > 0 and len(y) > 0:
+            if log_data:
+                const = [np.mean(y/self.orig_fn(x)), 0]
+                self.fn = lambda x, cc=const, ff=self.orig_fn: cc[0] * ff(x) + cc[1]
+            else:
+                const = [np.mean(y-self.orig_fn(x)), 0]
+                self.fn = lambda x, cc=const, ff=self.orig_fn: ff(x) + cc[0]
+
 
     def draw(self, renderer):
         import matplotlib.pylab as plt
@@ -294,64 +299,31 @@ def __normalize_fmt(args, kwargs):
         args = (kwargs.pop('fmt'), ) + args
     return args, kwargs
 
-def computeIterationStats(runs, work_bins, xi, filteritr,
-                          modifier=1.):
-    if xi == 'work':
-        xi = 0
-    elif xi == 'time':
-        xi = 1
-    elif xi == 'tol':
-        xi = 2
-    else:              raise ValueError('x_axis')
-
-    val = np.array([itr.calcEg() for _, itr in enum_iter(runs, filteritr)])
-
+def computeIterationStats(runs, work_bins, filteritr, fnItrStats,
+                          arr_fnAgg):
     mymax = lambda A: [np.max(A[:, i]) for i in xrange(0, A.shape[1])] if len(A) > 0 else None
     xy = []
     for r in runs:
         prev = 0
-        totalTime = 0
         for i in xrange(0, len(r.iters)):
             if not filteritr(r, i):
                 continue
-            itr = r.iters[i]
-            lvl_stats = mymax(np.array([[
-                1+np.max(j) if len(j) > 0 else 0,
-                np.max(data) if len(data) > 0 else 0,
-                len(data)] for j, data in itr.lvls_sparse_itr(prev)]))
-
-            if lvl_stats is None:
-                assert(prev > 0)
-                lvl_stats = xy[-1][5:]
-            else:
-                if prev > 0:
-                    lvl_stats = mymax(np.vstack((lvl_stats, xy[-1][5:])))
-
-            totalTime += itr.totalTime
-            xy.append([itr.calcTotalWork(), totalTime, # calcTotalTime(),
-                       itr.TOL,
-                       itr.exact_error,
-                       modifier*itr.totalErrorEst()]+lvl_stats)
-            prev = itr.lvls_count
-
+            stats = fnItrStats(r, i)
+            assert(len(stats) == len(arr_fnAgg))
+            stats = [stats[i] if stats[i] is not None or len(xy)==0
+                     else xy[-1][i] for i in xrange(len(stats))]
+            xy.append(stats)
     xy = np.array(xy)
-    lxy = np.log(xy[:, xi])
+    lxy = np.log(xy[:, 0])
     bins = np.digitize(lxy, np.linspace(np.min(lxy), np.max(lxy), work_bins))
     bins[bins == work_bins] = work_bins-1
     ubins = np.unique(bins)
-    xy_binned = np.zeros((len(ubins), 6))
+    xy_binned = np.zeros((len(ubins), len(arr_fnAgg)))
     for i, b in enumerate(ubins):
         d = xy[bins==b, :]
-        xy_binned[i, 0] = np.mean(d[:, xi])  # Mean work
-        xy_binned[i, 1] =  np.max(d[:, 3])   # Max exact error
-        xy_binned[i, 2] =  np.min(d[:, 4])   # min error estimate
-
-        xy_binned[i, 3] =  np.max(d[:, 5])   # Max dimension
-        xy_binned[i, 4] =  np.max(d[:, 6])   # max level in all dim
-        xy_binned[i, 5] =  np.max(d[:, 7])   # max active dim
-
-    xy_binned = xy_binned[xy_binned[:,0].argsort(), :]
-    return xy_binned
+        for j in range(0, len(arr_fnAgg)):
+            xy_binned[i, j] = arr_fnAgg[j](d[:, j])
+    return xy_binned[xy_binned[:,0].argsort(), :]
 
 def filteritr_last(run, iter_idx):
     return len(run.iters)-1 == iter_idx
@@ -457,46 +429,71 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
     elif xi == 'tol':
         x_label = "Avg. tolerance"
     else:              raise ValueError('x_axis')
+
+    mymax = lambda A, n: [np.max(A[:, i]) for i in xrange(0, A.shape[1])] if len(A) > 0 else [None]*n
+    def fnItrStats(run, i):
+        itr = run.iters[i]
+        try:
+            prev = next(run.iters[j].lvls_count for j in
+                        xrange(i-1, 0, -1) if filteritr(r, j))
+        except:
+            prev = 0
+
+        if xi == 'work':
+            itr_stats = [itr.calcTotalWork()]
+        elif xi == 'time':
+            itr_stats = [run.iter_total_times()[i]]
+        elif xi == 'tol':
+            itr_stats = [run.TOL]
+
+        lvl_stats = mymax(np.array([[
+            1+np.max(j) if len(j) > 0 else 0,
+            np.max(data) if len(data) > 0 else 0,
+            len(data)] for j, data in itr.lvls_sparse_itr(prev)]), 3)
+        return itr_stats + lvl_stats
+
     ax.set_xlabel(x_label)
     ax.set_xscale('log')
 
-    xy_binned = computeIterationStats(runs, xi=xi,
+    xy_binned = computeIterationStats(runs,
                                       work_bins=work_bins,
-                                      filteritr=filteritr)
+                                      filteritr=filteritr,
+                                      fnItrStats=fnItrStats,
+                                      arr_fnAgg=[np.mean] + [np.max]*3)
 
     plotObj = []
-
     maxrefine_kwargs = kwargs.pop('maxrefine_kwargs', None)
     active_kwargs = kwargs.pop('active_kwargs', None)
 
     dim_args, dim_kwargs = __normalize_fmt(args, kwargs)
     # Max dimensions
-    if np.max(xy_binned[:, 3]) / np.min(xy_binned[:, 5]) > 100:
+    if np.max(xy_binned[:, 1]) / np.min(xy_binned[:, 1]) > 100:
         ax2 = ax.twinx()
         ax2.set_yscale('log')
     else:
         ax2 = ax
-    plotObj.append(ax2.plot(xy_binned[:, 0], xy_binned[:, 3],
+    plotObj.append(ax2.plot(xy_binned[:, 0], xy_binned[:, 1],
                             *dim_args, **dim_kwargs))
 
     # Max level in all dimension
     if maxrefine_kwargs is not None:
         maxrefine_args, maxrefine_kwargs = __normalize_fmt((), maxrefine_kwargs)
-        plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 4],
+        plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 2],
                                *maxrefine_args, **maxrefine_kwargs))
 
     # Max active dim
     if maxrefine_kwargs is not None:
         active_args, active_kwargs = __normalize_fmt((), active_kwargs)
-        plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 5],
+        plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 3],
                                *active_args, **active_kwargs))
 
-    return xy_binned[:, [0,3]], plotObj
+    return xy_binned[:, 0:2], plotObj
 
 @public
 def plotWorkVsMaxError(ax, runs, *args, **kwargs):
-    modifier = kwargs.pop('modifier', 1.)
-    relative = modifier != 1.
+    modifier = kwargs.pop('modifier', None)
+    relative = modifier is not None
+    modifier = modifier if relative else 1.
     work_bins = kwargs.pop('work_bins', 50)
     xi = kwargs.pop('x_axis', 'work').lower()
     filteritr = kwargs.pop("filteritr", filteritr_all)
@@ -509,18 +506,30 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
         x_label = "Avg. tolerance"
     else:              raise ValueError('x_axis')
     ax.set_xlabel(x_label)
-    ax.set_ylabel('Max Relative Error' if relative != 1. else 'Max Error')
+    ax.set_ylabel('Max Relative Error' if relative else 'Max Error')
     ax.set_yscale('log')
     ax.set_xscale('log')
 
-    xy_binned = computeIterationStats(runs, xi=xi,
+    def fnItrStats(run, i):
+        itr = run.iters[i]
+        if xi == 'work':
+            itr_stats = [itr.calcTotalWork()]
+        elif xi == 'time':
+            itr_stats = [run.iter_total_times[i]]
+        elif xi == 'tol':
+            itr_stats = [run.TOL]
+        return itr_stats + [itr.exact_error, modifier*itr.totalErrorEst()]
+
+    xy_binned = computeIterationStats(runs,
                                       work_bins=work_bins,
-                                      modifier=modifier,
-                                      filteritr=filteritr)
+                                      filteritr=filteritr,
+                                      fnItrStats=fnItrStats,
+                                      arr_fnAgg=[np.mean, np.max, np.min])
     plotObj = []
 
-    ErrEst_kwargs = kwargs.pop('ErrEst_kwargs')
-    Ref_kwargs = kwargs.pop('Ref_kwargs')
+    ErrEst_kwargs = kwargs.pop('ErrEst_kwargs', None)
+    Ref_kwargs = kwargs.pop('Ref_kwargs', None)
+    Ref_ErrEst_kwargs = kwargs.pop('Ref_ErrEst_kwargs', Ref_kwargs)
     sel = np.logical_and(np.isfinite(xy_binned[:, 1]), xy_binned[:, 1] >=
                          np.finfo(float).eps)
     if np.sum(sel) == 0:
@@ -532,14 +541,14 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
     if ErrEst_kwargs is not None:
         ErrEst_args, ErrEst_kwargs = __normalize_fmt((), ErrEst_kwargs)
         plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 2], *ErrEst_args, **ErrEst_kwargs))
-
-    if Ref_kwargs is not None:
+    if np.sum(sel) > 0 and Ref_kwargs is not None:
         plotObj.append(ax.add_line(FunctionLine2D.ExpLine(data=xy_binned[sel, :2],
                                                           **Ref_kwargs)))
-        plotObj.append(ax.add_line(FunctionLine2D.ExpLine(data=xy_binned[sel, :][:, [0,2]],
-                                                          **Ref_kwargs)))
+        if ErrEst_kwargs is not None:
+            plotObj.append(ax.add_line(FunctionLine2D.ExpLine(data=xy_binned[sel, :][:, [0,2]],
+                                                              **Ref_ErrEst_kwargs)))
 
-    return xy_binned[sel, :2], plotObj
+    return xy_binned[:, :2], plotObj
 
 @public
 def plotTotalWorkVsLvls(ax, runs, *args, **kwargs):
@@ -1104,7 +1113,9 @@ def genPDFBooklet(runs, add_legend=True, label_fmt=None, **kwargs):
                            ErrEst_kwargs={'fmt': '--*',
                                           'label': label_fmt.format(label='Error Estimate')},
                            Ref_kwargs={'ls': '--', 'c':'k',
-                                       'label': label_fmt.format(label='{rate:.2g}')})
+                                       'label': label_fmt.format(label='{rate:.2g}')},
+                           Ref_ErrEst_kwargs={'ls': '-.', 'c':'k',
+                                              'label': label_fmt.format(label='{rate:.2g}')})
     except:
         __plot_except(ax)
 
@@ -1117,7 +1128,9 @@ def genPDFBooklet(runs, add_legend=True, label_fmt=None, **kwargs):
                            ErrEst_kwargs={'fmt': '--*', 'label':
                                           label_fmt.format(label='Error Estimate')},
                            Ref_kwargs={'ls': '--', 'c':'k',
-                                       'label': label_fmt.format(label='{rate:.2g}')})
+                                       'label': label_fmt.format(label='{rate:.2g}')},
+                           Ref_ErrEst_kwargs={'ls': '-.', 'c':'k',
+                                           'label': label_fmt.format(label='{rate:.2g}')})
     except:
         __plot_except(ax)
 
