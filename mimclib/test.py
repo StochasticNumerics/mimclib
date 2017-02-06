@@ -35,6 +35,7 @@ def RunStandardTest(fnSampleLvl=None,
                     fnSampleAll=None,
                     fnAddExtraArgs=None,
                     fnInit=None,
+                    fnItrDone=None,
                     fnSeed=np.random.seed, profCalc=None):
     import warnings
     import os.path
@@ -87,8 +88,6 @@ def RunStandardTest(fnSampleLvl=None,
     if fnSeed is not None:
         fnSeed(mimcRun.params.qoi_seed)
 
-    fnItrDone = None
-
     if mimcRun.params.db:
         db_args = {}
         if hasattr(mimcRun.params, "db_user"):
@@ -104,10 +103,15 @@ def RunStandardTest(fnSampleLvl=None,
         db = mimcdb.MIMCDatabase(**db_args)
         run_id = db.createRun(mimc_run=mimcRun,
                               tag=mimcRun.params.db_tag)
-        fnItrDone = lambda: db.writeRunData(run_id,
-                                            mimcRun,
-                                            iteration_idx=len(mimcRun.iters)-1)
-
+        if fnItrDone is None:
+            fnItrDone = lambda db=db, r_id=run_id, r=mimcRun: \
+                        db.writeRunData(r_id, r, iteration_idx=len(r.iters)-1)
+        else:
+            fnItrDone = lambda db=db, r_id=run_id, r=mimcRun, fn=fnItrDone: \
+                        fn(db, r_id, r)
+    elif fnItrDone is not None:
+        fnItrDone = lambda r=mimcRun, fn=fnItrDone: \
+                        fn(None, None, r)
     mimcRun.setFunctions(fnItrDone=fnItrDone)
 
     try:

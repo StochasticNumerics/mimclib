@@ -14,9 +14,12 @@ import argparse
 
 warnings.filterwarnings("error")
 warnings.filterwarnings("always", category=mimclib.test.ArgumentWarning)
+warnings.filterwarnings("always", category=UserWarning)
 
 class MyRun:
     def solveFor_seq(self, alpha, arrY):
+        if len(alpha) == 0:
+            alpha = [self.params.miproj_fix_lvl] * self.params.qoi_dim
         output = np.zeros(len(arrY))
         self.sf.BeginRuns(alpha, np.max([len(Y) for Y in arrY]))
         for i, Y in enumerate(arrY):
@@ -33,11 +36,20 @@ class MyRun:
 
     def initRun(self, run):
         self.prev_val = 0
-        self.qoi_problem = run.params.qoi_problem
-        self.proj = miproj.MIWProjSampler(d=run.params.qoi_dim,
+        self.params = run.params
+
+        if run.params.miproj_pts_sampler == 'optimal':
+            fnSamplePoints = miproj.sample_optimal_leg_pts
+        elif run.params.miproj_pts_sampler == 'arcsine':
+            fnSamplePoints = miproj.sample_arcsine_pts
+        else:
+            raise NotImplementedError("Unknown points sampler")
+
+        self.proj = miproj.MIWProjSampler(d=run.params.min_dim,
                                           fnBasis=miproj.legendre_polynomials,
-                                          fnSamplePoints=miproj.sample_optimal_leg_pts,
-                                          fnWorkModel=lambda lvls, r=run: self.workModel(run, lvls))
+                                          fnSamplePoints=fnSamplePoints,
+                                          fnWorkModel=lambda lvls, r=run: self.workModel(run, lvls),
+                                          reuse_samples=run.params.miproj_reuse_samples)
         self.proj.init_mimc_run(run)
         self.sf = SField_Matern(run.params)
         run.setFunctions(ExtendLvls=lambda lvls, r=run: self.extendLvls(run, lvls),
@@ -89,6 +101,19 @@ class MyRun:
         parser.add_argument("-qoi_set_dexp", type=float,
                             default=np.log(2.), action="store")
 
+        parser.add_argument("-miproj_pts_sampler", type=str,
+                            default="optimal", action="store")
+        parser.add_argument("-miproj_reuse_samples", type="bool",
+                            default=True, action="store")
+        parser.add_argument("-miproj_fix_lvl", type=int,
+                            default=5, action="store")
+
+
+    def ItrDone(self, db, run_id, run):
+        if db is not None:
+            db.writeRunData(run_id, run, iteration_idx=len(run.iters)-1,
+                            userdata=self.proj.max_condition_number)
+        self.proj.max_condition_number = 0
 
 if __name__ == "__main__":
     SField_Matern.Init()
@@ -98,5 +123,6 @@ if __name__ == "__main__":
     run = MyRun()
     mirun = mimclib.test.RunStandardTest(fnSampleAll=run.mySampleQoI,
                                          fnAddExtraArgs=run.addExtraArguments,
-                                         fnInit=run.initRun)
+                                         fnInit=run.initRun,
+                                         fnItrDone=run.ItrDone)
     SField_Matern.Final()
