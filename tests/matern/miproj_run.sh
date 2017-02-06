@@ -34,21 +34,21 @@ function plot_cmd {
 }
 
 #################### RUNNING
-run_cmd fixproj 1 10 3.5 -mimc_min_dim 0
-run_cmd fixproj 1 10 2.5 -mimc_min_dim 0
-run_cmd fixproj 1 10 1.5 -mimc_min_dim 0
-run_cmd fixproj 1 10 1.0 -mimc_min_dim 0
+run_cmd fixproj 1 10 3.5 -mimc_min_dim 0 -miproj_min_dim 20
+run_cmd fixproj 1 10 2.5 -mimc_min_dim 0 -miproj_min_dim 30
+run_cmd fixproj 1 10 1.5 -mimc_min_dim 0 -miproj_min_dim 50
+run_cmd fixproj 1 10 1.0 -mimc_min_dim 0 -miproj_min_dim 50
 
-run_cmd miproj 1 10 1.0
-run_cmd miproj 1 10 1.5
-run_cmd miproj 1 10 2.5
-run_cmd miproj 1 10 3.5
+run_cmd miproj 1 10 3.5 -miproj_min_dim 20
+run_cmd miproj 1 10 2.5 -miproj_min_dim 30
+run_cmd miproj 1 10 1.5 -miproj_min_dim 50
+run_cmd miproj 1 10 1.0 -miproj_min_dim 50
 
-run_cmd fixproj 3 7 4.5 -mimc_min_dim 0
-run_cmd fixproj 3 7 3.0 -mimc_min_dim 0
+run_cmd fixproj 3 7 3.0 -mimc_min_dim 0 -miproj_min_dim 50
+run_cmd fixproj 3 7 4.5 -mimc_min_dim 0 -miproj_min_dim 50
 
-run_cmd miproj 3 7 3.0
-run_cmd miproj 3 7 4.5
+run_cmd miproj 3 7 3.0 -miproj_min_dim 50
+run_cmd miproj 3 7 4.5 -miproj_min_dim 50
 
 #################### PLOTTING
 # plot_cmd fixproj-1-1.0
