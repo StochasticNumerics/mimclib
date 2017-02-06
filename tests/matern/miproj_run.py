@@ -108,7 +108,6 @@ class MyRun:
         parser.add_argument("-miproj_fix_lvl", type=int,
                             default=5, action="store")
 
-
     def ItrDone(self, db, run_id, run):
         if db is not None:
             db.writeRunData(run_id, run, iteration_idx=len(run.iters)-1,
