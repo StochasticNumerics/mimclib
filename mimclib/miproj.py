@@ -136,6 +136,7 @@ class MIWProjSampler(object):
             self.X = []
             self.W = np.empty(0)
             self.Y = None
+            self.total_time = 0
 
         def add_points(self, fnSample, alphas, X, W):
             assert(len(X) == len(W))
@@ -233,10 +234,13 @@ class MIWProjSampler(object):
                     X, W = self.fnSamplePoints(c_samples - len(self.prev_samples[ind]), basis)
                     self.prev_samples[ind].add_points(fnSample, inds, X, W)
                 X, W, Y = self.prev_samples[ind].XWY
+                sampling_time = self.prev_samples[ind].total_time
             else:
+                sampling_time = time.time()
                 assert(c_samples > 0)
                 X, W = self.fnSamplePoints(c_samples, basis)
                 Y = [fnSample(inds[i], X) for i in xrange(0, len(inds))]
+                sampling_time = time.time() - sampling_time
 
             basis_values = TensorExpansion.evaluate_basis(self.fnBasis, basis, X)
             for i in xrange(0, len(inds)):
@@ -262,9 +266,14 @@ class MIWProjSampler(object):
                 else:
                     psums_delta[sel_lvls, 0] += projections*mods[i]
 
-            total_time[sel_lvls] = (time.time() - tStart) * samples_per_beta / c_samples
-            total_work[sel_lvls] = work_per_sample * samples_per_beta
+            if self.reuse_samples:
+                self.prev_samples[ind].total_time += time.time() - tStart
+                sampling_time = self.prev_samples[ind].total_time
+            else:
+                sampling_time = time.time() - tStart
 
+            total_time[sel_lvls] = sampling_time * samples_per_beta / np.sum(samples_per_beta)
+            total_work[sel_lvls] = work_per_sample * samples_per_beta
         return M, psums_delta, psums_fine, total_time, total_work
 
     @staticmethod
