@@ -10,7 +10,7 @@ import time
 
 warnings.filterwarnings("always")
 
-def l2_error_mc(itrs, fnSample, rel_tol=0.1, maxM=2000):
+def l2_error_mc(itrs, fnSample, rel_tol=0.1, maxM=4000):
     if len(itrs) == 0:
         return np.array([])
     max_L = 1 + np.max([np.max([a[0] for a in itr.lvls_itr()]) for itr in itrs])
@@ -33,7 +33,7 @@ def l2_error_mc(itrs, fnSample, rel_tol=0.1, maxM=2000):
     np.random.seed(0)
     while M < maxM:
         Y = np.random.uniform(-1, 1, size=(nextM-M, N))
-        samples = fnSample(itr.parent, [max_L], Y)
+        samples = fnSample([max_L], Y)
         errors = np.zeros((nextM-M, len(itrs)))
         for i in xrange(0, len(itrs)):
             errors[:, i] = (samples - val[i](Y))**2
@@ -50,11 +50,18 @@ def l2_error_mc(itrs, fnSample, rel_tol=0.1, maxM=2000):
     return np.sqrt(s1/M)
 
 if __name__ == "__main__":
+    from matern import SField_Matern
     from miproj_run import MyRun
     sampler = MyRun()
+    sampler.sf = None
+    SField_Matern.Init()
+    def fnSample(iters):
+        if sampler.sf is None:
+            sampler.sf = SField_Matern(iters[0].parent.params)
+        return l2_error_mc(iters, sampler.solveFor_seq)
 
     from mimclib import ipdb
     ipdb.set_excepthook()
     from mimclib import test
-    test.run_errors_est_program(lambda iters:
-                                l2_error_mc(iters, sampler.solveFor_seq))
+    test.run_errors_est_program(fnSample)
+    SField_Matern.Final()
