@@ -95,7 +95,7 @@ def cCovExp(L,K,n):
 
 def fourierExample(inds,cfun,L=50.0,tau1=1.0,tau2=2.0,t_max=1.0,verbose=False):
 
-    ts = [time.time(),]
+    ts = [time.clock(),]
 
     w = lambda k: np.pi*k/L
     plotN = 200
@@ -213,7 +213,7 @@ def infDimHjmModel(inds,F,G,U,Psi,f0,kappa,t_max=1.0,tau_max=2.0,identifierStrin
     Solve an infinite-dimensional HJM model, crude example
     '''
 
-    ts = [time.time(),]
+    ts = [time.clock(),]
 
     if verbose:
         print('Evaluating the Two Factor Gaussian example.')
@@ -272,7 +272,7 @@ def infDimHjmModel(inds,F,G,U,Psi,f0,kappa,t_max=1.0,tau_max=2.0,identifierStrin
     for jj in range(1,len(Ws)):
         Ws[jj,:] = Ws[jj-1,:] + np.sqrt(dt)*np.dot(covMat,sp.randn(len(taus)))
 
-    ts.append(time.time())
+    ts.append(time.clock())
 
     if verbose:
         print('Mesh generations and initialisations done in %d seconds'%(ts[-1]-ts[-2]))
@@ -349,7 +349,7 @@ def infDimHjmModel(inds,F,G,U,Psi,f0,kappa,t_max=1.0,tau_max=2.0,identifierStrin
             print('The absurd additive term equals %f'%(weirdTerm,))
         rv[-1] *= underlying
         rv[-1] += weirdTerm
-        ts.append(time.time())
+        ts.append(time.clock())
         if verbose:
             print('The quantity of interest is %f'%(rv[-1]))
             print('Time spent on the level: %d seconds'%(ts[-1]-ts[-2]))
@@ -365,7 +365,7 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
     Template to solve HJM type problems
     '''
 
-    ts = [time.time(),]
+    ts = [time.clock(),]
 
     if verbose:
         print('Evaluating the Two Factor Gaussian example.')
@@ -414,7 +414,7 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
 
     rv = []
 
-    ts.append(time.time())
+    ts.append(time.clock())
 
     if verbose:
         print('Mesh generations and initialisations done in %d seconds'%(ts[-1]-ts[-2]))
@@ -488,7 +488,7 @@ def multiLevelHjmModel(inds,F,G,U,Psi,drift,vols,f0,t_max=1.0,tau_max=2.0,identi
             print('The absurd additive term equals %f'%(weirdTerm,))
         rv[-1] *= underlying
         rv[-1] += weirdTerm
-        ts.append(time.time())
+        ts.append(time.clock())
         if verbose:
             print('The quantity of interest is %f'%(rv[-1]))
             print('Time spent on the level: %d seconds'%(ts[-1]-ts[-2]))

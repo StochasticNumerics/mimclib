@@ -209,7 +209,7 @@ class MIWProjSampler(object):
         total_time = np.empty(len(lvls))
         total_work = np.empty(len(lvls))
         for alpha, ind in self.alpha_dict.iteritems():
-            tStart = time.time()
+            tStart = time.clock()
             sel_lvls = self.alpha_ind == ind
             work_per_sample = self.fnWorkModel(setutil.VarSizeList([alpha]))
             beta_indset = lvls.sublist(sel_lvls, d_start=self.d, min_dim=0)
@@ -234,13 +234,10 @@ class MIWProjSampler(object):
                     X, W = self.fnSamplePoints(c_samples - len(self.prev_samples[ind]), basis)
                     self.prev_samples[ind].add_points(fnSample, inds, X, W)
                 X, W, Y = self.prev_samples[ind].XWY
-                sampling_time = self.prev_samples[ind].total_time
             else:
-                sampling_time = time.time()
                 assert(c_samples > 0)
                 X, W = self.fnSamplePoints(c_samples, basis)
                 Y = [fnSample(inds[i], X) for i in xrange(0, len(inds))]
-                sampling_time = time.time() - sampling_time
 
             basis_values = TensorExpansion.evaluate_basis(self.fnBasis, basis, X)
             for i in xrange(0, len(inds)):
@@ -267,10 +264,10 @@ class MIWProjSampler(object):
                     psums_delta[sel_lvls, 0] += projections*mods[i]
 
             if self.reuse_samples:
-                self.prev_samples[ind].total_time += time.time() - tStart
+                self.prev_samples[ind].total_time += time.clock() - tStart
                 sampling_time = self.prev_samples[ind].total_time
             else:
-                sampling_time = time.time() - tStart
+                sampling_time = time.clock() - tStart
 
             total_time[sel_lvls] = sampling_time * samples_per_beta / np.sum(samples_per_beta)
             total_work[sel_lvls] = work_per_sample * samples_per_beta

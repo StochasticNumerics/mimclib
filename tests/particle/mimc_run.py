@@ -23,7 +23,7 @@ class ParticleField(object):
     def SampleQoI(self, run, inds, M):
         meshes = (1./run.fn.Hierarchy(inds)).astype(np.int)
         import time
-        tStart = time.time()
+        tStart = time.clock()
         Ps = meshes[:, 0]
         Ns = meshes[:, 1] if run.params.min_dim == 2 \
                           else (4*meshes[:, 0]/run.params.h0inv[0]).astype(np.int)
@@ -33,7 +33,7 @@ class ParticleField(object):
                                           sig=run.params.qoi_sig,
                                           var_sig=False,
                                           antithetic=True, dim=1)
-        return samples, time.time()-tStart
+        return samples, time.clock()-tStart
 
 if __name__ == "__main__":
     import mimclib.test

@@ -90,7 +90,7 @@ class MyRun:
         return
 
         # import time
-        # tStart = time.time()
+        # tStart = time.clock()
         # # estimate rates
         # self.d_err_rates, \
         #     s_fit_rates = misc.estimate_misc_error_rates(d=0,
@@ -99,9 +99,9 @@ class MyRun:
         #                                                  d_err_rates=np.zeros([]),
         #                                                  lev2knots=lambda beta:misc.lev2knots_doubling(1+beta))
         # #################### extrapolate error rates
-        # tEnd_rates = time.time() - tStart
+        # tEnd_rates = time.clock() - tStart
         # ######### Update
-        # tStart = time.time()
+        # tStart = time.clock()
         # self.profCalc = setutil.MISCProfCalculator(np.zeros(0), s_fit_rates)
         # mimc.extend_prof_lvls(lvls, self.profCalc, run.params.min_lvls)
 

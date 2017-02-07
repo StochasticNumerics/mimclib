@@ -377,7 +377,7 @@ class MyTB(ultratb.ListTB):
         if long_header:
             # Header with the exception type, python version, and date
             pyver = 'Python ' + sys.version.split()[0] + ': ' + sys.executable
-            date = time.ctime(time.time())
+            date = time.ctime(time.clock())
 
             if etype is not None:
                 head = '%s%s%s\n%s%s%s\n%s' % (Colors.topline, '-'*75, ColorsNormal,

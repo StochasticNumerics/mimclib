@@ -27,14 +27,14 @@ class Timer():
         self.tic()
 
     def tic(self):
-        self._tics.append(time.time())
+        self._tics.append(time.clock())
 
     def toc(self, pop=True):
         assert(len(self._tics) > 0)
         if pop:
-            return time.time()-self._tics.pop()
+            return time.clock()-self._tics.pop()
         else:
-            return time.time()-self._tics[-1]
+            return time.clock()-self._tics[-1]
 
     def ptoc(self, msg='Time since last tic: {:.4f} sec.', pop=False):
         assert(len(self._tics) > 0)

@@ -125,7 +125,7 @@ class MISCSampler(object):
         # TODO: Need to generalize to allow for array or general objects
         from . import mimc
         import time
-        t = time.time()
+        t = time.clock()
         samples = np.empty((M, len(inds)))
         for i, dind in enumerate(inds):
             alpha = dind[:self.d]
@@ -134,7 +134,7 @@ class MISCSampler(object):
             knots = self.collapsePoints(knots)
             values = self._solveAtPoints(fnSample, alpha, knots)
             samples[0, i] = np.sum(weights * values)
-        work = time.time()-t
+        work = time.clock()-t
         return samples, work
 
 @public

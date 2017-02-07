@@ -12,13 +12,13 @@ warnings.filterwarnings("ignore", category=mimclib.test.ArgumentWarning)
 
 def SamplePDE(sf, run, inds, M):
     import time
-    timeStart = time.time()
+    timeStart = time.clock()
     solves = np.zeros((M, len(inds)))
     sf.BeginRuns(1./run.fn.Hierarchy(inds))
     for m in range(0, M):
         solves[m, :] = sf.Sample()
     sf.EndRuns()
-    return solves, time.time() - timeStart
+    return solves, time.clock() - timeStart
 
 if __name__ == "__main__":
     from pdelib.SField import SField

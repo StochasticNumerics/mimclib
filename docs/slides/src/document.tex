@@ -452,14 +452,14 @@ linear solver, for this problem we have
 % \begin{frame}[fragile]{Minimal example of \texttt{fnSampleLvl}}
 % \begin{verbatim}
 % def mySampleLvl(moments, mods, inds, M):
-%     tic = time.time()
+%     tic = time.clock()
 %     psums = np.zeros(len(moments))
 %     for m in range(0, M):
 %         rf = SampleRandomField()
 %         solves = np.array([SolvePDE(rf, ind)
 %                            for ind in inds])
 %         psums += np.sum(mods*solves)**moments
-%     return psums, time.time() - tic
+%     return psums, time.clock() - tic
 % \end{verbatim}
 % \end{frame}
 

@@ -78,7 +78,7 @@ def RunStandardTest(fnSampleLvl=None,
         mimcRun.setFunctions(fnSampleAll=fnSampleAll)
 
     import time
-    tStart = time.time()
+    tStart = time.clock()
     if not hasattr(mimcRun.params, 'qoi_seed'):
         mimcRun.params.qoi_seed = np.random.randint(2**32-1)
 
@@ -118,11 +118,11 @@ def RunStandardTest(fnSampleLvl=None,
         mimcRun.doRun()
     except:
         if mimcRun.params.db:
-            db.markRunFailed(run_id, totalTime=time.time()-tStart)
+            db.markRunFailed(run_id, totalTime=time.clock()-tStart)
         raise   # If you don't want to raise, make sure the following code is not executed
 
     if mimcRun.params.db:
-        db.markRunSuccessful(run_id, totalTime=time.time()-tStart)
+        db.markRunSuccessful(run_id, totalTime=time.clock()-tStart)
     return mimcRun
 
 def run_errors_est_program(fnExactErr=None):
