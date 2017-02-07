@@ -28,8 +28,8 @@ def addExtraArguments(parser):
                         action="store", help="Initial condition in GBM")
 
 def mySampleQoI(run, inds, M):
-    tStart = time.time()
-    return np.array([HJM.testcude(inds) for m in range(M)]), time.time()-tStart
+    tStart = time.clock()
+    return np.array([HJM.testcude(inds) for m in range(M)]), time.clock()-tStart
 
 if __name__ == "__main__":
     import mimclib.test

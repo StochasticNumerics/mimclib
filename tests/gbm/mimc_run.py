@@ -65,7 +65,7 @@ def mySampleQoI(run, inds, M):
     meshes = (run.params.qoi_T/run.fn.Hierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
 
-    tStart = time.time()
+    tStart = time.clock()
     if run.params.qoi_type == "real":
         solves = np.empty((M, len(inds)), dtype=float)
     elif run.params.qoi_type == "obj":
@@ -88,7 +88,7 @@ def mySampleQoI(run, inds, M):
         elif run.params.qoi_type == "arr":
             solves[:, i, 0] = val
             solves[:, i, 1] = val
-    return solves, time.time()-tStart
+    return solves, time.clock()-tStart
 
 def initRun(run):
     if run.params.qoi_type == "obj":

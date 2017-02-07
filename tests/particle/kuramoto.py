@@ -79,10 +79,10 @@ def Solve(xmax, sig, K, Nx, Nt, T=1):
 
 def SolveFor(i):
     print("Doing", i)
-    t = time.time()
+    t = time.clock()
     val = Solve(sig=0.4, K=0.4, T=1, xmax=5+i, Nx=2**i, Nt=2**i)
     data.append(val)
-    print("Done", i, "->", val, "in", (time.time()-t)/60.)
+    print("Done", i, "->", val, "in", (time.clock()-t)/60.)
     return val
 
 if __name__ == "__main__":
@@ -234,13 +234,13 @@ class SField_Kuramoto(object):
 
 def SampleParallelKuramoto(args):
     import time
-    t = time.time()
+    t = time.clock()
     seed, dim, Ps, Ns, mods, T, M, K, sig, antithetic, var_sig = args
     gen = RandGen(seed)
     moments = SampleKuramoto(gen, dim=dim, Ps=Ps, Ns=Ns, mods=mods,
                              M=M, T=T, K=K, sig=sig, antithetic=antithetic,
                              var_sig=var_sig)
-    return np.hstack((moments, [(time.time()-t)]))
+    return np.hstack((moments, [(time.clock()-t)]))
 
 def MC(seed, P, N, M, T, K, sig, var_sig):
     gen = RandGen(seed)
