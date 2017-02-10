@@ -1247,7 +1247,8 @@ def genPDFBooklet(runs, add_legend=True, label_fmt=None, **kwargs):
             continue
         try:
             print_msg(plotFunc.__name__)
-            ax = add_fig()
+            if fig_index != 1:
+                ax = add_fig()
             add_rates = dict()
             from itertools import cycle
             markers = cycle(['o', 'v', '^', '<', '>', '8', 's', 'p', '*', 'h', 'H', 'D', 'd'])

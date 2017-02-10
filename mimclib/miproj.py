@@ -216,15 +216,15 @@ class MIWProjSampler(object):
             max_dim = beta_indset.max_dim()
             basis = setutil.VarSizeList()
             pols_to_beta = []
-            samples_per_beta = []
+            basis_per_beta = []
             for i, beta in enumerate(beta_indset):
-                new_b, sam_b = self.fnBasisFromLvl(beta)
-                samples_per_beta.append(sam_b)
+                new_b = self.fnBasisFromLvl(beta)
+                basis_per_beta.append(len(new_b))
                 basis.add_from_list(new_b)
                 pols_to_beta.extend([i]*len(new_b))
 
             pols_to_beta = np.array(pols_to_beta)
-            samples_per_beta = np.array(samples_per_beta)
+            basis_per_beta = np.array(basis_per_beta)
             c_samples = self.fnSamplesCount(basis)
 
             assert(np.all(basis.check_admissibility()))
@@ -269,8 +269,13 @@ class MIWProjSampler(object):
             else:
                 sampling_time = time.clock() - tStart
 
-            total_time[sel_lvls] = sampling_time * samples_per_beta / np.sum(samples_per_beta)
-            total_work[sel_lvls] = work_per_sample * samples_per_beta
+            total_time[sel_lvls] = sampling_time * basis_per_beta / np.sum(basis_per_beta)
+            total_work[sel_lvls] = work_per_sample * c_samples * basis_per_beta / np.sum(basis_per_beta)
+            # print("[{}, {}, {}, {:.12f}, {:.12f}],".format(len(basis),
+            #                                               alpha[0],
+            #                                               work_per_sample[0],
+            #                                               c_samples,
+            #                                               sampling_time))
         return M, psums_delta, psums_fine, total_time, total_work
 
     @staticmethod
@@ -342,12 +347,9 @@ def default_basis_from_level(beta, C=2):
     max_deg = 2 ** (beta + 1) - 1
     prev_deg = np.maximum(0, 2 ** beta - 1)
     l = len(beta)
-    m = np.prod(max_deg)
-    mprev = np.prod(prev_deg[prev_deg>0]) if np.any(prev_deg>0) else 0
-    c_samples = (C * m * np.log2(m + 1)) - (C * mprev * np.log2(mprev + 1))
-    return list(itertools.product(*[np.arange(prev_deg[i], max_deg[i])
-                                    for i in xrange(0, l)])), c_samples
 
+    return list(itertools.product(*[np.arange(prev_deg[i], max_deg[i])
+                                     for i in xrange(0, l)]))
 
 @public
 def default_samples_count(basis, C=2):

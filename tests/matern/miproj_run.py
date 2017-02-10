@@ -13,8 +13,8 @@ from mimclib import mimc, ipdb
 import argparse
 
 warnings.filterwarnings("error")
-warnings.filterwarnings("always", category=mimclib.test.ArgumentWarning)
-warnings.filterwarnings("always", category=UserWarning)
+warnings.filterwarnings("ignore", category=mimclib.test.ArgumentWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 class MyRun:
     def solveFor_seq(self, alpha, arrY):
