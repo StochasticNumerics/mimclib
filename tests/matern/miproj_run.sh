@@ -22,41 +22,41 @@ function run_cmd {
 }
 
 function plot_cmd {
-    echo ../plot_prog.py -db_engine mysql -db_name miproj_matern -db_host $HOST \
+    echo ../plot_prog.py -db_engine mysql -db_name mimc -db_host $HOST \
          -db_tag $1-optimal -o output/$1-optimal.pdf -verbose True -all_itr True \
          -qoi_exact_tag $1-optimal
 
-    echo ../plot_prog.py -db_engine mysql -db_name miproj_matern -db_host $HOST \
+    echo ../plot_prog.py -db_engine mysql -db_name mimc -db_host $HOST \
          -db_tag $1-arcsine -o output/$1-arcsine.pdf -verbose True -all_itr True \
          -qoi_exact_tag $1-arcsine
 
-    echo ./plot_cond.py -db_name miproj_matern -db_host $HOST -db_tag $1-optimal
-    echo ./plot_cond.py -db_name miproj_matern -db_host $HOST -db_tag $1-arcsine
+    echo ./plot_cond.py -db_name mimc -db_host $HOST -db_tag $1-optimal
+    echo ./plot_cond.py -db_name mimc -db_host $HOST -db_tag $1-arcsine
 }
 
 if [ "$1" = "plot" ]; then
-    # plot_cmd fixproj-1-1.0
-    # plot_cmd fixproj-1-1.5
-    # plot_cmd fixproj-1-2.5
-    # plot_cmd fixproj-1-3.5
+    # plot_cmd f_fixproj-1-1.0
+    # plot_cmd f_fixproj-1-1.5
+    # plot_cmd f_fixproj-1-2.5
+    plot_cmd f_fixproj-1-3.5
 
-    # plot_cmd miproj-1-1.0
-    # plot_cmd miproj-1-1.5
-    # plot_cmd miproj-1-2.5
-    plot_cmd miproj-1-3.5
+    # plot_cmd f_miproj-1-1.0
+    # plot_cmd f_miproj-1-1.5
+    # plot_cmd f_miproj-1-2.5
+    plot_cmd f_miproj-1-3.5
 
     # plot_cmd miproj-3-4.5
     # plot_cmd miproj-3-3.0
 else
-    run_cmd fixproj 1 10 3.5 -mimc_min_dim 0 -miproj_min_dim 5
-    run_cmd fixproj 1 10 2.5 -mimc_min_dim 0 -miproj_min_dim 5
-    run_cmd fixproj 1 10 1.5 -mimc_min_dim 0 -miproj_min_dim 5
-    run_cmd fixproj 1 10 1.0 -mimc_min_dim 0 -miproj_min_dim 5
+    run_cmd f_fixproj 1 10 3.5 -mimc_min_dim 0 -miproj_min_dim 5
+    # run_cmd f_fixproj 1 10 2.5 -mimc_min_dim 0 -miproj_min_dim 5
+    # run_cmd f_fixproj 1 10 1.5 -mimc_min_dim 0 -miproj_min_dim 5
+    # run_cmd f_fixproj 1 10 1.0 -mimc_min_dim 0 -miproj_min_dim 5
 
-    run_cmd miproj 1 10 3.5 -miproj_min_dim 5
-    run_cmd miproj 1 10 2.5 -miproj_min_dim 5
-    run_cmd miproj 1 10 1.5 -miproj_min_dim 5
-    run_cmd miproj 1 10 1.0 -miproj_min_dim 5
+    run_cmd f_miproj 1 10 3.5 -miproj_min_dim 5
+    # run_cmd f_miproj 1 10 2.5 -miproj_min_dim 5
+    # run_cmd f_miproj 1 10 1.5 -miproj_min_dim 5
+    # run_cmd f_miproj 1 10 1.0 -miproj_min_dim 5
 
     # run_cmd fixproj 3 7 3.0 -mimc_min_dim 0 -miproj_min_dim 5
     # run_cmd fixproj 3 7 4.5 -mimc_min_dim 0 -miproj_min_dim 5

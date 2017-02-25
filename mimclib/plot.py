@@ -2,6 +2,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import matplotlib
+# Force matplotlib to not use any Xwindows backend.
+matplotlib.use('Agg')
+
 import numpy as np
 import matplotlib.pylab as plt
 from . import mimc
@@ -515,7 +519,7 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
         if xi == 'work':
             itr_stats = [itr.calcTotalWork()]
         elif xi == 'time':
-            itr_stats = [run.iter_total_times[i]]
+            itr_stats = [run.iters[i].calcTotalTime()] #run.iter_total_times[i]]
         elif xi == 'tol':
             itr_stats = [run.TOL]
         return itr_stats + [itr.exact_error, modifier*itr.totalErrorEst()]
@@ -1247,11 +1251,11 @@ def genPDFBooklet(runs, add_legend=True, label_fmt=None, **kwargs):
             continue
         try:
             print_msg(plotFunc.__name__)
-            if fig_index != 1:
-                ax = add_fig()
+            ax = add_fig()
             add_rates = dict()
             from itertools import cycle
-            markers = cycle(['o', 'v', '^', '<', '>', '8', 's', 'p', '*', 'h', 'H', 'D', 'd'])
+            markers = cycle(['o', 'v', '^', '<', '>', '8', 's', 'p',
+                             '*', 'h', 'H', 'D', 'd'])
             linestyles = cycle(['--', '-.', '-', ':', '-'])
             cycler = ax._get_lines.prop_cycler
             for j, direction in enumerate(directions):

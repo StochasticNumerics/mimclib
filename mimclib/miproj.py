@@ -4,7 +4,6 @@ from __future__ import print_function
 
 import numpy as np
 from . import setutil
-from scipy.linalg import solve
 import itertools
 import warnings
 import time
@@ -80,13 +79,18 @@ class TensorExpansion(object):
         :return: Basis polynomials evaluated at X, (M, N)
         :rtype: `len(X) x len(mis)` np.array
         '''
+        # M Number of samples, dim is dimensions
         dim = np.max([len(x) for x in X])
         max_deg = np.max(base_indices.to_dense_matrix(), axis=0)
         rdim = np.minimum(dim, len(max_deg))
         values = np.ones((len(X), len(base_indices)))
         basis_values = np.empty(rdim, dtype=object)
+        pt_dim = np.array([len(x) for x in X])
         for d in xrange(0, rdim):
+            #vals = np.array([x[d] for x in X if d < len(x)])
             vals = np.array([x[d] if d < len(x) else 0 for x in X])
+            #basis_values[d] = np.ones((len(X), max_deg[d]+1))
+            #basis_values[d][pt_dim > d] = fnBasis(vals, max_deg[d]+1)
             basis_values[d] = fnBasis(vals, max_deg[d]+1)
 
         for i, mi in enumerate(base_indices):
@@ -133,6 +137,12 @@ Supposed to take function and maintain polynomial coefficients
 class MIWProjSampler(object):
     class SamplesCollection(object):
         def __init__(self):
+            self.clear()
+
+        def max_dim(self):
+            return np.max([len(x) for x in self.X]) if len(self) > 0 else 0
+
+        def clear(self):
             self.X = []
             self.W = np.empty(0)
             self.Y = None
@@ -229,7 +239,12 @@ class MIWProjSampler(object):
 
             assert(np.all(basis.check_admissibility()))
             mods, inds = mimc.expand_delta(alpha)
+
             if self.reuse_samples:
+                if self.prev_samples[ind].max_dim() < basis.max_dim():
+                    # Clear samples if dimensions are diff
+                    self.prev_samples[ind].clear()
+
                 if c_samples > len(self.prev_samples[ind]):
                     X, W = self.fnSamplePoints(c_samples - len(self.prev_samples[ind]), basis)
                     self.prev_samples[ind].add_points(fnSample, inds, X, W)
@@ -239,12 +254,31 @@ class MIWProjSampler(object):
                 X, W = self.fnSamplePoints(c_samples, basis)
                 Y = [fnSample(inds[i], X) for i in xrange(0, len(inds))]
 
+            sampling_time = time.clock() - tStart
+            tStart = time.clock()
             basis_values = TensorExpansion.evaluate_basis(self.fnBasis, basis, X)
+            assembly_time_1 = time.clock() - tStart
+
+            tStart = time.clock()
+            from scipy.sparse.linalg import gmres, LinearOperator
+            BW = np.dot(np.diag(np.sqrt(W)), basis_values)
+            G = LinearOperator((BW.shape[1], BW.shape[1]),
+                               matvec=lambda v: np.dot(BW.transpose(), np.dot(BW, v)),
+                               rmatvec=lambda v: np.dot(BW, np.dot(BW.transpose(), v)))
+            assembly_time_2 = time.clock() - tStart
+
+            # This following operation is only needed for diagnosis purposes
+            GFull = basis_values.transpose().dot(basis_values * W[:, None])
+            max_cond = np.linalg.cond(GFull)
+            # assert np.max(np.abs(BW.transpose().dot(BW)-GFull)/GFull) < 1e-10, str(np.max(np.abs(BW.transpose().dot(BW)-GFull)/GFull))
+            #G = GFull
+
+            tStart = time.clock()
             for i in xrange(0, len(inds)):
                 # Add each element separately
-                coeffs, cond = MIWProjSampler.weighted_least_squares(Y[i], W, basis_values)
-                self.max_condition_number = np.maximum(self.max_condition_number,
-                                                       cond)
+                R = np.dot(basis_values.transpose(), (Y[i] * W))
+                coeffs, info = gmres(G, R)
+                assert(info == 0)
                 projections = np.empty(len(beta_indset), dtype=TensorExpansion)
 
                 for j in xrange(0, len(beta_indset)):
@@ -262,32 +296,39 @@ class MIWProjSampler(object):
                     psums_fine[sel_lvls, 0] = projections
                 else:
                     psums_delta[sel_lvls, 0] += projections*mods[i]
+            projection_time = time.clock() - tStart
+            self.max_condition_number = np.maximum(self.max_condition_number,
+                                                   max_cond)
 
+            # For now, only compute sampling time
+            time_taken = sampling_time + assembly_time_1 + \
+                         assembly_time_2 + projection_time
             if self.reuse_samples:
-                self.prev_samples[ind].total_time += time.clock() - tStart
-                sampling_time = self.prev_samples[ind].total_time
-            else:
-                sampling_time = time.clock() - tStart
+                self.prev_samples[ind].total_time += time_taken
+                time_taken = self.prev_samples[ind].total_time
 
-            total_time[sel_lvls] = sampling_time * basis_per_beta / np.sum(basis_per_beta)
+            total_time[sel_lvls] = time_taken * basis_per_beta / np.sum(basis_per_beta)
             total_work[sel_lvls] = work_per_sample * c_samples * basis_per_beta / np.sum(basis_per_beta)
-            # print("[{}, {}, {}, {:.12f}, {:.12f}],".format(len(basis),
-            #                                               alpha[0],
-            #                                               work_per_sample[0],
-            #                                               c_samples,
-            #                                               sampling_time))
+            ## WARNING: Not accounting for projection time!!!
+            # print("{}, {}, {}, {}, {:.12f}, {:.12f}, {:.12f}, {:.12f}, {:.12f}"
+            #       .format(len(basis), alpha[0], work_per_sample[0],
+            #               c_samples,
+            #               max_cond,
+            #               sampling_time,
+            #               assembly_time_1, assembly_time_2,
+            #               projection_time))
         return M, psums_delta, psums_fine, total_time, total_work
 
     @staticmethod
     def weighted_least_squares(Y, W, basisvalues):
         '''
         Solve least-squares system.
-
         :param Y: sample values
         :param W: weights
         :param basisvalues: polynomial basis values
         :return: coefficients
         '''
+        from scipy.linalg import solve
         R = basisvalues.transpose().dot(Y * W)
         G = basisvalues.transpose().dot(basisvalues * W[:, None])
         cond = np.linalg.cond(G)
@@ -298,6 +339,7 @@ class MIWProjSampler(object):
         if not np.isfinite(coefficients).all():
             warnings.warn('Numerical instability encountered')
         return coefficients, cond
+
 
 def sample_uniform_pts(N, bases_indices, interval=(-1, 1)):
     dim = bases_indices.max_dim()
@@ -347,7 +389,6 @@ def default_basis_from_level(beta, C=2):
     max_deg = 2 ** (beta + 1) - 1
     prev_deg = np.maximum(0, 2 ** beta - 1)
     l = len(beta)
-
     return list(itertools.product(*[np.arange(prev_deg[i], max_deg[i])
                                      for i in xrange(0, l)]))
 
