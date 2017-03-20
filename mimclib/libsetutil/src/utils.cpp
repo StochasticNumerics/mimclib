@@ -4,7 +4,7 @@
 #include "var_list.hpp"
 
 extern "C"{
-    void sample_optimal_leg_pts(unsigned int N,
+    void sample_optimal_leg_pts(unsigned int* N_per_basis,
                                 const VarSizeList* bases_indices,
                                 double *X, double a, double b);
 }
@@ -25,7 +25,7 @@ std::vector<double> legendre_pol(double X, unsigned int N, double a, double b){
     return ret;
 }
 
-void sample_optimal_leg_pts(unsigned int N,
+void sample_optimal_leg_pts(unsigned int *N_per_basis,
                             const VarSizeList* bases_indices,
                             double *X, double a, double b) {
     static std::mt19937 gen;
@@ -35,22 +35,24 @@ void sample_optimal_leg_pts(unsigned int N,
 
     unsigned int max_dim = bases_indices->max_dim();
     double acceptanceratio = 1./(4*std::exp(1));
-    for (unsigned int i=0;i<N;i++){
-        auto base_pol = bases_indices->get(uni_int(gen));
-        for (unsigned int dim=0;dim<max_dim;dim++){
-            bool accept = false;
-            double Xreal = 0;
-            while (!accept){
-                double Xnext = (std::cos(M_PI * uni(gen)) + 1.) / 2.;
-                double dens_prop_Xnext = 1. / (M_PI * std::sqrt(Xnext*(1 - Xnext)));
-                Xreal = a + Xnext*(b-a);
-                double dens_goal_Xnext = legendre_pol(Xreal, 1+base_pol[dim], a, b).back();
-                dens_goal_Xnext *= dens_goal_Xnext;
-                double alpha = acceptanceratio * dens_goal_Xnext / dens_prop_Xnext;
-                double U = uni(gen);
-                accept = (U < alpha);
+    for (unsigned int j=0;j<(bases_indices->count()-1);j++){
+        for (unsigned int i=0;i<N_per_basis[j];i++){
+            auto base_pol = bases_indices->get(j);
+            for (unsigned int dim=0;dim<max_dim;dim++){
+                bool accept = false;
+                double Xreal = 0;
+                while (!accept){
+                    double Xnext = (std::cos(M_PI * uni(gen)) + 1.) / 2.;
+                    double dens_prop_Xnext = 1. / (M_PI * std::sqrt(Xnext*(1 - Xnext)));
+                    Xreal = a + Xnext*(b-a);
+                    double dens_goal_Xnext = legendre_pol(Xreal, 1+base_pol[dim], a, b).back();
+                    dens_goal_Xnext *= dens_goal_Xnext;
+                    double alpha = acceptanceratio * dens_goal_Xnext / dens_prop_Xnext;
+                    double U = uni(gen);
+                    accept = (U < alpha);
+                }
+                X[i*max_dim + dim] = Xreal;
             }
-            X[i*max_dim + dim] = Xreal;
         }
     }
 }

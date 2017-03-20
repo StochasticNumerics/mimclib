@@ -48,6 +48,7 @@ class MyRun:
         self.proj = miproj.MIWProjSampler(d=run.params.min_dim,
                                           fnBasis=miproj.legendre_polynomials,
                                           fnSamplePoints=fnSamplePoints,
+                                          fnWeightPoints=lambda x, b: miproj.weighted_points_optimal(b),
                                           fnWorkModel=lambda lvls, r=run: self.workModel(run, lvls),
                                           reuse_samples=run.params.miproj_reuse_samples)
         self.proj.init_mimc_run(run)
