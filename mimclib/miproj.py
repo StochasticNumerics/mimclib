@@ -322,7 +322,7 @@ class MIWProjSampler(object):
             for i in xrange(0, len(sub_alphas)):
                 # Add each element separately
                 R = np.dot(sam_col.basis_values.transpose(), (sam_col.Y[i] * sam_col.W))
-                coeffs, info = gmres(G, R)
+                coeffs, info = gmres(G, R, tol=1e-12)
                 assert(info == 0)
                 projections = np.empty(sam_col.beta_count, dtype=TensorExpansion)
 
@@ -352,14 +352,14 @@ class MIWProjSampler(object):
                 total_time[sel_lvls] += time_taken * todoN_per_beta / np.sum(todoN_per_beta)
             total_work[sel_lvls] = work_per_sample * totalN_per_beta
             ## WARNING: Not accounting for projection time!!!
-            print("{}, {}, {}, {}, {:.12f}, {:.12f}, {:.12f}, {:.12f}, {:.12f}"
-                  .format(len(sam_col.basis), alpha[0], work_per_sample,
-                          np.sum(totalN_per_beta),
-                          sampling_time,
-                          pt_sampling_time,
-                          assembly_time_1,
-                          assembly_time_2,
-                          projection_time))
+            # print("{}, {}, {}, {}, {:.12f}, {:.12f}, {:.12f}, {:.12f}, {:.12f}"
+            #       .format(len(sam_col.basis), alpha[0], work_per_sample,
+            #               np.sum(totalN_per_beta),
+            #               sampling_time,
+            #               pt_sampling_time,
+            #               assembly_time_1,
+            #               assembly_time_2,
+            #               projection_time))
         return M, psums_delta, psums_fine, total_time, total_work
 
     @staticmethod
