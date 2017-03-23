@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import matplotlib
 # Force matplotlib to not use any Xwindows backend.
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 
 import numpy as np
 import matplotlib.pylab as plt
@@ -318,7 +318,7 @@ def computeIterationStats(runs, work_bins, filteritr, fnItrStats,
                      else xy[-1][i] for i in xrange(len(stats))]
             xy.append(stats)
     xy = np.array(xy)
-    lxy = np.log(xy[:, 0])
+    lxy = xy[:, 0]
     bins = np.digitize(lxy, np.linspace(np.min(lxy), np.max(lxy), work_bins))
     bins[bins == work_bins] = work_bins-1
     ubins = np.unique(bins)
@@ -519,7 +519,9 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
         if xi == 'work':
             itr_stats = [itr.calcTotalWork()]
         elif xi == 'time':
-            itr_stats = [run.iters[i].calcTotalTime()] #run.iter_total_times[i]]
+            #itr_stats = [run.iter_total_times[i]]
+            itr_stats = [run.iters[i].calcTotalTime()]
+            #itr_stats = [itr.totalTime]
         elif xi == 'tol':
             itr_stats = [run.TOL]
         return itr_stats + [itr.exact_error, modifier*itr.totalErrorEst()]
@@ -534,9 +536,9 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
     ErrEst_kwargs = kwargs.pop('ErrEst_kwargs', None)
     Ref_kwargs = kwargs.pop('Ref_kwargs', None)
     Ref_ErrEst_kwargs = kwargs.pop('Ref_ErrEst_kwargs', Ref_kwargs)
-    sel = np.logical_and(np.isfinite(xy_binned[:, 1]), xy_binned[:, 1] >=
-                         np.finfo(float).eps)
-    if np.sum(sel) == 0:
+    sel = np.nonzero(np.logical_and(np.isfinite(xy_binned[:, 1]), xy_binned[:, 1] >=
+                                    np.finfo(float).eps))[0]
+    if len(sel) == 0:
         plotObj.append(None)
     else:
         args, kwargs = __normalize_fmt(args, kwargs)
@@ -545,12 +547,48 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
     if ErrEst_kwargs is not None:
         ErrEst_args, ErrEst_kwargs = __normalize_fmt((), ErrEst_kwargs)
         plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 2], *ErrEst_args, **ErrEst_kwargs))
-    if np.sum(sel) > 0 and Ref_kwargs is not None:
+    sel = sel[np.log(xy_binned[sel, 0]) > np.median(np.log(xy_binned[:, 0]))]
+    if len(sel) > 0 and Ref_kwargs is not None:
         plotObj.append(ax.add_line(FunctionLine2D.ExpLine(data=xy_binned[sel, :2],
                                                           **Ref_kwargs)))
         if ErrEst_kwargs is not None:
             plotObj.append(ax.add_line(FunctionLine2D.ExpLine(data=xy_binned[sel, :][:, [0,2]],
                                                               **Ref_ErrEst_kwargs)))
+
+    return xy_binned[:, :2], plotObj
+
+
+@public
+def plotAvgWorkVsTime(ax, runs, *args, **kwargs):
+    work_bins = kwargs.pop('work_bins', 50)
+    filteritr = kwargs.pop("filteritr", filteritr_all)
+    ax.set_xlabel('Avg. work')
+    ax.set_ylabel('Running time')
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+
+    def fnItrStats(run, i):
+        itr = run.iters[i]
+        return [itr.calcTotalWork()] + [itr.totalTime]*3
+
+    xy_binned = computeIterationStats(runs,
+                                      work_bins=len(runs[0].iters),
+                                      filteritr=filteritr,
+                                      fnItrStats=fnItrStats,
+                                      arr_fnAgg=[np.mean, np.mean, np.max, np.min])
+    plotObj = []
+    Ref_kwargs = kwargs.pop('Ref_kwargs', None)
+    sel = np.nonzero(np.logical_and(np.isfinite(xy_binned[:, 1]), xy_binned[:, 1] >=
+                                    np.finfo(float).eps))[0]
+    if len(sel) == 0:
+        plotObj.append(None)
+    else:
+        plotObj.append(ax.errorbar(xy_binned[:, 0], xy_binned[:, 1],
+                                   yerr=[xy_binned[:, 2], xy_binned[:, 3]],
+                                   *args, **kwargs))
+    if Ref_kwargs is not None:
+        plotObj.append(ax.add_line(FunctionLine2D.ExpLine(rate=1,
+                                                          **Ref_kwargs)))
 
     return xy_binned[:, :2], plotObj
 
@@ -1036,8 +1074,7 @@ def __plot_except(ax):
     print('-----------------------------------------------------')
     traceback.print_exc(limit=None)
     print('-----------------------------------------------------')
-
-    raise
+    #raise
 
 @public
 def genPDFBooklet(runs, add_legend=True, label_fmt=None, **kwargs):
@@ -1110,31 +1147,40 @@ def genPDFBooklet(runs, add_legend=True, label_fmt=None, **kwargs):
 
     print_msg("plotWorkVsMaxError")
     ax = add_fig()
+    Ref_kwargs = {'ls': '--', 'c':'k', 'label': label_fmt.format(label='{rate:.2g}')}
+    ErrEst_kwargs = {'fmt': '--*','label': label_fmt.format(label='Error Estimate')}
+    Ref_ErrEst_kwargs = {'ls': '-.', 'c':'k', 'label': label_fmt.format(label='{rate:.2g}')}
+    Ref_ErrEst_kwargs = None
+    ErrEst_kwargs = None
     try:
         plotWorkVsMaxError(ax, runs,
                            filteritr=filteritr,
                            modifier=modifier, fmt='-*',
-                           ErrEst_kwargs={'fmt': '--*',
-                                          'label': label_fmt.format(label='Error Estimate')},
-                           Ref_kwargs={'ls': '--', 'c':'k',
-                                       'label': label_fmt.format(label='{rate:.2g}')},
-                           Ref_ErrEst_kwargs={'ls': '-.', 'c':'k',
-                                              'label': label_fmt.format(label='{rate:.2g}')})
+                           ErrEst_kwargs=ErrEst_kwargs,
+                           Ref_kwargs=Ref_kwargs,
+                           Ref_ErrEst_kwargs=Ref_ErrEst_kwargs)
     except:
         __plot_except(ax)
-
 
     print_msg("plotWorkVsMaxError")
     ax = add_fig()
     try:
         plotWorkVsMaxError(ax, runs, filteritr=filteritr,
                            x_axis='time', modifier=modifier, fmt='-*',
-                           ErrEst_kwargs={'fmt': '--*', 'label':
-                                          label_fmt.format(label='Error Estimate')},
-                           Ref_kwargs={'ls': '--', 'c':'k',
-                                       'label': label_fmt.format(label='{rate:.2g}')},
-                           Ref_ErrEst_kwargs={'ls': '-.', 'c':'k',
-                                           'label': label_fmt.format(label='{rate:.2g}')})
+                           ErrEst_kwargs=ErrEst_kwargs,
+                           Ref_kwargs=Ref_kwargs,
+                           Ref_ErrEst_kwargs=Ref_ErrEst_kwargs)
+    except:
+        __plot_except(ax)
+
+    print_msg("plotAvgWorkVsTime")
+    ax = add_fig()
+    try:
+        plotAvgWorkVsTime(ax, runs,
+                          filteritr=filteritr,
+                          fmt='-*',
+                          Ref_kwargs={'ls': '--', 'c':'k',
+                                      'label': label_fmt.format(label='{rate:.2g}')})
     except:
         __plot_except(ax)
 
@@ -1443,6 +1489,7 @@ def run_program(fnExactErr=None, **kwargs):
     run_data = filter(lambda r: len(r.iters) > 0, run_data)
     if len(run_data) == 0:
         raise Exception("No runs!!!")
+
     fnNorm = run_data[0].fn.Norm
     if args.verbose:
         print("Plotting data")

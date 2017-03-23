@@ -65,33 +65,45 @@ def plotAll(o, tags=None, label=None, db=None, work_bins=50):
             prev_count = 0
             for itr in r.iters:
                 itr.total_samples = prev_count + np.sum([
-                    miproj.default_samples_count(
-                        miproj.default_basis_from_level(beta))
+                    np.sum(miproj.default_samples_count(
+                        miproj.default_basis_from_level(beta)))
                     for beta in itr.lvls_itr(prev)])
                 prev_count = itr.total_samples
                 prev = itr.lvls_count
 
         def fnItrStats(run, i):
             itr = run.iters[i]
-            return [itr.total_samples] + [itr.db_data.user_data]*3 + [itr.exact_error]
+            return [i] + [itr.db_data.user_data[0]]*3 +\
+                [itr.db_data.user_data[1]]*3 + [itr.exact_error]
 
-        xy_binned = miplot.computeIterationStats(runs, work_bins=work_bins,
+        xy_binned = miplot.computeIterationStats(runs, work_bins=len(runs[0].iters),
                                                  filteritr=miplot.filteritr_all,
                                                  fnItrStats=fnItrStats,
                                                  arr_fnAgg=[np.mean,
                                                             np.mean,
                                                             np.min,
                                                             np.max,
+                                                            np.mean,
+                                                            np.min,
+                                                            np.max,
                                                             np.max])
         ax = add_fig('condo')
-        ax.set_xscale('log')
+        #ax.set_xscale('log')
         ax.set_yscale('log')
-        ax.set_xlabel('Number of Terms')
-        ax.set_ylabel('Condition number')
+        ax.set_xlabel('Iteration')
+        ax.set_ylabel('Matrix Size')
         ax.errorbar(xy_binned[:, 0], xy_binned[:, 1],
                     yerr=[xy_binned[:, 2], xy_binned[:, 3]],
                     color=color[i], marker=marker[i], ls='-')
 
+        ax = add_fig('matrix')
+        #ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.set_xlabel('Iteration')
+        ax.set_ylabel('Condition number')
+        ax.errorbar(xy_binned[:, 0], xy_binned[:, 4],
+                    yerr=[xy_binned[:, 5], xy_binned[:, 6]],
+                    color=color[i], marker=marker[i], ls='-')
         if len(runs) != 1 or runs[0].params.min_dim != 0:
             continue;
         ax = add_fig('alpha')

@@ -10,17 +10,18 @@ import time
 
 warnings.filterwarnings("always")
 
-def l2_error_mc(itrs, fnSample, rel_tol=0.1, maxM=4000):
+def l2_error_mc(itrs, fnSample, rel_tol=0.01, maxM=16000):
     if len(itrs) == 0:
         return np.array([])
     max_L = 1 + np.max([np.max([a[0] for a in itr.lvls_itr()]) for itr in itrs])
-    N = 200
+    N = -1
     try:
         N = itrs[0].parent.params.qoi_N
     except:
         pass
     if N < 0:
         N = np.max([itr.parent.last_itr.lvls_max_dim()-1 for itr in itrs])
+    N += 100
 
     tStart = time.clock()
     print("MaxL:", max_L, ", N:", N)
@@ -41,7 +42,7 @@ def l2_error_mc(itrs, fnSample, rel_tol=0.1, maxM=4000):
         s2 += np.sum(errors**2, axis=0)
         M += len(samples)
         err = 3*np.sqrt((s2/M - (s1/M)**2)/M)    # Approximate error of error estimate
-        max_rel_err = np.max(np.sqrt(err / (s1/M)))
+        max_rel_err = np.max(err / (err+np.abs(s1/M)))
         print("Estimate with", M, "samples -> max relative error: ", max_rel_err,
               "in", (time.clock()-tStart)/60., "min")
         if max_rel_err < rel_tol:

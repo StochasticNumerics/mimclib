@@ -40,15 +40,18 @@ class MyRun:
 
         if run.params.miproj_pts_sampler == 'optimal':
             fnSamplePoints = miproj.sample_optimal_leg_pts
+            fnWeightPoints = lambda x, b: miproj.optimal_weights(b)
         elif run.params.miproj_pts_sampler == 'arcsine':
             fnSamplePoints = miproj.sample_arcsine_pts
+            fnWeightPoints = lambda x, b: miproj.arcsine_weights(x)
         else:
             raise NotImplementedError("Unknown points sampler")
 
         self.proj = miproj.MIWProjSampler(d=run.params.min_dim,
+                                          min_dim=run.params.qoi_min_vars,
                                           fnBasis=miproj.legendre_polynomials,
                                           fnSamplePoints=fnSamplePoints,
-                                          fnWeightPoints=lambda x, b: miproj.weighted_points_optimal(b),
+                                          fnWeightPoints=fnWeightPoints,
                                           fnWorkModel=lambda lvls, r=run: self.workModel(run, lvls),
                                           reuse_samples=run.params.miproj_reuse_samples)
         self.proj.init_mimc_run(run)
@@ -64,16 +67,25 @@ class MyRun:
 
     def extendLvls(self, run, lvls):
         max_added = None
+        max_dim = 5 + (0 if len(lvls) == 0 else np.max(lvls.get_dim()))
+        max_dim = np.maximum(run.params.miproj_min_dim, max_dim)
+
         if self.profit_calc is None:
+            # Adaptive
             error = run.fn.Norm(run.last_itr.calcDeltaEl())
             work = run.last_itr.Wl_estimate
             prof = setutil.calc_log_prof_from_EW(error, work)
             max_added = 30
+            lvls.expand_set(prof, max_dim=max_dim, max_added=max_added)
         else:
+            # non-adaptive
             prof = self.profit_calc
-        max_dim = 5 + (0 if len(lvls) == 0 else np.max(lvls.get_dim()))
-        max_dim = np.maximum(run.params.miproj_min_dim, max_dim)
-        lvls.expand_set(prof, max_dim=max_dim, max_added=max_added)
+            prev_total_samples = np.sum(np.prod(2**lvls.to_dense_matrix(d_start=self.params.qoi_dim), axis=1))
+            while True:
+                lvls.expand_set(prof, max_dim=max_dim, max_added=max_added)
+                new_total_samples = np.sum(np.prod(2**lvls.to_dense_matrix(d_start=self.params.qoi_dim), axis=1))
+                if not self.params.qoi_double_work or new_total_samples >= 2*prev_total_samples:
+                    break
         self.proj.update_index_set(lvls)
 
     def addExtraArguments(self, parser):
@@ -93,6 +105,10 @@ class MyRun:
         parser.add_argument("-qoi_x0", type=float, nargs='+',
                             default=np.array([0.4,0.2,0.6]),
                             action=store_as_array)
+        parser.add_argument("-qoi_min_vars", type=int,
+                            default=10, action="store")
+        parser.add_argument("-qoi_double_work", type="bool",
+                            default=False, action="store")
 
         parser.add_argument("-qoi_set_adaptive", type="bool",
                             default=True, action="store")
@@ -110,12 +126,14 @@ class MyRun:
         parser.add_argument("-miproj_fix_lvl", type=int,
                             default=5, action="store")
         parser.add_argument("-miproj_min_dim", type=int,
-                            default=5, action="store")
+                            default=2, action="store")
 
     def ItrDone(self, db, run_id, run):
         if db is not None:
-            db.writeRunData(run_id, run, iteration_idx=len(run.iters)-1,
-                            userdata=self.proj.max_condition_number)
+            db.writeRunData(run_id, run,
+                            iteration_idx=len(run.iters)-1,
+                            userdata=np.array([self.proj.max_matrix_size,
+                                               self.proj.max_condition_number]))
         self.proj.max_condition_number = 0
 
 if __name__ == "__main__":

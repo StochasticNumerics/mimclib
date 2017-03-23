@@ -38,7 +38,7 @@ def _unpickle(obj, load=cPickle.load):
         return load(f)
 
 def _nan2none(arr):
-    return [None if np.isnan(x) else x for x in arr]
+    return [None if not np.isfinite(x) else x for x in arr]
 
 def _none2nan(x):
     return np.nan if x is None else x

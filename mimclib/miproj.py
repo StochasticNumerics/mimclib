@@ -19,21 +19,44 @@ import os
 import ctypes as ct
 import numpy.ctypeslib as npct
 __lib__ = npct.load_library("libset_util", __file__)
-__lib__.sample_optimal_leg_pts.restype = None
+__lib__.sample_optimal_leg_pts.restype = np.uint32
 __lib__.sample_optimal_leg_pts.argtypes = [npct.ndpointer(dtype=np.uint32, ndim=1, flags='CONTIGUOUS'),
+                                           ct.c_uint32,
                                            ct.c_voidp,
                                            npct.ndpointer(dtype=np.double, ndim=1, flags='CONTIGUOUS'),
                                            ct.c_double, ct.c_double]
+__lib__.sample_optimal_random_leg_pts.restype = np.uint32
+__lib__.sample_optimal_random_leg_pts.argtypes = [ct.c_uint32,ct.c_uint32,
+                                                  ct.c_voidp,
+                                                  npct.ndpointer(dtype=np.double, ndim=1, flags='CONTIGUOUS'),
+                                                  ct.c_double, ct.c_double]
 
 @public
-def sample_optimal_leg_pts(N_per_basis, bases_indices, interval=(-1, 1)):
-    max_dim = bases_indices.max_dim()
-    N = np.sum(N_per_basis)
-    X = np.empty(max_dim*N)
-    __lib__.sample_optimal_leg_pts(N_per_basis.astype(np.uint32),
-                                   bases_indices._handle, X,
-                                   interval[0], interval[1])
-    X = X.reshape((N, max_dim))
+def sample_optimal_leg_pts(N_per_basis, bases_indices, min_dim, interval=(-1, 1)):
+    if hasattr(N_per_basis, '__iter__'):
+        N_per_basis = N_per_basis.astype(np.uint32)
+        totalN = np.sum(N_per_basis)
+        total = False
+    else:
+        totalN = N_per_basis
+        total = True
+
+    max_dim = np.maximum(min_dim, bases_indices.max_dim())
+    X = np.empty(max_dim*totalN)
+    assert(len(N_per_basis) == len(bases_indices))
+    if total:
+        count = __lib__.sample_optimal_random_leg_pts(totalN,max_dim,
+                                                      bases_indices._handle,
+                                                      X, interval[0],
+                                                      interval[1])
+    else:
+        count = __lib__.sample_optimal_leg_pts(N_per_basis.astype(np.uint32),
+                                               max_dim,
+                                               bases_indices._handle,
+                                               X,
+                                               interval[0], interval[1])
+    assert(count == totalN*max_dim)
+    X = X.reshape((totalN, max_dim))
     return X
 
 """
@@ -160,6 +183,7 @@ class MIWProjSampler(object):
             return len(self.X)
 
     def __init__(self, d=0,  # d is the spatial dimension
+                 min_dim=0, # Minimum stochastic dimensions
                  fnBasis=None,
                  fnSamplesCount=None,
                  fnSamplePoints=None,
@@ -175,6 +199,7 @@ class MIWProjSampler(object):
         self.fnWeightPoints = fnWeightPoints
         self.fnBasisFromLvl = fnBasisFromLvl if fnBasisFromLvl is not None else default_basis_from_level
         self.d = d   # Spatial dimension
+        self.min_dim = min_dim
         self.alpha_ind = np.zeros(0)
         self.fnWorkModel = fnWorkModel if fnWorkModel is not None else (lambda lvls: np.ones(len(lvls)))
 
@@ -186,6 +211,7 @@ class MIWProjSampler(object):
         self.prev_samples = defaultdict(lambda: MIWProjSampler.SamplesCollection())
         self.reuse_samples = reuse_samples
         self.max_condition_number = 0
+        self.max_matrix_size = 0
 
     def init_mimc_run(self, run):
         run.params.M0 = np.array([0])
@@ -212,13 +238,18 @@ class MIWProjSampler(object):
         assert(len(self.alpha_ind) == len(lvls))
         psums_delta = np.empty((len(lvls), 1), dtype=TensorExpansion)
         psums_fine = np.empty((len(lvls), 1), dtype=TensorExpansion)
-        total_time = np.empty(len(lvls))
-        total_work = np.empty(len(lvls))
+        total_time = np.zeros(len(lvls))
+        total_work = np.zeros(len(lvls))
+
+        # Add previous times and works from previous iteration
+        if self.reuse_samples and len(run.iters) >= 2:
+            total_time[:len(run.iters[-2].tT)] = run.iters[-2].tT
+
         for alpha, ind in self.alpha_dict.iteritems():
             tStart = time.clock()
             sam_col = self.prev_samples[ind]
             sel_lvls = np.nonzero(self.alpha_ind == ind)[0]
-            work_per_sample = self.fnWorkModel(setutil.VarSizeList([alpha]))
+            work_per_sample = self.fnWorkModel(setutil.VarSizeList([alpha]))[0]
             beta_indset = lvls.sublist(sel_lvls[sam_col.beta_count:],
                                        d_start=self.d, min_dim=0)
             #new_basis = setutil.VarSizeList()
@@ -227,33 +258,44 @@ class MIWProjSampler(object):
                 #new_basis.add_from_list(new_b)
                 sam_col.basis.add_from_list(new_b)
                 sam_col.pols_to_beta = np.concatenate((sam_col.pols_to_beta,
-                                                      [sam_col.beta_count+i]*len(new_b)))
-            sam_col.beta_count += len(beta_indset)
+                                                      [sam_col.beta_count]*len(new_b)))
+                sam_col.beta_count += 1
+
+            if not self.reuse_samples or self.min_dim < sam_col.basis.max_dim():
+                sam_col.clear_samples()
+                total_time[sel_lvls] = 0
+
+            while self.min_dim < sam_col.basis.max_dim():
+                self.min_dim *= 2
 
             N_per_basis = self.fnSamplesCount(sam_col.basis)
             assert(np.all(sam_col.basis.check_admissibility()))
             mods, sub_alphas = mimc.expand_delta(alpha)
 
-            if not self.reuse_samples:
-                # if self.prev_samples[ind].max_dim() < sam_col.basis.max_dim():
-                #     # Clear samples if dimensions are diff
-                self.prev_samples[ind].clear_samples()
-
             N_todo = N_per_basis.copy()
             if len(sam_col.N_per_basis) > 0:
                 N_todo[:len(sam_col.N_per_basis)] -= sam_col.N_per_basis
-                N_todo[N_todo < 0] = 0
-            if np.sum(N_todo) > 0:
-                X = self.fnSamplePoints(N_todo, sam_col.basis)
-                assert(len(X) == np.sum(N_todo))
-                sam_col.add_points(fnSample, sub_alphas, X)
+                assert(np.all(N_todo >= 0))
+
             sam_col.N_per_basis = N_per_basis
-
-            N_per_beta = np.zeros(sam_col.beta_count)
+            todoN_per_beta = np.zeros(sam_col.beta_count)
+            totalN_per_beta = np.zeros(sam_col.beta_count)
             for i in xrange(0, sam_col.beta_count):
-                N_per_beta[i] = np.sum(N_todo[sam_col.pols_to_beta == i])
+                todoN_per_beta[i] = np.sum(N_todo[sam_col.pols_to_beta == i])
+                totalN_per_beta[i] = np.sum(N_per_basis[sam_col.pols_to_beta == i])
 
-            sampling_time = time.clock() - tStart
+            if np.sum(N_todo) > 0:
+                X = self.fnSamplePoints(N_todo, sam_col.basis, self.min_dim)
+                assert(len(X) == np.sum(N_todo))
+                pt_sampling_time = time.clock() - tStart
+
+                tStart = time.clock()
+                sam_col.add_points(fnSample, sub_alphas, X)
+                sampling_time = time.clock() - tStart
+            else:
+                pt_sampling_time = time.clock() - tStart
+                sampling_time = 0
+
             tStart = time.clock()
             # sam_col.basis_values.resize(len(sam_col.X), len(sam_col.basis))
             # TODO: should only compute new basis_values
@@ -264,7 +306,7 @@ class MIWProjSampler(object):
 
             tStart = time.clock()
             from scipy.sparse.linalg import gmres, LinearOperator
-            BW = np.dot(np.diag(np.sqrt(sam_col.W)), sam_col.basis_values)
+            BW = np.sqrt(sam_col.W)[:, None] * sam_col.basis_values
             G = LinearOperator((BW.shape[1], BW.shape[1]),
                                matvec=lambda v: np.dot(BW.transpose(), np.dot(BW, v)),
                                rmatvec=lambda v: np.dot(BW, np.dot(BW.transpose(), v)))
@@ -286,7 +328,7 @@ class MIWProjSampler(object):
 
                 for j in xrange(0, sam_col.beta_count):
                     # if len(beta_indset[j]) == 0:
-                    #     sel_coeff = np.ones(len(coeffs), dtype=np.bool)
+                    #     sel_coeff = np.ones(len(coeffs), dtype=np.Boole)
                     # else:
                     sel_coeff = sam_col.pols_to_beta == j
                     projections[j] = TensorExpansion(fnBasis=self.fnBasis,
@@ -302,20 +344,22 @@ class MIWProjSampler(object):
             projection_time = time.clock() - tStart
             self.max_condition_number = np.maximum(self.max_condition_number,
                                                    max_cond)
-
+            self.max_matrix_size = np.maximum(self.max_matrix_size, BW.shape[1])
             # For now, only compute sampling time
-            time_taken = sampling_time + assembly_time_1 + \
+            time_taken = sampling_time + pt_sampling_time + assembly_time_1 + \
                          assembly_time_2 + projection_time
-            total_time[sel_lvls] = time_taken * N_per_beta / np.sum(N_per_beta)
-            total_work[sel_lvls] = work_per_sample * N_per_beta
+            if np.sum(todoN_per_beta) > 0:
+                total_time[sel_lvls] += time_taken * todoN_per_beta / np.sum(todoN_per_beta)
+            total_work[sel_lvls] = work_per_sample * totalN_per_beta
             ## WARNING: Not accounting for projection time!!!
-            # print("{}, {}, {}, {}, {:.12f}, {:.12f}, {:.12f}, {:.12f}, {:.12f}"
-            #       .format(len(sam_col.basis), alpha[0], work_per_sample[0],
-            #               c_samples,
-            #               max_cond,
-            #               sampling_time,
-            #               assembly_time_1, assembly_time_2,
-            #               projection_time))
+            print("{}, {}, {}, {}, {:.12f}, {:.12f}, {:.12f}, {:.12f}, {:.12f}"
+                  .format(len(sam_col.basis), alpha[0], work_per_sample,
+                          np.sum(totalN_per_beta),
+                          sampling_time,
+                          pt_sampling_time,
+                          assembly_time_1,
+                          assembly_time_2,
+                          projection_time))
         return M, psums_delta, psums_fine, total_time, total_work
 
     @staticmethod
@@ -341,10 +385,10 @@ class MIWProjSampler(object):
 
 @public
 def sample_optimal_pts(fnBasis, N_per_basis,
-                       bases_indices,
+                       bases_indices, min_dim,
                        interval=(-1, 1)):
     assert(len(N_per_basis) == len(bases_indices))
-    max_dim = bases_indices.max_dim()
+    max_dim = np.maximum(min_dim, bases_indices.max_dim())
     acceptanceratio = 1./(4*np.exp(1))
     X = np.zeros((N, max_dim))
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -367,18 +411,19 @@ def sample_optimal_pts(fnBasis, N_per_basis,
     return X
 
 @public
-def sample_arcsine_pts(N_per_basis, bases_indices, interval=(-1, 1)):
+def sample_arcsine_pts(N_per_basis, bases_indices, min_dim, interval=(-1, 1)):
     N = np.sum(N_per_basis)
-    max_dim = bases_indices.max_dim()
+    max_dim = np.maximum(min_dim, bases_indices.max_dim())
     X_temp = (np.cos(np.pi * np.random.rand(N, max_dim)) + 1) / 2
     return interval[0]+X_temp*(interval[1]-interval[0])
 
 @public
-def weighted_points_arcsine(X, interval=(-1, 1)):
-    return np.prod(np.pi * np.sqrt((X-interval[0])*(interval[1] - X)), axis=1)
+def arcsine_weights(X, interval=(-1, 1)):
+    X = np.array(X)
+    return np.prod(np.pi * np.sqrt((X-interval[0])*(interval[1]-X)), axis=1)
 
 @public
-def weighted_points_optimal(basis_values):
+def optimal_weights(basis_values):
     if basis_values.shape[0] == 0:
         return np.zeros(0)
     # TODO: Check sizes
@@ -399,7 +444,7 @@ def default_samples_count(basis, C=2):
     if m == 1:
         return np.array([int(2*C)])
     else:
-        return np.ones(len(basis), dtype=np.int) * int(np.ceil(C * np.log2(m+1)))
+        return np.ones(len(basis), dtype=np.float) * np.ceil(C * np.log2(m+1))
 
 @public
 def chebyshev_polynomials(Xtilde, N, interval=(-1,1)):

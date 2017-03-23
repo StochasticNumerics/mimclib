@@ -432,6 +432,10 @@ class MIMCRun(object):
         return np.cumsum([itr.totalTime for itr in self.iters])
 
     @property
+    def iter_calc_total_times(self):
+        return np.cumsum([itr.calcTotalTime() for itr in self.iters])
+
+    @property
     def _Ca(self):
         return norm.ppf((1+self.params.confidence)/2)   # TODO: TEMP. UNCOMMENT
 
@@ -915,8 +919,6 @@ estimate optimal number of levels"
                         self._extendLevels(new_lvls=np.arange(
                             self.last_itr.lvls_count, L+1).reshape((-1, 1)))
                         self._estimateAll()
-                if verbose > VERBOSE_INFO:
-                    timer.ptoc()
                 self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
                                           self.params.theta)
                 if self.last_itr.lvls_count == 0 or \
@@ -937,14 +939,10 @@ estimate optimal number of levels"
                 if not self.params.reuse_samples:
                     self.last_itr.zero_samples()
 
-                if verbose > VERBOSE_INFO:
-                    timer.ptoc()
                 samples_added = self._genSamples(todoM) or samples_added
                 self.last_itr.totalTime = timer.toc()
                 self.output(verbose=verbose)
                 print_info("------------------------------------------------")
-                if verbose > VERBOSE_INFO:
-                    timer.ptoc()
                 if samples_added:
                     if self.fn.ItrDone is not None:
                         self.fn.ItrDone()
