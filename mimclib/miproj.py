@@ -412,8 +412,8 @@ def sample_optimal_pts(fnBasis, N_per_basis,
 
 @public
 def sample_arcsine_pts(N_per_basis, bases_indices, min_dim, interval=(-1, 1)):
-    N = np.sum(N_per_basis)
-    max_dim = np.maximum(min_dim, bases_indices.max_dim())
+    N = int(np.sum(N_per_basis))
+    max_dim = int(np.maximum(min_dim, bases_indices.max_dim()))
     X_temp = (np.cos(np.pi * np.random.rand(N, max_dim)) + 1) / 2
     return interval[0]+X_temp*(interval[1]-interval[0])
 
