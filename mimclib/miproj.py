@@ -35,13 +35,13 @@ __lib__.sample_optimal_random_leg_pts.argtypes = [ct.c_uint32,ct.c_uint32,
 def sample_optimal_leg_pts(N_per_basis, bases_indices, min_dim, interval=(-1, 1)):
     if hasattr(N_per_basis, '__iter__'):
         N_per_basis = N_per_basis.astype(np.uint32)
-        totalN = np.sum(N_per_basis)
+        totalN = int(np.sum(N_per_basis))
         total = False
     else:
         totalN = N_per_basis
         total = True
 
-    max_dim = np.maximum(min_dim, bases_indices.max_dim())
+    max_dim = int(np.maximum(min_dim, bases_indices.max_dim()))
     X = np.empty(max_dim*totalN)
     assert(len(N_per_basis) == len(bases_indices))
     if total:
