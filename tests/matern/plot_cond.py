@@ -87,13 +87,16 @@ def plotAll(o, tags=None, label=None, db=None, work_bins=50):
                                                             np.min,
                                                             np.max,
                                                             np.max])
+        from mimclib import ipdb
+        ipdb.embed()
         ax = add_fig('condo')
         #ax.set_xscale('log')
         ax.set_yscale('log')
         ax.set_xlabel('Iteration')
         ax.set_ylabel('Matrix Size')
         ax.errorbar(xy_binned[:, 0], xy_binned[:, 1],
-                    yerr=[xy_binned[:, 2], xy_binned[:, 3]],
+                    yerr=[xy_binned[:, 0]-xy_binned[:, 2],
+                          xy_binned[:, 3]-xy_binned[:, 0]],
                     color=color[i], marker=marker[i], ls='-')
 
         ax = add_fig('matrix')
@@ -102,7 +105,8 @@ def plotAll(o, tags=None, label=None, db=None, work_bins=50):
         ax.set_xlabel('Iteration')
         ax.set_ylabel('Condition number')
         ax.errorbar(xy_binned[:, 0], xy_binned[:, 4],
-                    yerr=[xy_binned[:, 5], xy_binned[:, 6]],
+                    yerr=[xy_binned[:, 0]-xy_binned[:, 5],
+                          xy_binned[:, 6]-xy_binned[:, 0]],
                     color=color[i], marker=marker[i], ls='-')
         if len(runs) != 1 or runs[0].params.min_dim != 0:
             continue;
@@ -113,7 +117,7 @@ def plotAll(o, tags=None, label=None, db=None, work_bins=50):
         ax.set_ylabel('Error')
         ax.plot(xy_binned[:, 0], xy_binned[:, -1], color=color[i],
                 marker=marker[i], ls='-')
-        C = np.polyfit(np.log(xy_binned[:, 0]), np.log(xy_binned[:, -1]), 1)
+        C = np.polyfit(np.log(1+xy_binned[:, 0]), np.log(xy_binned[:, -1]), 1)
         func = lambda x: np.exp(C[1])*x**C[0]
         ax.add_line(miplot.FunctionLine2D(fn=func, linestyle='--', c='k',
                                           label='{:.3g}'.format(C[0])))
