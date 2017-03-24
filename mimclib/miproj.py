@@ -236,12 +236,12 @@ class MIWProjSampler(object):
         total_work = 0
         for alpha, ind in self.alpha_dict.iteritems():
             work_per_sample = self.fnWorkModel(setutil.VarSizeList([alpha]))[0]
-            beta_indset = lvls.sublist(sel_lvls[sam_col.beta_count:],
-                                       d_start=self.d, min_dim=0)
-            total_samples = np.sum(self.fnSamplesCount(np.sum([self.fnBasisFromLvl(beta)
-                                                               for beta in itr.lvls_itr()])))
+            sel_lvls = np.nonzero(self.alpha_ind == ind)[0]
+            beta_indset = self.lvls.sublist(sel_lvls, d_start=self.d, min_dim=0)
+            total_samples = np.sum(self.fnSamplesCount(sum([self.fnBasisFromLvl(beta)
+                                                            for beta in beta_indset], [])))
             total_work += work_per_sample * total_samples
-        return total_time
+        return total_work
 
     def sample_all(self, run, lvls, M, moments, fnSample):
         assert np.all(moments == 1), "miproj only support first moments"

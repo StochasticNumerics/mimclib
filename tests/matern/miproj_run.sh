@@ -30,8 +30,8 @@ function run_cmd {
 
 function plot_cmd {
     echo ../plot_prog.py -db_engine mysql -db_name mimc -db_host $HOST \
-         -db_tag $BASETAG$1-optimal -o output/$BASETAG$1-optimal.pdf -verbose True -all_itr True \
-         -qoi_exact_tag $BASETAG$1-optimal
+         -db_tag $BASETAG$1-optimal -o output/$BASETAG$1-optimal.pdf -verbose True -all_itr True #\
+         #-qoi_exact_tag $BASETAG$1-optimal
 
     # echo ./plot_cond.py -db_name mimc -db_host $HOST -db_tag $BASETAG$1-optimal
     # echo ../plot_prog.py -db_engine mysql -db_name mimc -db_host $HOST \
@@ -61,28 +61,29 @@ function all_cmds {
     fi;
 }
 
-# all_cmds $1 fixproj 1 10 10.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 10.99
-# all_cmds $1 fixproj 1 10 8.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 8.99
-# all_cmds $1 fixproj 1 10 6.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 6.99
-# all_cmds $1 fixproj 1 10 4.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 4.99
+# all_cmds $1 adapt-fixproj 1 10 10.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 10.99
+# all_cmds $1 adapt-fixproj 1 10 8.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 8.99
+# all_cmds $1 adapt-fixproj 1 10 6.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 6.99
+# all_cmds $1 adapt-fixproj 1 10 4.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 4.99
+# all_cmds $1 adapt-fixproj 1 10 2.5 -mimc_min_dim 0 -miproj_min_dim 5 -qoi_set_sexp 2.99
 
-# all_cmds fixproj 1 10 3.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 3.99
-# all_cmds fixproj 1 10 2.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 2.99
-# all_cmds fixproj 1 10 1.5 -mimc_min_dim 0 -miproj_min_dim 5
-# all_cmds fixproj 1 10 1.0 -mimc_min_dim 0 -miproj_min_dim 5
+# all_cmds $1 adapt-fixproj 1 10 3.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 3.99
+# all_cmds $1 adapt-fixproj 1 10 2.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 2.99
+# all_cmds $1 adapt-fixproj 1 10 1.5 -mimc_min_dim 0 -miproj_min_dim 5
+# all_cmds $1 adapt-fixproj 1 10 1.0 -mimc_min_dim 0 -miproj_min_dim 5
 
-all_cmds miproj 1 10 6.5 -miproj_min_dim 5  -qoi_set_sexp 6.99 -qoi_set_adaptive False
-all_cmds adapt-miproj 1 10 6.5 -miproj_min_dim 5  -qoi_set_adaptive True
+all_cmds $1 miproj 1 10 6.5 -miproj_min_dim 5  -qoi_set_sexp 6.99 -qoi_set_adaptive False
+all_cmds $1 adapt-miproj 1 10 6.5 -miproj_min_dim 5
 
-# all_cmds miproj 1 10 4.5 -miproj_min_dim 5  -qoi_set_sexp 4.99 -qoi_set_adaptive False
-# all_cmds adapt-miproj 1 10 4.5 -miproj_min_dim 5 -qoi_set_adaptive True
+# all_cmds $1 miproj 1 10 4.5 -miproj_min_dim 5  -qoi_set_sexp 4.99 -qoi_set_adaptive False
+# all_cmds $1 adapt-miproj 1 10 4.5 -miproj_min_dim 5
 
-# all_cmds miproj 1 10 3.5 -miproj_min_dim 5  -qoi_set_sexp 3.99
-# all_cmds miproj 1 10 2.5 -miproj_min_dim 5  -qoi_set_sexp 2.99
-# all_cmds miproj 1 10 1.5 -miproj_min_dim 5
-# all_cmds miproj 1 10 1.0 -miproj_min_dim 5
+# all_cmds $1 adapt-miproj 1 10 3.5 -miproj_min_dim 5  -qoi_set_sexp 3.99
+# all_cmds $1 adapt-miproj 1 10 2.5 -miproj_min_dim 5  -qoi_set_sexp 2.99
+# all_cmds $1 adapt-miproj 1 10 1.5 -miproj_min_dim 5
+# all_cmds $1 adapt-miproj 1 10 1.0 -miproj_min_dim 5
 
-# all_cmds fixproj 3 7 3.0 -mimc_min_dim 0 -miproj_min_dim 5
-# all_cmds fixproj 3 7 4.5 -mimc_min_dim 0 -miproj_min_dim 5
-# all_cmds miproj 3 7 3.0 -miproj_min_dim 5
-# all_cmds miproj 3 7 4.5 -miproj_min_dim 5
+# all_cmds $1 adapt-fixproj 3 7 3.0 -mimc_min_dim 0 -miproj_min_dim 5
+# all_cmds $1 adapt-fixproj 3 7 4.5 -mimc_min_dim 0 -miproj_min_dim 5
+# all_cmds $1 adapt-miproj 3 7 3.0 -miproj_min_dim 5
+# all_cmds $1 adapt-miproj 3 7 4.5 -miproj_min_dim 5
