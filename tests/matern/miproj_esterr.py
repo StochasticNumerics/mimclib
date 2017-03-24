@@ -15,7 +15,10 @@ def l2_error_mc(itrs, fnSample, rel_tol=0.01, maxM=16000):
         return np.array([])
 
     min_dim = itrs[0].parent.params.min_dim
-    max_L = 1 + itrs[0].parent.params.max_lvl
+    if min_dim == 0:
+        max_L = itrs[0].parent.params.miproj_fix_lvl
+    else:
+        max_L = 1 + np.max([np.max([a[0] for a in itr.lvls_itr()]) for itr in itrs])
 
     N = -1
     try:
