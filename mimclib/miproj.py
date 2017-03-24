@@ -212,6 +212,7 @@ class MIWProjSampler(object):
         self.reuse_samples = reuse_samples
         self.max_condition_number = 0
         self.max_matrix_size = 0
+        self.direct = True
 
     def init_mimc_run(self, run):
         run.params.M0 = np.array([0])
@@ -297,7 +298,7 @@ class MIWProjSampler(object):
                 sampling_time = 0
 
             tStart = time.clock()
-            # sam_col.basis_values.resize(len(sam_col.X), len(sam_col.basis))
+            # sam_col.basis_values.re size(len(sam_col.X), len(sam_col.basis))
             # TODO: should only compute new basis_values
             sam_col.basis_values = TensorExpansion.evaluate_basis(
                 self.fnBasis, sam_col.basis, sam_col.X)
@@ -305,25 +306,33 @@ class MIWProjSampler(object):
             assembly_time_1 = time.clock() - tStart
 
             tStart = time.clock()
+            from numpy.linalg import solve
             from scipy.sparse.linalg import gmres, LinearOperator
+
             BW = np.sqrt(sam_col.W)[:, None] * sam_col.basis_values
-            G = LinearOperator((BW.shape[1], BW.shape[1]),
-                               matvec=lambda v: np.dot(BW.transpose(), np.dot(BW, v)),
-                               rmatvec=lambda v: np.dot(BW, np.dot(BW.transpose(), v)))
+            if self.direct:
+                G = BW.transpose().dot(BW)
+            else:
+                G = LinearOperator((BW.shape[1], BW.shape[1]),
+                                   matvec=lambda v: np.dot(BW.transpose(), np.dot(BW, v)),
+                                   rmatvec=lambda v: np.dot(BW, np.dot(BW.transpose(), v)))
+
             assembly_time_2 = time.clock() - tStart
 
             # This following operation is only needed for diagnosis purposes
-            GFull = sam_col.basis_values.transpose().dot(sam_col.basis_values * sam_col.W[:, None])
+            GFull = G if self.direct else BW.transpose().dot(BW)
             max_cond = np.linalg.cond(GFull)
-            # assert np.max(np.abs(BW.transpose().dot(BW)-GFull)/GFull) < 1e-10, str(np.max(np.abs(BW.transpose().dot(BW)-GFull)/GFull))
             #G = GFull
 
             tStart = time.clock()
             for i in xrange(0, len(sub_alphas)):
                 # Add each element separately
                 R = np.dot(sam_col.basis_values.transpose(), (sam_col.Y[i] * sam_col.W))
-                coeffs, info = gmres(G, R, tol=1e-12)
-                assert(info == 0)
+                if self.direct:
+                    coeffs = solve(G, R)
+                else:
+                    coeffs, info = gmres(G, R, tol=1e-12)
+                    assert(info == 0)
                 projections = np.empty(sam_col.beta_count, dtype=TensorExpansion)
 
                 for j in xrange(0, sam_col.beta_count):

@@ -13,14 +13,17 @@ warnings.filterwarnings("always")
 def l2_error_mc(itrs, fnSample, rel_tol=0.01, maxM=16000):
     if len(itrs) == 0:
         return np.array([])
-    max_L = 1 + np.max([np.max([a[0] for a in itr.lvls_itr()]) for itr in itrs])
+
+    min_dim = itrs[0].parent.params.min_dim
+    max_L = 1 + itrs[0].parent.params.max_lvl
+
     N = -1
     try:
         N = itrs[0].parent.params.qoi_N
     except:
         pass
     if N < 0:
-        N = np.max([itr.parent.last_itr.lvls_max_dim()-1 for itr in itrs])
+        N = np.max([itr.parent.last_itr.lvls_max_dim()-min_dim for itr in itrs])
     N += 100
 
     tStart = time.clock()
