@@ -47,12 +47,17 @@ class MyRun:
         else:
             raise NotImplementedError("Unknown points sampler")
 
+        if run.params.min_dim > 0:
+            fnWorkModel = lambda lvls, r=run: self.workModel(run, lvls)
+        else:
+            fnWorkModel = None
+
         self.proj = miproj.MIWProjSampler(d=run.params.min_dim,
                                           min_dim=run.params.qoi_min_vars,
                                           fnBasis=miproj.legendre_polynomials,
                                           fnSamplePoints=fnSamplePoints,
                                           fnWeightPoints=fnWeightPoints,
-                                          fnWorkModel=lambda lvls, r=run: self.workModel(run, lvls),
+                                          fnWorkModel=fnWorkModel,
                                           reuse_samples=run.params.miproj_reuse_samples)
         self.proj.init_mimc_run(run)
         self.sf = SField_Matern(run.params)
@@ -61,7 +66,7 @@ class MyRun:
 
         self.profit_calc = None
         if not run.params.qoi_set_adaptive:
-            self.profit_calc = setutil.MIProfCalculator([run.params.qoi_set_dexp] * run.params.qoi_dim,
+            self.profit_calc = setutil.MIProfCalculator([run.params.qoi_set_dexp] * run.params.min_dim,
                                                         run.params.qoi_set_xi,
                                                         run.params.qoi_set_sexp)
 
@@ -77,16 +82,18 @@ class MyRun:
             prof = setutil.calc_log_prof_from_EW(error, work)
             max_added = 30
             lvls.expand_set(prof, max_dim=max_dim, max_added=max_added)
+            self.proj.update_index_set(lvls)
         else:
             # non-adaptive
             prof = self.profit_calc
-            prev_total_samples = np.sum(np.prod(2**lvls.to_dense_matrix(d_start=self.params.qoi_dim), axis=1))
+            prev_total_work = self.proj.estimateWork()
             while True:
                 lvls.expand_set(prof, max_dim=max_dim, max_added=max_added)
-                new_total_samples = np.sum(np.prod(2**lvls.to_dense_matrix(d_start=self.params.qoi_dim), axis=1))
-                if not self.params.qoi_double_work or new_total_samples >= 2*prev_total_samples:
+                self.proj.update_index_set(lvls)
+                new_total_work = self.proj.estimateWork()
+                if not self.params.qoi_double_work or new_total_work >= 2*prev_total_work:
                     break
-        self.proj.update_index_set(lvls)
+
 
     def addExtraArguments(self, parser):
         class store_as_array(argparse._StoreAction):

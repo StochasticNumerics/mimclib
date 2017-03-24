@@ -448,11 +448,6 @@ class MIMCRun(object):
     def _checkFunctions(self):
         # If self.params.reuse_samples is True then
         # all_itr will always equal last_itr
-        if not hasattr(self.fn, "WorkModel") and hasattr(self.params, "gamma"):
-            self.fn.WorkModel = lambda lvls: work_estimate(lvls,
-                                                          np.log(self.params.beta) *
-                                                          self.params.gamma)
-
         if not hasattr(self.fn, "Hierarchy"):
             self.fn.Hierarchy = lambda lvls: get_geometric_hl(lvls,
                                                              self.params.h0inv,

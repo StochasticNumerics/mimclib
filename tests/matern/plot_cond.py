@@ -62,13 +62,10 @@ def plotAll(o, tags=None, label=None, db=None, work_bins=50):
 
         for r in runs:
             prev = 0
-            prev_count = 0
             for itr in r.iters:
-                itr.total_samples = prev_count + np.sum([
-                    np.sum(miproj.default_samples_count(
-                        miproj.default_basis_from_level(beta)))
-                    for beta in itr.lvls_itr(prev)])
-                prev_count = itr.total_samples
+                itr.total_samples = np.sum(miproj.default_samples_count(sum(
+                    [miproj.default_basis_from_level(beta)
+                     for beta in itr.lvls_itr(0)], [])))
                 prev = itr.lvls_count
 
         def fnItrStats(run, i):
@@ -93,8 +90,8 @@ def plotAll(o, tags=None, label=None, db=None, work_bins=50):
         ax.set_xlabel('Iteration')
         ax.set_ylabel('Matrix Size')
         ax.errorbar(xy_binned[:, 0], xy_binned[:, 1],
-                    yerr=[xy_binned[:, 0]-xy_binned[:, 2],
-                          xy_binned[:, 3]-xy_binned[:, 0]],
+                    yerr=[xy_binned[:, 1]-xy_binned[:, 2],
+                          xy_binned[:, 3]-xy_binned[:, 1]],
                     color=color[i], marker=marker[i], ls='-')
 
         ax = add_fig('matrix')
@@ -103,19 +100,29 @@ def plotAll(o, tags=None, label=None, db=None, work_bins=50):
         ax.set_xlabel('Iteration')
         ax.set_ylabel('Condition number')
         ax.errorbar(xy_binned[:, 0], xy_binned[:, 4],
-                    yerr=[xy_binned[:, 0]-xy_binned[:, 5],
-                          xy_binned[:, 6]-xy_binned[:, 0]],
+                    yerr=[xy_binned[:, 4]-xy_binned[:, 5],
+                          xy_binned[:, 6]-xy_binned[:, 4]],
                     color=color[i], marker=marker[i], ls='-')
         if len(runs) != 1 or runs[0].params.min_dim != 0:
             continue;
+
+        def fnItrStats(run, i):
+            itr = run.iters[i]
+            return [itr.total_samples, itr.exact_error]
+
+        xy_binned = miplot.computeIterationStats(runs, work_bins=50,
+                                                 filteritr=miplot.filteritr_all,
+                                                 fnItrStats=fnItrStats,
+                                                 arr_fnAgg=[np.mean, np.max])
         ax = add_fig('alpha')
         ax.set_xscale('log')
         ax.set_yscale('log')
         ax.set_xlabel('Number of terms')
         ax.set_ylabel('Error')
-        ax.plot(xy_binned[:, 0], xy_binned[:, -1], color=color[i],
+        sel = xy_binned[:, -1] > 0
+        ax.plot(xy_binned[sel, 0], xy_binned[sel, -1], color=color[i],
                 marker=marker[i], ls='-')
-        C = np.polyfit(np.log(1+xy_binned[:, 0]), np.log(xy_binned[:, -1]), 1)
+        C = np.polyfit(np.log(1+xy_binned[sel, 0]), np.log(xy_binned[sel, -1]), 1)
         func = lambda x: np.exp(C[1])*x**C[0]
         ax.add_line(miplot.FunctionLine2D(fn=func, linestyle='--', c='k',
                                           label='{:.3g}'.format(C[0])))

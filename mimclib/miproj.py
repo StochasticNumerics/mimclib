@@ -232,6 +232,17 @@ class MIWProjSampler(object):
                                     np.array([self.alpha_dict[tuple(k)] for
                                               k in new_alpha])))
 
+    def estimateWork(self):
+        total_work = 0
+        for alpha, ind in self.alpha_dict.iteritems():
+            work_per_sample = self.fnWorkModel(setutil.VarSizeList([alpha]))[0]
+            beta_indset = lvls.sublist(sel_lvls[sam_col.beta_count:],
+                                       d_start=self.d, min_dim=0)
+            total_samples = np.sum(self.fnSamplesCount(np.sum([self.fnBasisFromLvl(beta)
+                                                               for beta in itr.lvls_itr()])))
+            total_work += work_per_sample * total_samples
+        return total_time
+
     def sample_all(self, run, lvls, M, moments, fnSample):
         assert np.all(moments == 1), "miproj only support first moments"
         assert np.all(M == 1), "miproj only supports M=1 exactly"

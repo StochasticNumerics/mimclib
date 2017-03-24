@@ -517,10 +517,11 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
     def fnItrStats(run, i):
         itr = run.iters[i]
         if xi == 'work':
+            #itr_stats = [np.sum(itr.tW)]
             itr_stats = [itr.calcTotalWork()]
         elif xi == 'time':
             #itr_stats = [run.iter_total_times[i]]
-            itr_stats = [run.iters[i].calcTotalTime()]
+            itr_stats = [itr.calcTotalTime()]
             #itr_stats = [itr.totalTime]
         elif xi == 'tol':
             itr_stats = [run.TOL]
@@ -547,7 +548,7 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
     if ErrEst_kwargs is not None:
         ErrEst_args, ErrEst_kwargs = __normalize_fmt((), ErrEst_kwargs)
         plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 2], *ErrEst_args, **ErrEst_kwargs))
-    sel = sel[np.log(xy_binned[sel, 0]) > np.median(np.log(xy_binned[:, 0]))]
+    #sel = sel[np.log(xy_binned[sel, 0]) > np.median(np.log(xy_binned[:, 0]))]
     if len(sel) > 0 and Ref_kwargs is not None:
         plotObj.append(ax.add_line(FunctionLine2D.ExpLine(data=xy_binned[sel, :2],
                                                           **Ref_kwargs)))
@@ -584,10 +585,12 @@ def plotAvgWorkVsTime(ax, runs, *args, **kwargs):
         plotObj.append(None)
     else:
         plotObj.append(ax.errorbar(xy_binned[:, 0], xy_binned[:, 1],
-                                   yerr=[xy_binned[:, 2], xy_binned[:, 3]],
+                                   yerr=[xy_binned[:, 1]-xy_binned[:, 2],
+                                         xy_binned[:, 3]-xy_binned[:, 1]],
                                    *args, **kwargs))
     if Ref_kwargs is not None:
         plotObj.append(ax.add_line(FunctionLine2D.ExpLine(rate=1,
+                                                          data=xy_binned[:, :2],
                                                           **Ref_kwargs)))
 
     return xy_binned[:, :2], plotObj
