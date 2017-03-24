@@ -87,8 +87,6 @@ def plotAll(o, tags=None, label=None, db=None, work_bins=50):
                                                             np.min,
                                                             np.max,
                                                             np.max])
-        from mimclib import ipdb
-        ipdb.embed()
         ax = add_fig('condo')
         #ax.set_xscale('log')
         ax.set_yscale('log')
