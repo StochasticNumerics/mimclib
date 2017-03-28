@@ -15,7 +15,7 @@ args, unknowns = parser.parse_known_args()
 
 if args.qoi_dim:
     base = "\
- mimc_run.py -mimc_TOL {TOL} -qoi_seed 0 \
+ misc_run.py -mimc_TOL {TOL} -qoi_seed 0 \
 -qoi_problem 0 -qoi_sigma 0.2 \
 -mimc_min_dim {qoi_dim} -qoi_dim {qoi_dim} -qoi_df_nu {qoi_df_nu} \
 -qoi_x0 0.3 0.4 0.6 -ksp_rtol 1e-25 -ksp_type gmres  \

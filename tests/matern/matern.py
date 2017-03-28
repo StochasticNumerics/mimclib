@@ -42,7 +42,7 @@ class SField_Matern(object):
         self.params = params
         assert(len(params.qoi_x0) >= params.qoi_dim), "x0 should have d dimension"
         #print("---------", d, a0, f0, nu, L, x0, sigma)
-        __lib__.SFieldCreate(ct.byref(self.ref), params.qoi_problem,
+        __lib__.SFieldCreate(ct.byref(self.ref), 0,
                              params.qoi_dim, params.qoi_a0,
                              params.qoi_f0,
                              params.qoi_df_nu,
@@ -114,3 +114,30 @@ class SField_Matern(object):
 
     def GetN(self):
         return self.params.qoi_N
+
+if __name__=='__main__':
+    from mimclib import Bunch
+    params = Bunch()
+    params.qoi_dim = 1
+    params.qoi_a0 = 0
+    params.qoi_f0 = 1
+    params.qoi_df_nu = 3.5
+    params.qoi_df_L = 1
+    params.qoi_df_sig = 0.5
+    params.qoi_scale = 1
+    params.qoi_x0 = np.array([0.3,0.4, 0.6])
+    params.qoi_sigma = 1
+    params.h0inv = 3
+    params.beta = 2
+
+    arrY = np.array([[1,1,1,1], [1,1,1,1]], dtype=np.float)
+    SField_Matern.Init()
+    output = np.zeros(len(arrY))
+    sf = SField_Matern(params)
+    sf.BeginRuns(np.array([5]), np.max([len(Y) for Y in arrY]))
+    for i, Y in enumerate(arrY):
+        output[i] = sf.SolveFor(np.array(Y))
+    sf.EndRuns()
+    SField_Matern.Final()
+
+    print(output)

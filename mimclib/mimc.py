@@ -846,7 +846,7 @@ estimate optimal number of levels"
 
     def _calcTheta(self, TOL, bias_est):
         if not self.params.const_theta:
-            return 1 - bias_est/TOL
+            return (1 - bias_est/TOL) if TOL > 0 else np.inf
         return self.params.theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):

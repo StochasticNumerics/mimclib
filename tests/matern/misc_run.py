@@ -17,14 +17,17 @@ warnings.filterwarnings("always", category=mimclib.test.ArgumentWarning)
 
 class MyRun:
     def solveFor_seq(self, alpha, arrY):
+        if len(alpha) == 0:
+            alpha = [5] * self.params.qoi_dim
         output = np.zeros(len(arrY))
         self.sf.BeginRuns(alpha, np.max([len(Y) for Y in arrY]))
         for i, Y in enumerate(arrY):
-            output[i] = self.sf.SolveFor(np.array(Y))
+            output[i] = self.sf.SolveFor(np.array(Y)/np.sqrt(3))
         self.sf.EndRuns()
         return output
 
     def mySampleQoI(self, run, inds, M):
+
         return self.misc.sample(inds, M, fnSample=self.solveFor_seq)
 
     def workModel(self, run, lvls):
@@ -36,7 +39,7 @@ class MyRun:
     def initRun(self, run):
         self.prev_val = 0
         self.extrapolate_s_dims = 0 if run.params.qoi_problem < 0 else 10
-
+        self.params = run.params
         if run.params.qoi_problem < 0: # Fake mode for deterministic problem
             run.params.qoi_problem = 0
 
@@ -80,7 +83,7 @@ class MyRun:
             d = run.params.min_dim + self.extrapolate_s_dims
             eye = np.eye(d, dtype=int)
             new_lvls = np.vstack([np.zeros(d, dtype=int)] +
-                             [i*eye for i in range(1, run.params.min_lvls)])
+                             [i*eye for i in range(1, run.params.min_lvl)])
             lvls.add_from_list(new_lvls)
             return
 
@@ -114,7 +117,7 @@ class MyRun:
         self.profCalc = setutil.MISCProfCalculator(self.d_err_rates +
                                                    self.d_work_rates,
                                                    s_err_rates)
-        mimc.extend_prof_lvls(lvls, self.profCalc, run.params.min_lvls)
+        mimc.extend_prof_lvls(lvls, self.profCalc, run.params.min_lvl)
 
     def addExtraArguments(self, parser):
         class store_as_array(argparse._StoreAction):

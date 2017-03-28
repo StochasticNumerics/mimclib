@@ -471,7 +471,7 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
 
     dim_args, dim_kwargs = __normalize_fmt(args, kwargs)
     # Max dimensions
-    if np.max(xy_binned[:, 1]) / np.min(xy_binned[:, 1]) > 100:
+    if (np.max(xy_binned[:, 1]) - np.min(xy_binned[:, 1])) > 100:
         ax2 = ax.twinx()
         ax2.set_yscale('log')
     else:
@@ -491,6 +491,7 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
         plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 3],
                                *active_args, **active_kwargs))
 
+    ax.grid(True)
     return xy_binned[:, 0:2], plotObj
 
 @public
@@ -533,7 +534,6 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
                                       fnItrStats=fnItrStats,
                                       arr_fnAgg=[np.mean, np.max, np.min])
     plotObj = []
-
     ErrEst_kwargs = kwargs.pop('ErrEst_kwargs', None)
     Ref_kwargs = kwargs.pop('Ref_kwargs', None)
     Ref_ErrEst_kwargs = kwargs.pop('Ref_ErrEst_kwargs', Ref_kwargs)
@@ -896,8 +896,86 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
                                    yerr=[times[:, 1]-times[:, 0],
                                          times[:, 2]-times[:, 1]],
                                    **MC_kwargs))
-
     return plotObj[0][0].get_xydata(), plotObj
+
+@public
+def plotSeeds(ax, runs, *args, **kwargs):
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.set_xlabel('Dim')
+    ax.set_ylabel('Error')
+    Ref_kwargs = kwargs.pop('Ref_kwargs', None)
+    iter_idx = kwargs.pop('iter_idx', None)
+    fnNorm = kwargs.pop("fnNorm", np.abs)
+    ##### TEMP
+
+    args, kwargs = __normalize_fmt(args, kwargs)
+    #itr = runs[0].last_itr
+    if iter_idx is None:
+        itr = runs[0].last_itr
+    else:
+        itr = runs[0].iters[iter_idx]
+    El = itr.calcDeltaEl()
+    inds = []
+    x = []
+    for d in xrange(1, itr.lvls_max_dim()):
+        ei = np.zeros(d)
+        ei[-1] = 1
+        # if len(ei) >= 2:
+        #     ei[-2] = 1
+        ii = itr.lvls_find(ei)
+        if ii is not None:
+            inds.append(ii)
+            x.append(d)
+    inds = np.array(inds)
+    x = np.array(x)
+    line = ax.plot(x, fnNorm(El[inds]), *args, **kwargs)
+
+    if Ref_kwargs is not None:
+        ax.add_line(FunctionLine2D.ExpLine(data=line[0].get_xydata(),
+                                           **Ref_kwargs))
+    return line[0].get_xydata(), [line]
+
+
+
+@public
+def plotBestNTerm(ax, runs, *args, **kwargs):
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.set_xlabel('N')
+    ax.set_ylabel('Error')
+    Ref_kwargs = kwargs.pop('Ref_kwargs', None)
+    iter_idx = kwargs.pop('iter_idx', None)
+    ##### TEMP
+
+    args, kwargs = __normalize_fmt(args, kwargs)
+    #itr = runs[0].last_itr
+    if iter_idx is None:
+        itr = runs[0].last_itr
+    else:
+        itr = runs[0].iters[iter_idx]
+    sorted_coeff = np.sort(np.abs(itr.calcEg().coefficients))[::-1]
+
+    import pickle
+    proj = itr.calcEg()
+    d = dict()
+    for i in range(len(proj.base_indices)):
+        d[tuple(proj.base_indices[i].tolist())] = proj.coefficients[i]
+    with open('/home/hajiali/Downloads/coeffs/my_coeffs4', 'w') as f:
+        pickle.dump(d, f)
+
+
+    error = np.cumsum(np.abs(sorted_coeff[::-1]))[::-1]
+    N = 2 * np.arange(1, len(sorted_coeff)+1)
+    N[1] = 4
+    line = ax.plot(np.log(N)*N, error, *args, **kwargs)
+    if Ref_kwargs is not None:
+        sel = np.zeros(len(N), dtype=np.bool)
+        sel[np.arange(int(0.01*len(N)), int(0.03*len(N)))] = True
+        sel = np.logical_and(sel, error > 1e-8)
+        ax.add_line(FunctionLine2D.ExpLine(data=line[0].get_xydata()[sel, :],
+                                           **Ref_kwargs))
+    return line[0].get_xydata(), [line]
 
 @public
 def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
@@ -1364,6 +1442,23 @@ def genPDFBooklet(runs, add_legend=True, label_fmt=None, **kwargs):
     #                         max_TOLs=5, max_dim=max_dim)
     # except:
     #     __plot_except(ax)
+    print_msg("plotSeeds")
+    try:
+        ax = add_fig()
+        plotSeeds(ax, runs, fmt='-o', fnNorm=fnNorm,
+                  label='Last iteration', Ref_kwargs=Ref_kwargs)
+        plotSeeds(ax, runs, fmt='-o', fnNorm=fnNorm,
+                  Ref_kwargs=None,
+                  iter_idx=int(len(runs[0].iters)/4))
+    except:
+        __plot_except(ax)
+
+    print_msg("plotSeeds")
+    try:
+        ax = add_fig()
+        plotBestNTerm(ax, runs, fmt='-o', Ref_kwargs=Ref_kwargs)
+    except:
+        __plot_except(ax)
 
     if TOLs_count > 1:
         print_msg("plotLvlsNumVsTOL")

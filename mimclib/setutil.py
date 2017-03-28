@@ -70,7 +70,8 @@ __lib__.CreateMISCProfCalc.argtypes = [__ct_ind_t__, __ct_ind_t__,
                                        __arr_double__, __arr_double__]
 __lib__.CreateMIProfCalc.restype = ct.c_voidp
 __lib__.CreateMIProfCalc.argtypes = [__ct_ind_t__, __arr_double__,
-                                     ct.c_double, ct.c_double]
+                                     ct.c_double, ct.c_double,
+                                     ct.c_double]
 
 __lib__.CreateTDFTProfCalc.restype = ct.c_voidp
 __lib__.CreateTDFTProfCalc.argtypes = [__ct_ind_t__, __arr_double__, __arr_double__]
@@ -446,12 +447,13 @@ class VarSizeList(object):
     def is_boundary(self):
         return self.count_neighbors() < self.max_dim()
 
-    def expand_set(self, profits, max_dim, max_added=None):
+    def expand_set(self, profits, max_dim, max_added=None, max_prof=None):
         assert max_dim >= self.max_dim(), "Set already has more than max_dim"
         if isinstance(profits, ProfCalculator):
             assert max_added is None, \
                 "Cannot provide max_added when using a profit calculator"
-            max_prof = self.get_min_outer_prof(profits, max_dim)
+            if max_prof is None:
+                max_prof = self.get_min_outer_prof(profits, max_dim)
             new_handle = __lib__.VarSizeList_expand_set_calc(self._handle,
                                                              profits._handle,
                                                              max_prof, max_dim,
@@ -503,16 +505,16 @@ class ProfCalculator(object):
 
 class MISCProfCalculator(ProfCalculator):
     def __init__(self, d_rates, s_err_rates):
-        self.max_dim = len(d.rates) + len(s_err_rates)
+        self.max_dim = len(d_rates) + len(s_err_rates)
         self._handle = __lib__.CreateMISCProfCalc(len(d_rates),
                                                   len(s_err_rates),
                                                   np.array(d_rates, dtype=np.float),
                                                   np.array(s_err_rates, dtype=np.float))
 class MIProfCalculator(ProfCalculator):
-    def __init__(self, dexp, xi, sexp):
+    def __init__(self, dexp, xi, sexp, mul=1):
         self._handle = __lib__.CreateMIProfCalc(len(dexp),
                                                 np.array(dexp, dtype=np.float),
-                                                xi, sexp)
+                                                xi, sexp, mul)
 
 class TDFTProfCalculator(ProfCalculator):
     def __init__(self, td_w=None, ft_w=None):

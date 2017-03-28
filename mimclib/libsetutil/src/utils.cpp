@@ -4,11 +4,12 @@
 #include "var_list.hpp"
 
 extern "C"{
-    unsigned int sample_optimal_leg_pts(unsigned int* N_per_basis,
+    unsigned int sample_optimal_leg_pts(const unsigned int* N_per_basis,
                                         unsigned int max_dim,
                                         const VarSizeList* bases_indices,
                                         double *X, double a, double b);
     unsigned int sample_optimal_random_leg_pts(unsigned int total_N,
+                                               unsigned int* N_per_basis,
                                                unsigned int max_dim,
                                                const VarSizeList* bases_indices,
                                                double *X, double a, double b);
@@ -30,6 +31,7 @@ std::vector<double> legendre_pol(double X, unsigned int N, double a, double b){
     return ret;
 }
 unsigned int sample_optimal_random_leg_pts(unsigned int total_N,
+                                           unsigned int* N_per_basis,
                                            unsigned int max_dim,
                                            const VarSizeList* bases_indices,
                                            double *X, double a, double b){
@@ -41,7 +43,9 @@ unsigned int sample_optimal_random_leg_pts(unsigned int total_N,
     double acceptanceratio = 1./(4*std::exp(1));
     int count=0;
     for (unsigned int j=0;j<total_N;j++){
-        auto base_pol = bases_indices->get(uni_int(gen));
+        auto pol = uni_int(gen);
+        N_per_basis[pol]++;
+        auto base_pol = bases_indices->get(pol);
         for (unsigned int dim=0;dim<max_dim;dim++){
             bool accept = false;
             double Xreal = 0;
@@ -62,7 +66,7 @@ unsigned int sample_optimal_random_leg_pts(unsigned int total_N,
     return count;
 }
 
-unsigned int sample_optimal_leg_pts(unsigned int *N_per_basis,
+unsigned int sample_optimal_leg_pts(const unsigned int *N_per_basis,
                                     unsigned int max_dim,
                                     const VarSizeList* bases_indices,
                                     double *X, double a, double b) {

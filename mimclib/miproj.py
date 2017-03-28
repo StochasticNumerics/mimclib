@@ -26,26 +26,28 @@ __lib__.sample_optimal_leg_pts.argtypes = [npct.ndpointer(dtype=np.uint32, ndim=
                                            npct.ndpointer(dtype=np.double, ndim=1, flags='CONTIGUOUS'),
                                            ct.c_double, ct.c_double]
 __lib__.sample_optimal_random_leg_pts.restype = np.uint32
-__lib__.sample_optimal_random_leg_pts.argtypes = [ct.c_uint32,ct.c_uint32,
-                                                  ct.c_voidp,
+__lib__.sample_optimal_random_leg_pts.argtypes = [ct.c_uint32,
+                                                  npct.ndpointer(dtype=np.uint32, ndim=1, flags='CONTIGUOUS'),
+                                                  ct.c_uint32, ct.c_voidp,
                                                   npct.ndpointer(dtype=np.double, ndim=1, flags='CONTIGUOUS'),
                                                   ct.c_double, ct.c_double]
 
 @public
-def sample_optimal_leg_pts(N_per_basis, bases_indices, min_dim, interval=(-1, 1)):
-    if hasattr(N_per_basis, '__iter__'):
-        N_per_basis = N_per_basis.astype(np.uint32)
-        totalN = int(np.sum(N_per_basis))
-        total = False
+def sample_optimal_leg_pts(N_per_basis, bases_indices, min_dim,
+                           random=False,interval=(0, 1)):
+    if random:
+        totalN = np.ceil(np.sum(N_per_basis))
     else:
-        totalN = N_per_basis
-        total = True
+        N_per_basis = np.ceil(N_per_basis).astype(np.uint32)
+        totalN = int(np.sum(N_per_basis))
 
     max_dim = int(np.maximum(min_dim, bases_indices.max_dim()))
     X = np.empty(max_dim*totalN)
     assert(len(N_per_basis) == len(bases_indices))
-    if total:
-        count = __lib__.sample_optimal_random_leg_pts(totalN,max_dim,
+    if random:
+        N_per_basis = np.zeros(len(N_per_basis), dtype=np.uint32)
+        count = __lib__.sample_optimal_random_leg_pts(np.uint32(totalN),
+                                                      N_per_basis, max_dim,
                                                       bases_indices._handle,
                                                       X, interval[0],
                                                       interval[1])
@@ -57,7 +59,7 @@ def sample_optimal_leg_pts(N_per_basis, bases_indices, min_dim, interval=(-1, 1)
                                                interval[0], interval[1])
     assert(count == totalN*max_dim)
     X = X.reshape((totalN, max_dim))
-    return X
+    return X, N_per_basis
 
 """
 TensorExpansion is a simple object representing a basis function and a list of
@@ -169,7 +171,7 @@ class MIWProjSampler(object):
             self.W = np.empty(0)
             self.Y = None
             self.total_time = 0
-            self.N_per_basis = np.empty(0)
+            self.N_per_basis = np.empty(0, dtype=np.uint32)
 
         def add_points(self, fnSample, alphas, X):
             self.X.extend(X.tolist())
@@ -289,7 +291,6 @@ class MIWProjSampler(object):
                 N_todo[:len(sam_col.N_per_basis)] -= sam_col.N_per_basis
                 assert(np.all(N_todo >= 0))
 
-            sam_col.N_per_basis = N_per_basis
             todoN_per_beta = np.zeros(sam_col.beta_count)
             totalN_per_beta = np.zeros(sam_col.beta_count)
             for i in xrange(0, sam_col.beta_count):
@@ -297,8 +298,10 @@ class MIWProjSampler(object):
                 totalN_per_beta[i] = np.sum(N_per_basis[sam_col.pols_to_beta == i])
 
             if np.sum(N_todo) > 0:
-                X = self.fnSamplePoints(N_todo, sam_col.basis, self.min_dim)
-                assert(len(X) == np.sum(N_todo))
+                X, N_done = self.fnSamplePoints(N_todo, sam_col.basis, self.min_dim)
+                assert(len(X) >= np.sum(N_todo))
+                N_done[:len(sam_col.N_per_basis)] += sam_col.N_per_basis
+                sam_col.N_per_basis = N_done
                 pt_sampling_time = time.clock() - tStart
 
                 tStart = time.clock()
@@ -309,6 +312,7 @@ class MIWProjSampler(object):
                 sampling_time = 0
 
             tStart = time.clock()
+
             # sam_col.basis_values.re size(len(sam_col.X), len(sam_col.basis))
             # TODO: should only compute new basis_values
             sam_col.basis_values = TensorExpansion.evaluate_basis(
@@ -317,17 +321,16 @@ class MIWProjSampler(object):
             assembly_time_1 = time.clock() - tStart
 
             tStart = time.clock()
-            from numpy.linalg import solve
+            from scipy.linalg import solve
             from scipy.sparse.linalg import gmres, LinearOperator
-
             BW = np.sqrt(sam_col.W)[:, None] * sam_col.basis_values
             if self.direct:
-                G = BW.transpose().dot(BW)
+                #G = BW.transpose().dot(BW)
+                G = sam_col.basis_values.transpose().dot(sam_col.basis_values * sam_col.W[:, None])
             else:
                 G = LinearOperator((BW.shape[1], BW.shape[1]),
                                    matvec=lambda v: np.dot(BW.transpose(), np.dot(BW, v)),
                                    rmatvec=lambda v: np.dot(BW, np.dot(BW.transpose(), v)))
-
             assembly_time_2 = time.clock() - tStart
 
             # This following operation is only needed for diagnosis purposes
@@ -340,7 +343,7 @@ class MIWProjSampler(object):
                 # Add each element separately
                 R = np.dot(sam_col.basis_values.transpose(), (sam_col.Y[i] * sam_col.W))
                 if self.direct:
-                    coeffs = solve(G, R)
+                    coeffs = solve(G, R, sym_pos=True)
                 else:
                     coeffs, info = gmres(G, R, tol=1e-12)
                     assert(info == 0)
@@ -403,32 +406,34 @@ class MIWProjSampler(object):
             warnings.warn('Numerical instability encountered')
         return coefficients, cond
 
-@public
-def sample_optimal_pts(fnBasis, N_per_basis,
-                       bases_indices, min_dim,
-                       interval=(-1, 1)):
-    assert(len(N_per_basis) == len(bases_indices))
-    max_dim = np.maximum(min_dim, bases_indices.max_dim())
-    acceptanceratio = 1./(4*np.exp(1))
-    X = np.zeros((N, max_dim))
-    with np.errstate(divide='ignore', invalid='ignore'):
-        # pol = np.random.randint(0, len(bases_indices))
-        for pol in xrange(0, len(bases_indices)):
-            for i in xrange(N_per_basis[pol]):
-                base_pol = bases_indices.get_item(pol, max_dim)
-                for dim in range(max_dim):
-                    accept=False
-                    while not accept:
-                        Xnext = (np.cos(np.pi * np.random.rand()) + 1) / 2
-                        dens_prop_Xnext = 1 / (np.pi * np.sqrt(Xnext*(1 - Xnext)))   # TODO: What happens if Xnext is 0
-                        Xreal = interval[0] + Xnext *(interval[1] - interval[0])
-                        dens_goal_Xnext = fnBasis(np.array([Xreal]), 1+base_pol[dim])[0,-1] ** 2
-                        alpha = acceptanceratio * dens_goal_Xnext / dens_prop_Xnext
-                        U = np.random.rand()
-                        accept = (U < alpha)
-                        if accept:
-                            X[i,dim] = Xreal
-    return X
+# @public
+# def sample_optimal_pts(fnBasis, N_per_basis,
+#                        bases_indices, min_dim,
+#                        interval=(0, 1)):
+#     assert(len(N_per_basis) == len(bases_indices))
+#     N = np.ceil(np.sum(N_per_basis))
+#     max_dim = np.maximum(min_dim, bases_indices.max_dim())
+#     acceptanceratio = 1./(4*np.exp(1))
+#     X = np.zeros((N, max_dim))
+#     with np.errstate(divide='ignore', invalid='ignore'):
+#         pol = np.random.randint(0, len(bases_indices))
+#         # for pol in xrange(0, len(bases_indices)):
+#         #     for i in xrange(N_per_basis[pol]):
+#         for i in xrange(N):
+#             base_pol = bases_indices.get_item(pol, max_dim)
+#             for dim in range(max_dim):
+#                 accept=False
+#                 while not accept:
+#                     Xnext = (np.cos(np.pi * np.random.rand()) + 1) / 2
+#                     dens_prop_Xnext = 1 / (np.pi * np.sqrt(Xnext*(1 - Xnext)))   # TODO: What happens if Xnext is 0
+#                     Xreal = interval[0] + Xnext *(interval[1] - interval[0])
+#                     dens_goal_Xnext = fnBasis(np.array([Xreal]), 1+base_pol[dim])[0,-1] ** 2
+#                     alpha = acceptanceratio * dens_goal_Xnext / dens_prop_Xnext
+#                     U = np.random.rand()
+#                     accept = (U < alpha)
+#                     if accept:
+#                         X[i,dim] = Xreal
+#     return X
 
 @public
 def sample_arcsine_pts(N_per_basis, bases_indices, min_dim, interval=(-1, 1)):
@@ -452,8 +457,19 @@ def optimal_weights(basis_values):
 @public
 def default_basis_from_level(beta, C=2):
     # beta is zero indexed
-    max_deg = 2 ** (beta + 1) - 1
-    prev_deg = np.maximum(0, 2 ** beta - 1)
+    # max_deg = 2 ** (beta + 1) - 1
+    # prev_deg = np.maximum(0, 2 ** beta - 1)
+    max_deg = 2 ** beta
+    prev_deg = np.maximum(0, 2 ** (np.array(beta, dtype=np.int)-1))
+    l = len(beta)
+    return list(itertools.product(*[np.arange(prev_deg[i], max_deg[i])
+                                     for i in xrange(0, l)]))
+
+@public
+def linear_basis_from_level(beta, C=2):
+    # beta is zero indexed
+    max_deg = 1 + 2*np.array(beta, dtype=np.int)
+    prev_deg = np.maximum(0, max_deg - 2)
     l = len(beta)
     return list(itertools.product(*[np.arange(prev_deg[i], max_deg[i])
                                      for i in xrange(0, l)]))
@@ -464,7 +480,7 @@ def default_samples_count(basis, C=2):
     if m == 1:
         return np.array([int(2*C)])
     else:
-        return np.ones(len(basis), dtype=np.float) * np.ceil(C * np.log2(m+1))
+        return np.ones(len(basis), dtype=np.float) * C * np.log2(m+1)
 
 @public
 def chebyshev_polynomials(Xtilde, N, interval=(-1,1)):
@@ -491,7 +507,7 @@ def chebyshev_polynomials(Xtilde, N, interval=(-1,1)):
     return out * orthonormalizer
 
 @public
-def legendre_polynomials(Xtilde, N, interval=(-1,1)):
+def legendre_polynomials(Xtilde, N, interval=(0,1)):
     r'''
     Compute values of the orthonormal Legendre polynomials on
     :math:`([-1,1],dx/2)` in :math:`X\subset [-1,1]`

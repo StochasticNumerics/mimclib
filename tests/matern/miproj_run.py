@@ -2,12 +2,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import time
 import warnings
 import os.path
 import numpy as np
 import mimclib.test
 import mimclib.miproj as miproj
-from matern import SField_Matern
 from mimclib import setutil
 from mimclib import mimc, ipdb
 import argparse
@@ -17,7 +17,14 @@ warnings.filterwarnings("ignore", category=mimclib.test.ArgumentWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 class MyRun:
-    def solveFor_seq(self, alpha, arrY):
+    def solveFor_sin(self, alpha, arrY):
+        j = np.arange(0, arrY.shape[1], dtype=np.float)
+        output = np.sin(np.sum(1. / (1+((1.+j[None, :]) **
+                                        (-(self.params.qoi_df_nu+0.5)) *
+                                        arrY)**2.), axis=1))
+        return output
+
+    def solveFor_sf(self, alpha, arrY):
         if len(alpha) == 0:
             alpha = [self.params.miproj_fix_lvl] * self.params.qoi_dim
         output = np.zeros(len(arrY))
@@ -26,6 +33,35 @@ class MyRun:
             output[i] = self.sf.SolveFor(np.array(Y))
         self.sf.EndRuns()
         return output
+
+    def solveFor_kl1D(self, alpha, arrY):
+        from kl1D import kl1D
+        if len(alpha) == 0:
+            alpha = [self.params.miproj_fix_lvl] * self.params.qoi_dim
+        assert(len(alpha) == 1)
+        return kl1D(arrY, 2**alpha[0], self.params.qoi_df_nu + 0.5)[:, 0]
+
+    def solveFor_matern(self, alpha, arrY):
+        from matern_fem import matern
+        if len(alpha) == 0:
+            alpha = [self.params.miproj_fix_lvl] * self.params.qoi_dim
+        assert(len(alpha) == 1)
+        return matern(arrY, 2**alpha[0],
+                      nu=self.params.qoi_df_nu,
+                      df_sig=self.params.qoi_df_sig,
+                      df_L=self.params.qoi_df_L,
+                      qoi_x0=self.params.qoi_x0[0],
+                      qoi_sig=self.params.qoi_sigma)[:, 0]
+
+    def solveFor_seq(self, alpha, arrY):
+        if self.params.qoi_problem == 'matern':
+            return self.solveFor_sf(alpha, arrY)
+        if self.params.qoi_problem == 'matern-py':
+            return self.solveFor_matern(alpha, arrY)
+        if self.params.qoi_problem == 'kl1D':
+            return self.solveFor_kl1D(alpha, arrY)
+        if self.params.qoi_problem == 'sin':
+            return self.solveFor_sin(alpha, arrY)
 
     def mySampleQoI(self, run, lvls, M, moments):
         return self.proj.sample_all(run, lvls, M, moments,
@@ -53,14 +89,18 @@ class MyRun:
             fnWorkModel = None
 
         self.proj = miproj.MIWProjSampler(d=run.params.min_dim,
-                                          min_dim=run.params.qoi_min_vars,
+                                          min_dim=np.minimum(run.params.qoi_min_vars, run.params.miproj_max_dim),
                                           fnBasis=miproj.legendre_polynomials,
+                                          fnBasisFromLvl=miproj.default_basis_from_level,
                                           fnSamplePoints=fnSamplePoints,
                                           fnWeightPoints=fnWeightPoints,
                                           fnWorkModel=fnWorkModel,
                                           reuse_samples=run.params.miproj_reuse_samples)
         self.proj.init_mimc_run(run)
-        self.sf = SField_Matern(run.params)
+        if self.params.qoi_problem == 'matern':
+            from matern import SField_Matern
+            SField_Matern.Init()
+            self.sf = SField_Matern(run.params)
         run.setFunctions(ExtendLvls=lambda lvls, r=run: self.extendLvls(run, lvls),
                          fnNorm=lambda arr: np.array([x.norm() for x in arr]))
 
@@ -68,13 +108,17 @@ class MyRun:
         if not run.params.qoi_set_adaptive:
             self.profit_calc = setutil.MIProfCalculator([run.params.qoi_set_dexp] * run.params.min_dim,
                                                         run.params.qoi_set_xi,
-                                                        run.params.qoi_set_sexp)
+                                                        run.params.qoi_set_sexp,
+                                                        run.params.qoi_set_mul)
+            # self.profit_calc = setutil.MISCProfCalculator([run.params.qoi_set_dexp] * run.params.min_dim,
+            #                                               [run.params.qoi_set_sexp] * run.params.miproj_max_dim)
 
     def extendLvls(self, run, lvls):
         max_added = None
         max_dim = 5 + (0 if len(lvls) == 0 else np.max(lvls.get_dim()))
-        max_dim = np.maximum(run.params.miproj_min_dim, max_dim)
-
+        max_dim = np.minimum(run.params.miproj_max_dim,
+                             np.maximum(run.params.miproj_min_dim, max_dim))
+        tStart = time.clock()
         if self.profit_calc is None:
             # Adaptive
             error = run.fn.Norm(run.last_itr.calcDeltaEl())
@@ -93,7 +137,8 @@ class MyRun:
                 new_total_work = self.proj.estimateWork()
                 if not self.params.qoi_double_work or new_total_work >= 2*prev_total_work:
                     break
-
+        if self.params.verbose >= 1:
+            print("Time taken to extend levels: ", time.clock()-tStart)
 
     def addExtraArguments(self, parser):
         class store_as_array(argparse._StoreAction):
@@ -101,7 +146,7 @@ class MyRun:
                 setattr(namespace, self.dest, np.array(values))
 
         parser.add_argument("-qoi_dim", type=int, default=1, action="store")
-        parser.add_argument("-qoi_problem", type=int, default=0, action="store")
+        parser.add_argument("-qoi_problem", type=str, default="matern", action="store")
         parser.add_argument("-qoi_a0", type=float, default=0., action="store")
         parser.add_argument("-qoi_f0", type=float, default=1., action="store")
         parser.add_argument("-qoi_df_nu", type=float, default=1., action="store")
@@ -121,6 +166,8 @@ class MyRun:
                             default=True, action="store")
         parser.add_argument("-qoi_set_xi", type=float, default=2.,
                             action="store")
+        parser.add_argument("-qoi_set_mul", type=float, default=1.,
+                            action="store")
         parser.add_argument("-qoi_set_sexp", type=float, default=4.,
                             action="store")
         parser.add_argument("-qoi_set_dexp", type=float,
@@ -131,9 +178,11 @@ class MyRun:
         parser.add_argument("-miproj_reuse_samples", type="bool",
                             default=True, action="store")
         parser.add_argument("-miproj_fix_lvl", type=int,
-                            default=5, action="store")
+                            default=3, action="store")
         parser.add_argument("-miproj_min_dim", type=int,
                             default=2, action="store")
+        parser.add_argument("-miproj_max_dim", type=int,
+                            default=10**6, action="store")
 
     def ItrDone(self, db, run_id, run):
         if db is not None:
@@ -144,7 +193,6 @@ class MyRun:
         self.proj.max_condition_number = 0
 
 if __name__ == "__main__":
-    SField_Matern.Init()
     from mimclib import ipdb
     ipdb.set_excepthook()
 
@@ -153,4 +201,6 @@ if __name__ == "__main__":
                                          fnAddExtraArgs=run.addExtraArguments,
                                          fnInit=run.initRun,
                                          fnItrDone=run.ItrDone)
-    SField_Matern.Final()
+    if mirun.params.qoi_problem == 'matern':
+        from matern import SField_Matern
+        SField_Matern.Final()

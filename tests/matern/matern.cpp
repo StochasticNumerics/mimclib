@@ -1,6 +1,7 @@
 #include "petsc.h"
 #include "common.hpp"
 #include "assert.h"
+#include <iostream>
 //////// This solver is based on Leveque book
 #define MAXD 10
 #define M_SQRT_PI 1.77245385091
@@ -155,7 +156,29 @@ PetscReal CalcCoeff(const PetscReal* x, myCSField sf){
             /* printf("%d -> %d -> Ak=%.12g, Y=%.12g, temp=%.12g, cos=%.12g, sin=%.12g, l=%d -> %.12g\n", k[0], */
             /*        curY, Ak, sf->Y[curY], temp, cos_k[0], sin_k[0], l[0], Ak*sf->Y[curY]*temp); */
             field += Ak*sf->Y[curY++]*temp;
+            // std::cout << "k = " << curY-1 << ", Ak="
+            //           << Ak << ", Term=" << (l[0]==0?"sin":"cos")<<std::endl;
         }
+    }
+    assert(curY == sf->curN || curY+1 == sf->curN);
+    return sf->a0 + exp(field);
+}
+
+PetscReal CalcCoeff_Simple(const PetscReal* x, myCSField sf){
+    int curY = 0;   // Every time we increment we should check that is
+                    // is less than N. We are ignoring the first mode
+                    // because the coefficient is zero
+    unsigned int i;
+    double field=0, func=0;
+    assert(sf->d == 1);
+    for (i=0;curY < sf->curN;i++){
+        uint k0 = i>0;
+        double Ak = sf->df_sig * pow(2, k0/2.) * pow(1 + i*i, -(sf->df_nu+sf->d/2.)/2.);
+        if (i % 2)
+            func = sin(i*x[0]*M_PI/sf->df_L);
+        else
+            func = cos(i*x[0]*M_PI/sf->df_L);
+        field += Ak*sf->Y[curY++]*func;
     }
     assert(curY == sf->curN || curY+1 == sf->curN);
     return sf->a0 + exp(field);
@@ -193,7 +216,7 @@ double Coeff(int *pt, int di, double shift, myCSField sf) {
     /* double xx=0.5; */
     /* printf("x=%.12f, field=%f\n", xx, CalcCoeff(&xx, sf)); */
     /* assert(0); */
-    return CalcCoeff(x, sf);
+    return CalcCoeff_Simple(x, sf);
 }
 
 double Forcing(int *pt, myCSField sf) {

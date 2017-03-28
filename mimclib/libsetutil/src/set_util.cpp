@@ -97,8 +97,9 @@ private:
 // (\prod_{j} exp(-dexp_j alpha_j)) (\prod_{j} (\xi (j+1)^{sexp}) ^ {-2^{\beta_j} })
 class MIProfCalculator : public ProfitCalculator {
 public:
-    MIProfCalculator(ind_t d, const double* _dexp, double _xi, double _sexp) :
-        dexp(_dexp, _dexp+d), xi(_xi), sexp(_sexp) {
+    MIProfCalculator(ind_t d, const double* _dexp, double _xi, double _sexp,
+                     double mul) :
+        dexp(_dexp, _dexp+d), xi(_xi), sexp(_sexp), mul(mul) {
     }
 
     double calc_log_prof(const mul_ind_t &cur) {
@@ -114,8 +115,9 @@ public:
                 d_cont += v*dexp[itr->ind];
             else{
                 // np.exp(-np.log(xi*(dim+1)**exponent)*(2.**(v-1)))
-                s_cont += v * std::log(2) + (pow(2., v)-1)
-                    * (std::log(xi) + sexp*std::log(itr->ind-d+1));
+                s_cont += (v-1) * std::log(2) + (pow(2., v-1))
+                    * (std::log(xi) +
+                       sexp*std::log(std::ceil((itr->ind-d)*mul)+1));
             }
         }
         return d_cont + s_cont;
@@ -124,6 +126,7 @@ private:
     std::vector<double> dexp;
     double xi;
     double sexp;
+    double mul;
 };
 
 
@@ -315,8 +318,8 @@ PProfitCalculator CreateMISCProfCalc(ind_t d, ind_t s, const double *d_w,
 }
 
 PProfitCalculator CreateMIProfCalc(ind_t d, const double *dexp,
-                                   double xi, double sexp){
-    return new MIProfCalculator(d, dexp, xi, sexp);
+                                   double xi, double sexp, double mul){
+    return new MIProfCalculator(d, dexp, xi, sexp, mul);
 }
 
 PProfitCalculator CreateTDFTProfCalc(ind_t d, const double *td_w,
