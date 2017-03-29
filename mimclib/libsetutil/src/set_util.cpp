@@ -115,7 +115,8 @@ public:
                 d_cont += v*dexp[itr->ind];
             else{
                 // np.exp(-np.log(xi*(dim+1)**exponent)*(2.**(v-1)))
-                s_cont += (v-1) * std::log(2) + (pow(2., v-1))
+                s_cont += //(v-1) * std::log(2) + (pow(2., v-1))
+                    v * std::log(2) + (pow(2., v)-1)
                     * (std::log(xi) +
                        sexp*std::log(std::ceil((itr->ind-d)*mul)+1));
             }

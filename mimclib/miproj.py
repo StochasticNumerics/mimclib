@@ -457,10 +457,10 @@ def optimal_weights(basis_values):
 @public
 def default_basis_from_level(beta, C=2):
     # beta is zero indexed
-    # max_deg = 2 ** (beta + 1) - 1
-    # prev_deg = np.maximum(0, 2 ** beta - 1)
-    max_deg = 2 ** beta
-    prev_deg = np.maximum(0, 2 ** (np.array(beta, dtype=np.int)-1))
+    max_deg = 2 ** (beta + 1) - 1
+    prev_deg = np.maximum(0, 2 ** beta - 1)
+    # max_deg = 2 ** beta
+    # prev_deg = np.maximum(0, 2 ** (np.array(beta, dtype=np.int)-1))
     l = len(beta)
     return list(itertools.product(*[np.arange(prev_deg[i], max_deg[i])
                                      for i in xrange(0, l)]))

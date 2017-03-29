@@ -956,15 +956,6 @@ def plotBestNTerm(ax, runs, *args, **kwargs):
         itr = runs[0].iters[iter_idx]
     sorted_coeff = np.sort(np.abs(itr.calcEg().coefficients))[::-1]
 
-    import pickle
-    proj = itr.calcEg()
-    d = dict()
-    for i in range(len(proj.base_indices)):
-        d[tuple(proj.base_indices[i].tolist())] = proj.coefficients[i]
-    with open('/home/hajiali/Downloads/coeffs/my_coeffs4', 'w') as f:
-        pickle.dump(d, f)
-
-
     error = np.cumsum(np.abs(sorted_coeff[::-1]))[::-1]
     N = 2 * np.arange(1, len(sorted_coeff)+1)
     N[1] = 4

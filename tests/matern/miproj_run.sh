@@ -5,7 +5,7 @@
 PROBLEM='matern'
 HOST='129.67.187.118'
 BASETAG="$PROBLEM-new-"
-COMMON="-mimc_TOL 0 -qoi_seed 0 -qoi_sigma 0.2  \
+COMMON="-qoi_seed 0 -qoi_sigma 0.2  \
        -qoi_x0 0.3 0.4 0.6 -ksp_rtol 1e-25 -ksp_type gmres -qoi_a0 0 -qoi_f0 1 \
        -qoi_scale 10 -qoi_df_sig 0.5 -mimc_beta 2 -mimc_gamma 1 -mimc_h0inv 3  \
        -mimc_verbose 1 -qoi_set_xi 2 -qoi_set_dexp 2.08 \
