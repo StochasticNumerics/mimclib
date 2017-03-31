@@ -8,8 +8,8 @@ import numpy as np
 import sys
 
 selectTag = 'matern-new-miproj%'
-from_db = MIMCDatabase(engine="mysql", host='127.0.0.1', db='mimc')
-to_db = MIMCDatabase(engine="sqlite", db='mimc.sqlite')
+to_db = MIMCDatabase(engine="mysql", host='127.0.0.1', db='mimc')
+from_db = MIMCDatabase(engine="sqlite", db='mimc.sqlite')
 
 with from_db.DBConn(**from_db.connArgs) as from_cur:
     with to_db.DBConn(**to_db.connArgs) as to_cur:

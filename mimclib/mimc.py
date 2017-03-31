@@ -827,7 +827,6 @@ estimate optimal number of levels"
         totalM[active] -= self.last_itr.M[active]
         if np.sum(totalM) == 0:
             return False
-
         calcM, psums_delta, psums_fine, \
             total_time, total_work = self.fn.SampleAll(lvls, totalM,
                                                        self.last_itr.computedMoments())

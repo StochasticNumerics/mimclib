@@ -34,7 +34,7 @@ __lib__.sample_optimal_random_leg_pts.argtypes = [ct.c_uint32,
 
 @public
 def sample_optimal_leg_pts(N_per_basis, bases_indices, min_dim,
-                           random=False,interval=(0, 1)):
+                           random=False,interval=(-1, 1)):
     if random:
         totalN = np.ceil(np.sum(N_per_basis))
     else:
@@ -185,7 +185,7 @@ class MIWProjSampler(object):
             return len(self.X)
 
     def __init__(self, d=0,  # d is the spatial dimension
-                 min_dim=0, # Minimum stochastic dimensions
+                 min_dim=1, # Minimum stochastic dimensions
                  fnBasis=None,
                  fnSamplesCount=None,
                  fnSamplePoints=None,
@@ -266,6 +266,7 @@ class MIWProjSampler(object):
             work_per_sample = self.fnWorkModel(setutil.VarSizeList([alpha]))[0]
             beta_indset = lvls.sublist(sel_lvls[sam_col.beta_count:],
                                        d_start=self.d, min_dim=0)
+
             #new_basis = setutil.VarSizeList()
             for i, beta in enumerate(beta_indset):
                 new_b = self.fnBasisFromLvl(beta)
@@ -279,8 +280,8 @@ class MIWProjSampler(object):
                 sam_col.clear_samples()
                 total_time[sel_lvls] = 0
 
-            while self.min_dim < sam_col.basis.max_dim():
-                self.min_dim *= 2
+            if self.min_dim < sam_col.basis.max_dim():
+                self.min_dim *= 2**int(np.ceil(np.log2(sam_col.basis.max_dim() / self.min_dim)))
 
             N_per_basis = self.fnSamplesCount(sam_col.basis)
             assert(np.all(sam_col.basis.check_admissibility()))
@@ -507,7 +508,7 @@ def chebyshev_polynomials(Xtilde, N, interval=(-1,1)):
     return out * orthonormalizer
 
 @public
-def legendre_polynomials(Xtilde, N, interval=(0,1)):
+def legendre_polynomials(Xtilde, N, interval=(-1, 1)):
     r'''
     Compute values of the orthonormal Legendre polynomials on
     :math:`([-1,1],dx/2)` in :math:`X\subset [-1,1]`
