@@ -212,9 +212,8 @@ class MIWProjSampler(object):
 
         self.prev_samples = defaultdict(lambda: MIWProjSampler.SamplesCollection())
         self.reuse_samples = reuse_samples
-        self.max_condition_number = 0
-        self.max_matrix_size = 0
         self.direct = True
+        self.user_data = []
 
     def init_mimc_run(self, run):
         run.params.M0 = np.array([0])
@@ -258,7 +257,7 @@ class MIWProjSampler(object):
         # Add previous times and works from previous iteration
         if self.reuse_samples and len(run.iters) >= 2:
             total_time[:len(run.iters[-2].tT)] = run.iters[-2].tT
-
+        from .mimc import Bunch
         for alpha, ind in self.alpha_dict.iteritems():
             tStart = time.clock()
             sam_col = self.prev_samples[ind]
@@ -278,7 +277,6 @@ class MIWProjSampler(object):
 
             if not self.reuse_samples or self.min_dim < sam_col.basis.max_dim():
                 sam_col.clear_samples()
-                total_time[sel_lvls] = 0
 
             if self.min_dim < sam_col.basis.max_dim():
                 self.min_dim *= 2**int(np.ceil(np.log2(sam_col.basis.max_dim() / self.min_dim)))
@@ -290,7 +288,6 @@ class MIWProjSampler(object):
             N_todo = N_per_basis.copy()
             if len(sam_col.N_per_basis) > 0:
                 N_todo[:len(sam_col.N_per_basis)] -= sam_col.N_per_basis
-                assert(np.all(N_todo >= 0))
 
             todoN_per_beta = np.zeros(sam_col.beta_count)
             totalN_per_beta = np.zeros(sam_col.beta_count)
@@ -366,15 +363,21 @@ class MIWProjSampler(object):
                 else:
                     psums_delta[sel_lvls, 0] += projections*mods[i]
             projection_time = time.clock() - tStart
-            self.max_condition_number = np.maximum(self.max_condition_number,
-                                                   max_cond)
-            self.max_matrix_size = np.maximum(self.max_matrix_size, BW.shape[1])
             # For now, only compute sampling time
             time_taken = sampling_time + pt_sampling_time + assembly_time_1 + \
                          assembly_time_2 + projection_time
             if np.sum(todoN_per_beta) > 0:
                 total_time[sel_lvls] += time_taken * todoN_per_beta / np.sum(todoN_per_beta)
             total_work[sel_lvls] = work_per_sample * totalN_per_beta
+            self.user_data.append(Bunch(alpha=alpha,
+                                        max_cond=max_cond,
+                                        matrix_size=BW.shape[1],
+                                        todoN_per_beta=todoN_per_beta,
+                                        sampling_time=sampling_time,
+                                        pt_sampling_time=pt_sampling_time,
+                                        assembly_time_1=assembly_time_1,
+                                        assembly_time_2=assembly_time_2,
+                                        projection_time=projection_time))
             ## WARNING: Not accounting for projection time!!!
             # print("{}, {}, {}, {}, {:.12f}, {:.12f}, {:.12f}, {:.12f}, {:.12f}"
             #       .format(len(sam_col.basis), alpha[0], work_per_sample,

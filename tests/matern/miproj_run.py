@@ -188,9 +188,8 @@ class MyRun:
         if db is not None:
             db.writeRunData(run_id, run,
                             iteration_idx=len(run.iters)-1,
-                            userdata=np.array([self.proj.max_matrix_size,
-                                               self.proj.max_condition_number]))
-        self.proj.max_condition_number = 0
+                            userdata=self.proj.user_data)
+        self.proj.user_data = []
 
 if __name__ == "__main__":
     from mimclib import ipdb
