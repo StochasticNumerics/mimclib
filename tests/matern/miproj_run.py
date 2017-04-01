@@ -25,8 +25,6 @@ class MyRun:
         return output
 
     def solveFor_sf(self, alpha, arrY):
-        if len(alpha) == 0:
-            alpha = [self.params.miproj_fix_lvl] * self.params.qoi_dim
         output = np.zeros(len(arrY))
         self.sf.BeginRuns(alpha, np.max([len(Y) for Y in arrY]))
         for i, Y in enumerate(arrY):
@@ -36,15 +34,11 @@ class MyRun:
 
     def solveFor_kl1D(self, alpha, arrY):
         from kl1D import kl1D
-        if len(alpha) == 0:
-            alpha = [self.params.miproj_fix_lvl] * self.params.qoi_dim
         assert(len(alpha) == 1)
         return kl1D(arrY, 2**alpha[0], self.params.qoi_df_nu + 0.5)[:, 0]
 
     def solveFor_matern(self, alpha, arrY):
         from matern_fem import matern
-        if len(alpha) == 0:
-            alpha = [self.params.miproj_fix_lvl] * self.params.qoi_dim
         assert(len(alpha) == 1)
         return matern(arrY, 2**alpha[0],
                       nu=self.params.qoi_df_nu,
@@ -54,6 +48,8 @@ class MyRun:
                       qoi_sig=self.params.qoi_sigma)[:, 0]
 
     def solveFor_seq(self, alpha, arrY):
+        if len(alpha) == 0:
+            alpha = [self.params.miproj_fix_lvl] * self.params.qoi_dim
         if self.params.qoi_problem == 'matern':
             return self.solveFor_sf(alpha, arrY)
         if self.params.qoi_problem == 'matern-py':

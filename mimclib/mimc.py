@@ -909,18 +909,27 @@ estimate optimal number of levels"
                 gc.collect()
                 if self.params.bayesian and self.last_itr.lvls_count > 0:
                     L = self._estimateOptimalL(TOL)
+                    if L > self.params.max_lvl:
+                        print_info("WARNING: MIMC did not converge with the maximum number of levels")
+                        break
                     if L > self.last_itr.lvls_count:
                         self._extendLevels(new_lvls=np.arange(
                             self.last_itr.lvls_count, L+1).reshape((-1, 1)))
                         self._estimateAll()
+
                 self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
                                           self.params.theta)
+
                 if self.last_itr.lvls_count == 0 or \
                    (not self.params.bayesian and
                     self.bias > (1 - self.params.theta) * TOL):
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
                     newTodoM = self._extendLevels()
+                    data = np.hstack(self.last_itr._lvls.to_list()[0])
+                    if data.size > 0 and np.max(data) > self.params.max_lvl:
+                        print_info("WARNING: MIMC did not converge with the maximum number of levels")
+                        break
                     samples_added = self._genSamples(newTodoM) or samples_added
                     self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
                                               self.params.theta)
@@ -946,12 +955,6 @@ estimate optimal number of levels"
                     self.iters.pop()
                 if self.params.bayesian or self.totalErrorEst() < TOL \
                    or (TOL < finalTOL and self.totalErrorEst() < finalTOL):
-                    break
-
-                data, _ = self.last_itr._lvls.to_list()
-                data = np.hstack(data)
-                if data.size > 0 and np.max(data) >= self.params.max_lvl:
-                    print_info("WARNING: MIMC did not converge with the maximum number of levels")
                     break
 
             print_info("MIMC iteration for TOL={} took {} seconds (time since start {})".format(TOL, timer.toc(), self.iter_total_times[-1]))
