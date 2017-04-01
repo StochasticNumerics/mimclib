@@ -3,8 +3,8 @@
 # make
 # rm -f data.sql
 PROBLEM='matern'
-DB_CONN='-db_engine mysql -db_name mimc -db_host 129.67.187.118 '
-BASETAG="$PROBLEM-new-"
+DB_CONN='-db_engine mysql -db_name mimc -db_host localhost '
+BASETAG="$PROBLEM-reuse-"
 COMMON="-qoi_seed 0 -qoi_sigma 0.2  \
        -qoi_x0 0.3 0.4 0.6 -ksp_rtol 1e-25 -ksp_type gmres -qoi_a0 0 -qoi_f0 1 \
        -qoi_scale 10 -qoi_df_sig 0.5 -mimc_beta 2 -mimc_gamma 1 -mimc_h0inv 3  \
@@ -107,3 +107,13 @@ all_cmds $1 miproj 1 10 6.5 -miproj_min_dim 5 -qoi_set_sexp 7. -qoi_set_adaptive
 all_cmds $1 miproj 1 10 4.5 -miproj_min_dim 5 -qoi_set_sexp 5. -qoi_set_adaptive False
 all_cmds $1 miproj 1 10 3.5 -miproj_min_dim 5 -qoi_set_sexp 4. -qoi_set_adaptive False
 all_cmds $1 miproj 1 10 2.5 -miproj_min_dim 5 -qoi_set_sexp 3. -qoi_set_adaptive False
+
+for i in {0..8}
+do
+    #all_cmds $1 fixproj-$i 1 6 10.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 11. -qoi_set_adaptive False
+    #all_cmds $1 fixproj-$i 1 6 8.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 9.0 -qoi_set_adaptive False
+    all_cmds $1 fixproj-$i 1 6 6.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 7.0 -qoi_set_adaptive False
+    all_cmds $1 fixproj-$i 1 6 4.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 5.0 -qoi_set_adaptive False
+    all_cmds $1 fixproj-$i 1 6 3.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5 -qoi_set_sexp 4.0 -qoi_set_adaptive False
+    all_cmds $1 fixproj-$i 1 6 2.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5 -qoi_set_sexp 3.0 -qoi_set_adaptive False
+done
