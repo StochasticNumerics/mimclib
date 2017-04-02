@@ -531,9 +531,8 @@ of levels in every iteration. This is based on CMLMC.")
         add_store('moments', type=int, default=4, help="Number of moments to compute")
         add_store('reuse_samples', type='bool', default=True,
                   help="Reuse samples between iterations")
-        add_store('abs_bnd', type='bool', default=False,
-                  help="Take absolute value of deltas when \
-estimating bias (sometimes that's too conservative).")
+        add_store('bias_calc', type=str, default='new',
+                  help="new, bnd or abs-bnd")
         add_store('const_theta', type='bool', default=False,
                   help="Use the same theta for all iterations")
         add_store('confidence', type=float, default=0.95,
@@ -674,8 +673,15 @@ Bias={:.12e}\nStatErr={:.12e}\
 
         if not self.params.bayesian:
             El = self.last_itr.calcDeltaEl()
-            bias = self.last_itr.get_lvls().estimate_bias(self.fn.Norm(El))
-            #bias = self.fnNorm1(np.sum(El[self.last_itr.get_lvls().is_boundary()]))
+            bias_calc = self.params.bias_calc.tolower()
+            if bias_calc == 'new':
+                bias = self.last_itr.get_lvls().estimate_bias(self.fn.Norm(El))
+            elif bias_calc == 'bnd':
+                El_bnd = El[self.last_itr.get_lvls().is_boundary()]
+                bias = self.fnNorm1(np.sum(El_bnd))
+            elif bias_calc == 'abs_bnd':
+                El_bnd = El[self.last_itr.get_lvls().is_boundary()]
+                bias = np.sum(self.fnNorm(El_bnd))
             return bias
         return self._estimateBayesianBias()
 
