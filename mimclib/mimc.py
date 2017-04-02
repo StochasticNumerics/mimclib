@@ -673,7 +673,7 @@ Bias={:.12e}\nStatErr={:.12e}\
 
         if not self.params.bayesian:
             El = self.last_itr.calcDeltaEl()
-            bias_calc = self.params.bias_calc.tolower()
+            bias_calc = self.params.bias_calc.lower()
             if bias_calc == 'new':
                 bias = self.last_itr.get_lvls().estimate_bias(self.fn.Norm(El))
             elif bias_calc == 'bnd':
