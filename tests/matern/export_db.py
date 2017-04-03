@@ -7,9 +7,9 @@ from mimclib import MIMCDatabase
 import numpy as np
 import sys
 
-selectTag = 'matern-new-miproj%'
+selectTag = '%'
 to_db = MIMCDatabase(engine="mysql", host='127.0.0.1', db='mimc')
-from_db = MIMCDatabase(engine="sqlite", db='mimc.sqlite')
+from_db = MIMCDatabase(engine="sqlite", db='/scratch/hajiali/mimc.sqlite')
 
 with from_db.DBConn(**from_db.connArgs) as from_cur:
     with to_db.DBConn(**to_db.connArgs) as to_cur:

@@ -482,14 +482,17 @@ ORDER BY dr.run_id, dr.iteration_idx
 
     def readRuns(self, minTOL=None, maxTOL=None, tag=None,
                  TOL=None, from_date=None, to_date=None,
-                 done_flag=None):
+                 done_flag=None, discard_0_itr=True):
         runs_ids = self.getRunsIDs(minTOL=minTOL, maxTOL=maxTOL,
                                    tag=tag, TOL=TOL,
                                    from_date=from_date, to_date=to_date,
                                    done_flag=done_flag)
         if len(runs_ids) == 0:
             return []
-        return self.readRunsByID(runs_ids)
+        runs = self.readRunsByID(runs_ids)
+        if discard_0_itr:
+            return filter(lambda r: len(r.iters) > 0, runs)
+        return runs
 
     def update_exact_errors(self, runs, fnItrError=None):
         if fnItrError is not None:

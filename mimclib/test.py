@@ -183,12 +183,15 @@ def run_errors_est_program(fnExactErr=None):
     if args.qoi_exact_tag is not None:
         assert args.qoi_exact is None, "Multiple exact values given"
         exact_runs = db.readRuns(tag=args.qoi_exact_tag)
-        args.qoi_exact, _ = estimate_exact(exact_runs)
-        if args.verbose:
-            print("Estimated exact value is {}".format(args.qoi_exact))
+        from . import plot
+        args.qoi_exact, _ = plot.estimate_exact(exact_runs)
+        print("Estimated exact value is {}".format(args.qoi_exact))
+        if fnExactErr is not None:
+            fnExactErr = lambda itrs, r=exact_runs[0], fn=fnExactErr: fn(r, itrs)
+    elif fnExactErr is not None:
+        fnExactErr = lambda itrs, fn=fnExactErr: fn(itrs[0].parent, itrs)
 
-    if args.qoi_exact is not None:
-        assert fnExactErr is None, "Multiple exact values given"
+    if args.qoi_exact is not None and fnExactErr is None:
         fnExactErr = lambda itrs, e=args.qoi_exact: \
                      fnNorm([v.calcEg() + e*-1 for v in itrs])
 

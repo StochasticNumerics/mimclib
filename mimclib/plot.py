@@ -318,7 +318,7 @@ def __normalize_fmt(args, kwargs):
     return args, kwargs
 
 def computeIterationStats(runs, work_bins, filteritr, fnItrStats,
-                          arr_fnAgg):
+                          arr_fnAgg, work_spacing=None):
     mymax = lambda A: [np.max(A[:, i]) for i in xrange(0, A.shape[1])] if len(A) > 0 else None
     xy = []
     for r in runs:
@@ -332,8 +332,8 @@ def computeIterationStats(runs, work_bins, filteritr, fnItrStats,
                      else xy[-1][i] for i in xrange(len(stats))]
             xy.append(stats)
     xy = np.array(xy)
-    lxy = xy[:, 0]
-    bins = np.digitize(lxy, np.linspace(np.min(lxy), np.max(lxy), work_bins))
+    bins = np.digitize(xy[:, 0], np.linspace(np.min(xy[:, 0]),
+                                             np.max(xy[:, 0]), work_bins))
     bins[bins == work_bins] = work_bins-1
     ubins = np.unique(bins)
     xy_binned = np.zeros((len(ubins), len(arr_fnAgg)))
@@ -341,7 +341,17 @@ def computeIterationStats(runs, work_bins, filteritr, fnItrStats,
         d = xy[bins==b, :]
         for j in range(0, len(arr_fnAgg)):
             xy_binned[i, j] = arr_fnAgg[j](d[:, j])
-    return xy_binned[xy_binned[:,0].argsort(), :]
+    xy_binned = xy_binned[xy_binned[:,0].argsort(), :]
+    if work_spacing is not None:
+        sel = np.zeros(xy_binned.shape[0], dtype=np.bool)
+        prevWork = xy_binned[0, 0]
+        sel[0] = True
+        for i in range(0, xy_binned.shape[0]):
+            if xy_binned[i, 0] >= prevWork + work_spacing:
+                sel[i] = True
+                prevWork = xy_binned[i, 0]
+        xy_binned = xy_binned[sel, :]
+    return xy_binned
 
 def filteritr_last(run, iter_idx):
     return len(run.iters)-1 == iter_idx
@@ -473,8 +483,7 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
     ax.set_xlabel(x_label)
     ax.set_xscale('log')
 
-    xy_binned = computeIterationStats(runs,
-                                      work_bins=work_bins,
+    xy_binned = computeIterationStats(runs,work_bins=work_bins,
                                       filteritr=filteritr,
                                       fnItrStats=fnItrStats,
                                       arr_fnAgg=[np.mean] + [np.max]*3)
@@ -514,49 +523,29 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
     relative = modifier is not None
     modifier = modifier if relative else 1.
     work_bins = kwargs.pop('work_bins', 50)
-    xi = kwargs.pop('x_axis', 'work').lower()
+    fnWork = kwargs.pop('fnWork', lambda itr: itr.calcTotalWork())
     filteritr = kwargs.pop("filteritr", filteritr_all)
-    workGrowth = kwargs.pop("workGrowth", None)
+    work_spacing = kwargs.pop("work_spacing", None)
+    if work_spacing is not None:
+        work_spacing = np.log(work_spacing)
+    fnAggError = kwargs.pop("fnAggError", np.max)
 
-    if xi == 'work':
-        x_label = "Avg. work"
-    elif xi == 'time':
-        x_label = "Avg. running time"
-    elif xi == 'tol':
-        x_label = "Avg. tolerance"
-    else:              raise ValueError('x_axis')
-    ax.set_xlabel(x_label)
     ax.set_ylabel('Max Relative Error' if relative else 'Max Error')
     ax.set_yscale('log')
     ax.set_xscale('log')
 
     def fnItrStats(run, i):
         itr = run.iters[i]
-        if xi == 'work':
-            #itr_stats = [np.sum(itr.tW)]
-            itr_stats = [itr.calcTotalWork()]
-        elif xi == 'time':
-            #itr_stats = [run.iter_total_times[i]]
-            itr_stats = [itr.calcTotalTime()]
-            #itr_stats = [itr.totalTime]
-        elif xi == 'tol':
-            itr_stats = [run.TOL]
-        return itr_stats + [itr.exact_error, modifier*itr.totalErrorEst()]
+        work = fnWork(run, i)
+        return [np.log(work), work, itr.exact_error, modifier*itr.totalErrorEst()]
 
-    xy_binned = computeIterationStats(runs,
-                                      work_bins=work_bins,
+    xy_binned = computeIterationStats(runs, work_bins=work_bins,
                                       filteritr=filteritr,
                                       fnItrStats=fnItrStats,
-                                      arr_fnAgg=[np.mean, np.max, np.min])
-    if workGrowth is not None:
-        sel = np.zeros(xy_binned.shape[0], dtype=np.bool)
-        prevWork = xy_binned[0, 0]
-        sel[0] = True
-        for i in range(0, xy_binned.shape[0]):
-            if xy_binned[i, 0] >= prevWork * workGrowth:
-                sel[i] = True
-                prevWork = xy_binned[i, 0]
-        xy_binned = xy_binned[sel, :]
+                                      work_spacing=work_spacing,
+                                      arr_fnAgg=[np.mean, np.mean,
+                                                 fnAggError, np.min])
+    xy_binned = xy_binned[:, 1:]
 
     plotObj = []
     ErrEst_kwargs = kwargs.pop('ErrEst_kwargs', None)
@@ -1110,7 +1099,7 @@ def genBooklet(runs, **kwargs):
         raise Exception("No runs!!!")
 
     label_fmt = kwargs.pop("label_fmt", None)
-    add_legend = kwargs.pop("add_legend", True)
+    call_add_legend = kwargs.pop("add_legend", True)
     filteritr = kwargs.pop("filteritr", filteritr_all)
     modifier = kwargs.pop("modifier", 1.)
     TOLs_count = len(np.unique([itr.TOL for _, itr in enum_iter(runs, filteritr)]))
@@ -1182,10 +1171,12 @@ def genBooklet(runs, **kwargs):
     try:
         plotWorkVsMaxError(ax, runs,
                            filteritr=filteritr,
+                           fnWork=lambda run, i: run.iters[i].calcTotalWork(),
                            modifier=modifier, fmt='-*',
                            ErrEst_kwargs=ErrEst_kwargs,
                            Ref_kwargs=Ref_kwargs,
                            Ref_ErrEst_kwargs=Ref_ErrEst_kwargs)
+        ax.set_xlabel('Avg. Iteration Work')
     except:
         __plot_except(ax)
 
@@ -1193,10 +1184,12 @@ def genBooklet(runs, **kwargs):
     ax = add_fig()
     try:
         plotWorkVsMaxError(ax, runs, filteritr=filteritr,
-                           x_axis='time', modifier=modifier, fmt='-*',
+                           fnWork=lambda run, i: run.iters[i].calcTotalTime(),
+                           modifier=modifier, fmt='-*',
                            ErrEst_kwargs=ErrEst_kwargs,
                            Ref_kwargs=Ref_kwargs,
                            Ref_ErrEst_kwargs=Ref_ErrEst_kwargs)
+        ax.set_xlabel('Avg. Iteration Time')
     except:
         __plot_except(ax)
 
@@ -1409,7 +1402,7 @@ def genBooklet(runs, **kwargs):
         except:
             __plot_except(ax)
 
-    if add_legend:
+    if call_add_legend:
         for fig in figures:
             for ax in fig.axes:
                 add_legend(ax, outside=legend_outside)
@@ -1484,26 +1477,25 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
     for k in kwargs.keys():
         args.__dict__[k] = kwargs[k]
 
-    db_args = dict()
+    args.db_args = dict()
     if args.db_name is not None:
-        db_args["db"] = args.db_name
+        args.db_args["db"] = args.db_name
     if args.db_user is not None:
-        db_args["user"] = args.db_user
+        args.db_args["user"] = args.db_user
     if args.db_host is not None:
-        db_args["host"] = args.db_host
+        args.db_args["host"] = args.db_host
     if args.db_engine is not None:
-        db_args["engine"] = args.db_engine
+        args.db_args["engine"] = args.db_engine
     if args.o is None:
         args.o = args.db_tag + ".pdf"
 
-    db = mimcdb.MIMCDatabase(**db_args)
+    db = mimcdb.MIMCDatabase(**args.db_args)
     if args.db_tag is None:
         warnings.warn("You did not select a database tag!!")
     if args.verbose:
         print("Reading data")
 
     run_data = db.readRuns(tag=args.db_tag, done_flag=args.done_flag)
-    run_data = filter(lambda r: len(r.iters) > 0, run_data)
     if len(run_data) == 0:
         raise Exception("No runs!!!")
 
@@ -1539,7 +1531,8 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
     figures = fnPlot(run_data, modifier=modifer if args.relative else
                      1., verbose=args.verbose,
                      fnNorm=fnNorm, filteritr=filteritr,
-                     label_fmt=args.label_fmt)
+                     label_fmt=args.label_fmt,
+                     input_args=args)
 
     if args.verbose:
         print("Saving file")

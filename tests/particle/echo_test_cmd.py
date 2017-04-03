@@ -26,9 +26,9 @@ if __name__ == "__main__":
     base_2 += " ".join(unknowns)
 
     if args.tries == 0:
-        cmd_single = "python " + base_1 + " -mimc_verbose 10 -db False "
+        cmd_single = "python " + base_1 + " -mimc_verbose 1 -db False "
         print(cmd_single.format(seed=0, bayesian=False, TOL=0.001))
-        cmd_single = "python " + base_2 + " -mimc_verbose 10 -db False "
+        cmd_single = "python " + base_2 + " -mimc_verbose 1 -db False "
         print(cmd_single.format(seed=0, bayesian=False, TOL=0.001))
     else:
         cmd_multi_1 = "python " + base_1 + " -mimc_verbose 0 -db True -db_tag {tag} "

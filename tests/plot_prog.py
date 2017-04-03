@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+import matplotlib
+matplotlib.use('Agg')
 import numpy as np
 
 if __name__ == "__main__":

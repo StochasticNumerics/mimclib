@@ -10,26 +10,28 @@ import time
 
 warnings.filterwarnings("always")
 
-def l2_error_mc(itrs, fnSample, rel_tol=0.01, maxM=1000):
+def l2_error_mc(itrs, fnSample, rel_tol=0.01, maxM=1000, max_L=10):
     if len(itrs) == 0:
         return np.array([])
 
-    min_dim = itrs[0].parent.params.min_dim
-    if min_dim == 0:
-        max_L = itrs[0].parent.params.miproj_fix_lvl
-    else:
-        max_L = 1 + np.max([np.max([a[0] for a in itr.lvls_itr()]) for itr in itrs])
+    if max_L is None:
+        max_L = np.max([
+            itr.parent.params.miproj_fix_lvl
+            if itr.parent.params.min_dim == 0
+            else 1+np.max([a[0] for a in itr.lvls_itr()]) for itr in itrs])
 
     N = -1
     try:
-        N = itrs[0].parent.params.qoi_N
+        N = np.max([itr.parent.params.qoi_N for itr in itrs])
     except:
         pass
+
     if N < 0:
-        N = np.max([itr.parent.last_itr.lvls_max_dim()-min_dim for itr in itrs])
-    N += 10
+        N = np.max([itr.parent.last_itr.lvls_max_dim()-itr.parent.params.min_dim for itr in itrs])
+        N += 10
+
     try:
-        N = np.minimum(N, itrs[0].parent.params.miproj_max_dim)
+        N = np.minimum(N, np.max([itr.parent.params.miproj_max_dim for itr in itrs]))
     except:
         pass
 
@@ -46,7 +48,7 @@ def l2_error_mc(itrs, fnSample, rel_tol=0.01, maxM=1000):
     nextM = 10
     np.random.seed(0)
     while M < maxM:
-        Y = np.random.uniform(0, 1, size=(nextM-M, N))
+        Y = np.random.uniform(-1, 1, size=(nextM-M, N))
         samples = fnSample([max_L], Y)
         errors = np.zeros((nextM-M, len(itrs)))
         for i in xrange(0, len(itrs)):
@@ -71,13 +73,13 @@ if __name__ == "__main__":
     import miproj_run
     sampler = miproj_run.MyRun()
     sampler.params = None
-    def fnSample(iters):
+    def fnSample(run, iters):
         if sampler.params is None:
-            sampler.params = iters[0].parent.params
+            sampler.params = run.params
             if sampler.params.qoi_problem == 'matern':
                 from matern import SField_Matern
                 SField_Matern.Init()
-                sampler.sf = SField_Matern(iters[0].parent.params)
+                sampler.sf = SField_Matern(sampler.params)
         return l2_error_mc(iters, sampler.solveFor_seq)
 
     from mimclib import ipdb
