@@ -111,8 +111,8 @@ all_cmds $1 "" 1 10 2.5 -miproj_min_dim 5 -qoi_set_sexp 3. -qoi_set_adaptive Fal
 
 for i in {0..8}
 do
-    #all_cmds $1 fix-$i 1 6 10.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 11. -qoi_set_adaptive False
-    #all_cmds $1 fix-$i 1 6 8.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 9.0 -qoi_set_adaptive False
+    all_cmds $1 -fix-$i 1 6 10.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 11. -qoi_set_adaptive False
+    all_cmds $1 -fix-$i 1 6 8.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 9.0 -qoi_set_adaptive False
     all_cmds $1 -fix-$i 1 6 6.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 7.0 -qoi_set_adaptive False
     all_cmds $1 -fix-$i 1 6 4.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 5.0 -qoi_set_adaptive False
     all_cmds $1 -fix-$i 1 6 3.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5 -qoi_set_sexp 4.0 -qoi_set_adaptive False

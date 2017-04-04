@@ -212,7 +212,7 @@ class MIWProjSampler(object):
 
         self.prev_samples = defaultdict(lambda: MIWProjSampler.SamplesCollection())
         self.reuse_samples = reuse_samples
-        self.direct = True
+        self.direct = False
         self.user_data = []
 
     def init_mimc_run(self, run):
@@ -244,6 +244,7 @@ class MIWProjSampler(object):
             total_work += work_per_sample * total_samples
         return total_work
 
+    #@profile
     def sample_all(self, run, lvls, M, moments, fnSample):
         assert np.all(moments == 1), "miproj only support first moments"
         assert np.all(M == 1), "miproj only supports M=1 exactly"
@@ -323,8 +324,7 @@ class MIWProjSampler(object):
             from scipy.sparse.linalg import gmres, LinearOperator
             BW = np.sqrt(sam_col.W)[:, None] * sam_col.basis_values
             if self.direct:
-                #G = BW.transpose().dot(BW)
-                G = sam_col.basis_values.transpose().dot(sam_col.basis_values * sam_col.W[:, None])
+                G = BW.transpose().dot(BW)
             else:
                 G = LinearOperator((BW.shape[1], BW.shape[1]),
                                    matvec=lambda v: np.dot(BW.transpose(), np.dot(BW, v)),
@@ -332,9 +332,12 @@ class MIWProjSampler(object):
             assembly_time_2 = time.clock() - tStart
 
             # This following operation is only needed for diagnosis purposes
-            GFull = G if self.direct else BW.transpose().dot(BW)
-            max_cond = np.linalg.cond(GFull)
-            #G = GFull
+            try:
+                GFull = G if self.direct else BW.transpose().dot(BW)
+                max_cond = np.linalg.cond(GFull)
+            except:
+                max_cond = np.nan
+                pass
 
             tStart = time.clock()
             for i in xrange(0, len(sub_alphas)):
