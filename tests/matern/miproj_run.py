@@ -63,9 +63,6 @@ class MyRun:
         return self.proj.sample_all(run, lvls, M, moments,
                                     fnSample=self.solveFor_seq)
 
-    def workModel(self, run, lvls):
-        return mimc.work_estimate(lvls, np.log(run.params.beta) * run.params.gamma)
-
     def initRun(self, run):
         self.prev_val = 0
         self.params = run.params
@@ -80,9 +77,11 @@ class MyRun:
             raise NotImplementedError("Unknown points sampler")
 
         if run.params.min_dim > 0:
-            fnWorkModel = lambda lvls, r=run: self.workModel(run, lvls)
+            fnWorkModel = lambda lvls, w=0.5*np.log(run.params.beta) * run.params.gamma: \
+                          mimc.work_estimate(lvls, w)
         else:
-            fnWorkModel = None
+            fnWorkModel = lambda lvls, w=run.params.beta ** (run.params.gamma/2.):\
+                          w * np.ones(len(lvls))
 
         self.proj = miproj.MIWProjSampler(d=run.params.min_dim,
                                           min_dim=np.minimum(run.params.qoi_min_vars, run.params.miproj_max_dim),

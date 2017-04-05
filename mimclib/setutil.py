@@ -523,8 +523,8 @@ class TDFTProfCalculator(ProfCalculator):
         assert len(td_w) == len(ft_w), "Argument mismatch"
         self.max_dim = len(td_w)
         self._handle = __lib__.CreateTDFTProfCalc(len(td_w),
-                                                  np.array(td_w),
-                                                  np.array(ft_w))
+                                                  np.array(td_w, dtype=np.float),
+                                                  np.array(ft_w, dtype=np.float))
 
 @public
 def TensorGrid(m, base=1, count=None):

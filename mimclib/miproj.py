@@ -203,7 +203,7 @@ class MIWProjSampler(object):
         self.d = d   # Spatial dimension
         self.min_dim = min_dim
         self.alpha_ind = np.zeros(0)
-        self.fnWorkModel = fnWorkModel if fnWorkModel is not None else (lambda lvls: np.ones(len(lvls)))
+        self.fnWorkModel = fnWorkModel
 
         from itertools import count
         from collections import defaultdict

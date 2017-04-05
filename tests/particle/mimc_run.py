@@ -5,6 +5,7 @@ from __future__ import print_function
 import warnings
 import os.path
 import numpy as np
+import mimclib
 
 def addExtraArguments(parser):
     parser.add_argument("-qoi_K", type=float, default=0.4,
@@ -18,6 +19,9 @@ import kuramoto
 
 class ParticleField(object):
     def Init(self, run):
+        run.setFunctions(fnWorkModel=lambda lvls,
+                         w=np.log(run.params.beta)*run.params.gamma: \
+                         mimclib.mimc.work_estimate(lvls, w))
         self.gen = kuramoto.RandGen(run.params.qoi_seed)
 
     def SampleQoI(self, run, inds, M):
