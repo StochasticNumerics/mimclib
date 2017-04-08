@@ -6,6 +6,7 @@ from __future__ import print_function
 import numpy as np
 import mimclib.plot as miplot
 import matplotlib.pyplot as plt
+from mimclib import ipdb
 
 def plotSeeds(ax, runs, *args, **kwargs):
     ax.set_yscale('log')
@@ -66,7 +67,7 @@ def plotBestNTerm(ax, runs, *args, **kwargs):
         sel[np.arange(int(0.01*len(N)), int(0.03*len(N)))] = True
         sel = np.logical_and(sel, error > 1e-8)
         ax.add_line(miplot.FunctionLine2D.ExpLine(data=line[0].get_xydata()[sel, :],
-                                           **Ref_kwargs))
+                                                  **Ref_kwargs))
     return line[0].get_xydata(), [line]
 
 
@@ -140,7 +141,6 @@ def plot_all(runs, **kwargs):
         ax.set_xlabel('Avg. Iteration Work')
     except:
         miplot.plot_failed(ax)
-        raise
 
     print_msg("plotWorkVsMaxError")
     ax = add_fig()
@@ -154,7 +154,6 @@ def plot_all(runs, **kwargs):
         ax.set_xlabel('Avg. Iteration Time')
     except:
         miplot.plot_failed(ax)
-        raise
 
     print_msg("plotSeeds")
     try:
@@ -166,7 +165,6 @@ def plot_all(runs, **kwargs):
                   iter_idx=int(len(runs[0].iters)/4))
     except:
         miplot.plot_failed(ax)
-        raise
 
     print_msg("plotUserData")
     ax = add_fig()
@@ -174,22 +172,62 @@ def plot_all(runs, **kwargs):
         plotUserData(ax, runs, '-o', which='cond')
     except:
         miplot.plot_failed(ax)
-        raise
 
     ax = add_fig()
     try:
         plotUserData(ax, runs, '-o', which='size')
     except:
         miplot.plot_failed(ax)
-        raise
 
+    print_msg("plotDirections")
+    ax = add_fig()
+    try:
+        miplot.plotDirections(ax, runs, miplot.plotExpectVsLvls,
+                              fnNorm=fnNorm)
+    except:
+        miplot.plot_failed(ax)
+
+    print_msg("plotDirections")
+    ax = add_fig()
+    try:
+        miplot.plotDirections(ax, runs, miplot.plotWorkVsLvls,
+                              fnNorm=fnNorm)
+    except:
+        miplot.plot_failed(ax)
+
+    if runs[0].params.min_dim > 0 and runs[0].last_itr.lvls_max_dim() > 5:
+        run = runs[0]
+        from mimclib import setutil
+        # For matern
+        profit_calc = setutil.MIProfCalculator([run.params.miproj_set_dexp] * run.params.min_dim,
+                                               run.params.miproj_set_xi,
+                                               run.params.miproj_set_sexp,
+                                               run.params.miproj_set_mul)
+        profits = run.last_itr._lvls.calc_log_prof(profit_calc)
+        reduced_run = runs[0].reduceDims(np.arange(0, runs[0].params.min_dim),
+                                         profits)    # Keep only the spatial dimensions
+        print_msg("plotDirections")
+        ax = add_fig()
+        try:
+            miplot.plotDirections(ax, [reduced_run],
+                                  miplot.plotExpectVsLvls, fnNorm=fnNorm,
+                                  x_axis='ell')
+        except:
+            miplot.plot_failed(ax)
+        print_msg("plotDirections")
+        ax = add_fig()
+        try:
+            miplot.plotDirections(ax, [reduced_run],
+                                  miplot.plotWorkVsLvls, fnNorm=fnNorm,
+                                  x_axis='ell')
+        except:
+            miplot.plot_failed(ax)
     print_msg("plotBestNTerm")
     try:
         ax = add_fig()
         plotBestNTerm(ax, runs, '-o', Ref_kwargs=Ref_kwargs)
     except:
         miplot.plot_failed(ax)
-        raise
 
     print_msg("plotWorkVsLvlStats")
     ax = add_fig()
@@ -204,10 +242,10 @@ def plot_all(runs, **kwargs):
     except:
         miplot.plot_failed(ax)
 
-
     figures.extend(plotSingleLevel(runs,
                                    kwargs['input_args'],
                                    modifier=modifier,
+                                   fnNorm=fnNorm,
                                    Ref_kwargs=Ref_kwargs))
 
     for fig in figures:
@@ -217,14 +255,15 @@ def plot_all(runs, **kwargs):
 
 def plotSingleLevel(runs, input_args, *args, **kwargs):
     modifier = kwargs.pop('modifier', None)
+    fnNorm = kwargs.pop('fnNorm', None)
     Ref_kwargs = kwargs.pop('Ref_kwargs', None)
+    plotIndividual  = kwargs.pop('plot_individual', True)
     from mimclib import db as mimcdb
     db = mimcdb.MIMCDatabase(**input_args.db_args)
     print("Reading data")
 
     fig_W = plt.figure()
     fig_T = plt.figure()
-
     fix_runs = []
     while True:
         fix_tag = input_args.db_tag + "-fix-" + str(len(fix_runs))
@@ -235,10 +274,9 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
         assert(len(run_data) == 1)
         # Modify work estimates to account for space discretization
         # TODO: WARNING: Different behavior between poisson and matern
-        ell = len(fix_deg)
-        work_per_sample = run_data[0].params.h0inv * run_data[0].params.beta ** (run_data[0].params.gamma * ell)  # matern
-        work_per_sample = run_data[0].params.h0inv * run_data[0].params.beta ** (run_data[0].params.gamma * ell/2.0) # poisson
-
+        ell = len(fix_runs)
+        #work_per_sample = run_data[0].params.beta ** (run_data[0].params.gamma * ell)  # matern
+        work_per_sample = run_data[0].params.beta ** (run_data[0].params.gamma * ell/2.0) # poisson
         for itr in run_data[0].iters:
             itr.tW *= work_per_sample
             itr.Wl_estimate = itr.tW
@@ -255,18 +293,27 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
     work_spacing = np.sqrt(2)
     runs_adaptive = db.readRuns(tag=input_args.db_tag + "-adapt", done_flag=input_args.done_flag)
 
-    for i, rr in enumerate(fix_runs):
-        miplot.plotWorkVsMaxError(fig_W.gca(), [rr],
-                                  modifier=modifier, fnWork=fnWork,
-                                  fnAggError=np.min, fmt='-*',
-                                  work_bins=1000, Ref_kwargs=None,
-                                  label='\\ell={}'.format(i))
 
-        miplot.plotWorkVsMaxError(fig_T.gca(), [rr], fnWork=fnTime,
-                                  modifier=modifier, fmt='-*',
-                                  fnAggError=np.min, work_bins=1000,
-                                  Ref_kwargs=None,
-                                  label='\\ell={}'.format(i))
+    if input_args.qoi_exact is not None:
+        print("Setting errors")
+        fnExactErr = lambda itrs, e=input_args.qoi_exact: \
+                     fnNorm([v.calcEg() + e*-1 for v in itrs])
+        miplot.set_exact_errors(fix_runs + runs_adaptive, fnExactErr)
+
+    if plotIndividual:
+        for i, rr in enumerate(fix_runs):
+            miplot.plotWorkVsMaxError(fig_W.gca(), [rr],
+                                      modifier=modifier, fnWork=fnWork,
+                                      fnAggError=np.min, fmt='--x',
+                                      work_bins=1000, Ref_kwargs=None,
+                                      label='\\ell={}'.format(i), alpha=0.7)
+            miplot.plotWorkVsMaxError(fig_T.gca(), [rr],
+                                      fnWork=fnTime,
+                                      modifier=modifier, fmt='--x',
+                                      fnAggError=np.min,
+                                      work_bins=1000, Ref_kwargs=None,
+                                      label='\\ell={}'.format(i),
+                                      alpha=0.7)
 
 
     for rr, label in [[fix_runs, 'SL'],
@@ -279,7 +326,6 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                                   work_bins=work_bins,
                                   Ref_kwargs=Ref_kwargs if rr==runs else None,
                                   work_spacing=work_spacing, label=label)
-
         miplot.plotWorkVsMaxError(fig_T.gca(), rr, fnWork=fnTime,
                                   modifier=modifier, fmt='-*',
                                   fnAggError=np.min,

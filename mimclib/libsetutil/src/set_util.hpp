@@ -37,6 +37,11 @@ extern "C"{
     PVarSizeList VarSizeList_expand_set(const PVarSizeList pset,
                                         const double* profit, uint32 count,
                                         uint32 max_added, ind_t dimLookahead);
+    PVarSizeList VarSizeList_reduce_set(const PVarSizeList pset,
+                                        const ind_t *keep_dim,
+                                        ind_t keep_dim_count,
+                                        uint32* out_indices,
+                                        uint32 out_indices_count);
     PVarSizeList VarSizeList_expand_set_calc(const PVarSizeList pset,
                                              PProfitCalculator profCalc,
                                              double max_prof, ind_t max_d,

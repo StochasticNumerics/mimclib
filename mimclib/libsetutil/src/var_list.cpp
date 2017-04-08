@@ -505,3 +505,27 @@ double VarSizeList::estimate_bias(const double *err_contributions,
     }
     return bias;
 }
+
+VarSizeList VarSizeList::reduce_set(const ind_t *keep_dim, ind_t keep_dim_count,
+                                    uint32* out_indices,
+                                    uint32 out_indices_count) const {
+    assert(out_indices_count >= count());
+
+    VarSizeList new_list;
+    for (auto itr=m_ind_set.begin();itr!=m_ind_set.end();itr++)
+    {
+        mul_ind_t::const_iterator ind_itr;
+        mul_ind_t new_ind = itr->sub_index(keep_dim, keep_dim_count);
+
+        uint32 index;
+        if (new_list.find_ind(new_ind, index)){
+            // Already added
+            out_indices[itr-m_ind_set.begin()] = index;
+        }
+        else{
+            new_list.push_back(new_ind);
+            out_indices[itr-m_ind_set.begin()] = new_list.count()-1;
+        }
+    }
+    return new_list;
+}

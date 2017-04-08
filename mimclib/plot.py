@@ -26,6 +26,14 @@ def _format_latex_sci(x):
     assert(len(parts) == 2)
     return "{:.2g} \\times 10^{{ {:g} }}".format(parts[0], parts[1])
 
+def _formatPower(rate):
+    rate = "{:.2g}".format(rate)
+    if rate == "-1":
+        return "-"
+    elif rate == "1":
+        return ""
+    return rate
+
 def ratefit(x, y):
     while True:
         c = np.polyfit(x, y, 1)
@@ -374,6 +382,93 @@ def enum_iter_i(runs, fnFilter=filteritr_all):
             if fnFilter(r, i):
                 yield i, r, r.iters[i]
 
+def plotDirections(ax, runs, fnPlot,
+                   fnNorm=None,
+                   plot_fine=False, plot_estimate=False,
+                   directions=None, rate=None, x_axis='ell',
+                   label_fmt='{label}', beta=None):
+    if directions is None:
+        default_max_dims = 5
+        max_dim = np.max([np.max(r.last_itr.lvls_max_dim()) for r in runs])
+        directions = np.eye(np.minimum(default_max_dims, max_dim), dtype=np.int).tolist()
+        cur = np.array(directions[0])
+        for i in range(1, len(directions)):
+            cur += np.array(directions[i])
+            directions.append(cur.tolist())
+    add_rates = dict()
+    from itertools import cycle
+    markers = cycle(['o', 'v', '^', '<', '>', '8', 's', 'p',
+                     '*', 'h', 'H', 'D', 'd'])
+    linestyles = cycle(['--', '-.', '-', ':', '-'])
+    cycler = ax._get_lines.prop_cycler
+    x_linear = x_axis == 'ell'
+    assert(x_linear or beta == None)
+    if beta is not None and hasattr(beta, '__iter__'):
+        beta = beta[0]
+
+    for j, direction in enumerate(directions):
+        mrk = next(markers)
+        prop = next(cycler)
+        labal = '$\Delta$' if len(directions)==1 \
+                else "$[{}]$".format(",".join(["0" if d==0
+                                               else ("" if d==1 else str(d))
+                                               +"\ell" for d in direction]))
+        cur_kwargs = {'ax' : ax, 'runs': runs,
+                      'linestyle' : '-',
+                      'marker' : mrk,
+                      'label': label_fmt.format(label=labal),
+                      'direction' : direction, 'x_axis': x_axis}
+        cur_kwargs.update(prop)
+        if plot_fine:
+            cur_kwargs['fine_kwargs'] = {'linestyle': '--',
+                                         'marker' : mrk}
+            cur_kwargs['fine_kwargs'].update(prop)
+
+        if max_dim == 1 and plot_estimate:
+            cur_kwargs['estimate_kwargs'] = {'linestyle': ':',
+                                             'marker' : mrk,
+                                             'label' : label_fmt.format(label='Corrected estimate')}
+
+        line_data, _ = fnPlot(fnNorm=fnNorm, **cur_kwargs)
+        if rate is None and len(line_data[1:, :]) > 0:
+            # Fit rate
+            if beta is not None:
+                cur_rate = ratefit(np.log(beta) * line_data[1:, 0],
+                                   np.log(line_data[1:, 1]))[0]
+            else:
+                if x_linear:
+                    cur_rate = ratefit(line_data[1:, 0],
+                                       np.log(line_data[1:, 1]))[0]
+                else:
+                    cur_rate = ratefit(np.log(line_data[1:, 0]),
+                                       np.log(line_data[1:, 1]))[0]
+            add_rates[cur_rate] = line_data
+        elif rate is not None:
+            ind = np.nonzero(np.array(direction) != 0)[0]
+            if np.all(ind < len(rate)):
+                add_rates[np.sum(rate[ind])] = line_data
+
+    def _getLevelRate(rate, beta=None):
+        if beta is not None:
+            func = lambda x, r=rate, b=beta: b ** (r*x)
+            label = r'${:.2g}^{{ {}\ell }}$'.format(beta,
+                                                    _formatPower(rate))
+        else:
+            if x_linear:
+                func = lambda x, r=rate: np.exp(r*x)
+                label = r'$\exp({}\ell)$'.format(_formatPower(rate))
+            else:
+                func = lambda x, r=rate: x**r
+                label = r'$x^{{ {} }}$'.format(_formatPower(rate))
+        return func, label
+
+    for j, r in enumerate(sorted(add_rates.keys(), key=lambda x:
+                                 np.abs(x))):
+        func, label = _getLevelRate(r, beta)
+        ax.add_line(FunctionLine2D(fn=func, data=add_rates[r][1:, :],
+                                   linestyle=next(linestyles),
+                                   c='k', label=label_fmt.format(label=label)))
+
 @public
 def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     """Plots Errors vs TOL of @runs, as
@@ -468,17 +563,17 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
             prev = 0
 
         if xi == 'work':
-            itr_stats = [itr.calcTotalWork()]
+            itr_stats = itr.calcTotalWork()
         elif xi == 'time':
-            itr_stats = [run.iter_total_times()[i]]
+            itr_stats = run.iter_total_times()[i]
         elif xi == 'tol':
-            itr_stats = [run.TOL]
+            itr_stats = run.TOL
 
         lvl_stats = mymax(np.array([[
             1+np.max(j) if len(j) > 0 else 0,
             np.max(data) if len(data) > 0 else 0,
             len(data)] for j, data in itr.lvls_sparse_itr(prev)]), 3)
-        return itr_stats + lvl_stats
+        return [np.log(itr_stats), itr_stats] + lvl_stats
 
     ax.set_xlabel(x_label)
     ax.set_xscale('log')
@@ -486,8 +581,8 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
     xy_binned = computeIterationStats(runs,work_bins=work_bins,
                                       filteritr=filteritr,
                                       fnItrStats=fnItrStats,
-                                      arr_fnAgg=[np.mean] + [np.max]*3)
-
+                                      arr_fnAgg=[np.mean, np.mean] + [np.max]*3)
+    xy_binned = xy_binned[:, 1:]
     plotObj = []
     maxrefine_kwargs = kwargs.pop('maxrefine_kwargs', None)
     active_kwargs = kwargs.pop('active_kwargs', None)
@@ -509,7 +604,7 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
                                *maxrefine_args, **maxrefine_kwargs))
 
     # Max active dim
-    if maxrefine_kwargs is not None:
+    if active_kwargs is not None:
         active_args, active_kwargs = __normalize_fmt((), active_kwargs)
         plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 3],
                                *active_args, **active_kwargs))
@@ -672,17 +767,34 @@ def plotTotalWorkVsLvls(ax, runs, *args, **kwargs):
                                    linestyle='--', c='k'))
     return plotObj
 
+def _get_x_axis(ax, ret, kwargs):
+    x_axis = kwargs.pop("x_axis", "ell").lower()
+    if x_axis == 'ell':
+        ax.set_xlabel(r'$\ell$')
+        x = np.arange(0, len(ret.central_delta_moments[:, 0]))
+    elif x_axis == 'work':
+        ax.set_xlabel(r'$W_\ell$')
+        ax.set_xscale('log')
+        x = np.mean(ret.Wl, axis=1)  # TODO: This should not take the average
+    elif x_axis == 'time':
+        ax.set_xlabel(r'$T_\ell$')
+        ax.set_xscale('log')
+        x = np.mean(ret.Tl, axis=1)  # TODO: This should not take the average
+    else:
+        raise ValueError('x_axis must be: ell, work or time')
+    return x, np.argsort(x)
+
 @public
 def plotExpectVsLvls(ax, runs, *args, **kwargs):
     """Plots El, Vl vs TOL of @runs, as
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
-    ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$E_\ell$')
     ax.set_yscale('log')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     fnNorm = kwargs.pop("fnNorm", np.abs)
+
     if "__calc_moments" in kwargs:
         ret = kwargs.pop("__calc_moments")
     else:
@@ -694,22 +806,29 @@ def plotExpectVsLvls(ax, runs, *args, **kwargs):
     fine_kwargs = kwargs.pop('fine_kwargs', None)
     plotObj = []
     El = ret.central_delta_moments[:, 0]
+    x, sorted_ind = _get_x_axis(ax, ret, kwargs)
+
     if ret.central_delta_moments.shape[1] > 1:
         Vl = ret.central_delta_moments[:, 1]
-        plotObj.append(ax.errorbar(np.arange(0, len(El)), np.abs(El), *args,
-                                   yerr=3*np.sqrt(np.abs(Vl/ret.M)), **kwargs))
+        plotObj.append(ax.errorbar(x[sorted_ind],
+                                   np.abs(El[sorted_ind]), *args,
+                                   yerr=3*np.sqrt(np.abs(Vl[sorted_ind]/ret.M[sorted_ind])),
+                                   **kwargs))
     else:
-        plotObj.append(ax.plot(np.arange(0, len(El)), np.abs(El), *args, **kwargs))
+        plotObj.append(ax.plot(x[sorted_ind], np.abs(El[sorted_ind]),
+                               *args, **kwargs))
 
 
     if fine_kwargs is not None:
         El = ret.central_fine_moments[:, 0]
         if ret.central_fine_moments.shape[1] > 1:
             Vl = ret.central_fine_moments[:, 1]
-            plotObj.append(ax.errorbar(np.arange(0, len(El)), np.abs(El),
-                                       yerr=3*np.sqrt(np.abs(Vl/ret.M)), **fine_kwargs))
+            plotObj.append(ax.errorbar(x[sorted_ind],
+                                       np.abs(El[sorted_ind]),
+                                       yerr=3*np.sqrt(np.abs(Vl[sorted_ind]/ret.M[sorted_ind])),
+                                       **fine_kwargs))
         else:
-            plotObj.append(ax.plot(np.arange(0, len(El)), np.abs(El), **fine_kwargs))
+            plotObj.append(ax.plot(x[sorted_ind], np.abs(El[sorted_ind]), **fine_kwargs))
 
     return plotObj[0][0].get_xydata(), plotObj
 
@@ -719,7 +838,6 @@ def plotVarVsLvls(ax, runs, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
-    ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$V_\ell$')
     ax.set_yscale('log')
     fnNorm = kwargs.pop("fnNorm", np.abs)
@@ -731,30 +849,34 @@ def plotVarVsLvls(ax, runs, *args, **kwargs):
                              direction=kwargs.pop('direction',
                                                   None),
                              fnNorm=fnNorm)
+
     fine_kwargs = kwargs.pop('fine_kwargs', None)
     estimate_kwargs = kwargs.pop('estimate_kwargs', None)
     plotObj = []
     Vl = ret.central_delta_moments[:, 1]
+    x, sorted_ind = _get_x_axis(ax, ret, kwargs)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     if ret.central_delta_moments.shape[-1] >= 4:
         El4 = ret.central_delta_moments[:, 3]
-        plotObj.append(ax.errorbar(np.arange(0, len(Vl)), Vl,
-                                   yerr=3*np.sqrt(np.abs(El4/ret.M)),
+        plotObj.append(ax.errorbar(x[sorted_ind], Vl[sorted_ind],
+                                   yerr=3*np.sqrt(np.abs(El4[sorted_ind]/ret.M[sorted_ind])),
                                    *args, **kwargs))
     else:
         args, kwargs = __normalize_fmt(args, kwargs)
-        plotObj.append(ax.plot(np.arange(0, len(Vl)), Vl, *args, **kwargs))
+        plotObj.append(ax.plot(x[sorted_ind], Vl[sorted_ind], *args, **kwargs))
 
     if fine_kwargs is not None:
         Vl = ret.central_fine_moments[:, 1]
         if ret.central_fine_moments.shape[-1] >= 4:
             El4 = ret.central_fine_moments[:, 3]
-            plotObj.append(ax.errorbar(np.arange(0, len(Vl)), Vl,
-                                   yerr=3*np.sqrt(np.abs(El4/ret.M)),
-                                   **fine_kwargs))
+            plotObj.append(ax.errorbar(x[sorted_ind],
+                                       Vl[sorted_ind],
+                                       yerr=3*np.sqrt(np.abs(El4[sorted_ind]/ret.M[sorted_ind])),
+                                       **fine_kwargs))
         else:
             fine_args, fine_kwargs = __normalize_fmt((), fine_kwargs)
-            plotObj.append(ax.plot(np.arange(0, len(Vl)), Vl, *fine_args, **fine_kwargs))
+            plotObj.append(ax.plot(x[sorted_ind], Vl[sorted_ind],
+                                   *fine_args, **fine_kwargs))
 
     if estimate_kwargs is not None:
         # mdat = np.ma.masked_array(ret.Vl_estimate, np.isnan(Vl_estimate))
@@ -763,8 +885,9 @@ def plotVarVsLvls(ax, runs, *args, **kwargs):
         med = np.nanpercentile(ret.Vl_estimate, 50, axis=1)
         max_vl = np.nanpercentile(ret.Vl_estimate, 95, axis=1)
         #err = np.sqrt(((np.sum(ret.Vl_estimate**2, 1)/ret.M) - avg**2)/ret.M)
-        plotObj.append(ax.errorbar(np.arange(0, len(Vl)),
-                                   med, yerr=[med-min_vl, max_vl-med],
+        plotObj.append(ax.errorbar(x[sorted_ind], med[sorted_ind],
+                                   yerr=[med[sorted_ind]-min_vl[sorted_ind],
+                                         max_vl[sorted_ind]-med[sorted_ind]],
                                    **estimate_kwargs))
     return plotObj[0][0].get_xydata(), plotObj
 
@@ -786,10 +909,11 @@ def plotKurtosisVsLvls(ax, runs, *args, **kwargs):
                              direction=kwargs.pop('direction',
                                                   None),
                              fnNorm=fnNorm)
+    x, sorted_ind = _get_x_axis(ax, ret, kwargs)
     Vl = ret.central_delta_moments[:, 1]
     E4l = ret.central_delta_moments[:, 3]
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    line = ax.plot(np.arange(0, len(Vl)), E4l/Vl**2, *args, **kwargs)
+    line = ax.plot(x[sorted_ind], E4l[sorted_ind]/Vl[sorted_ind]**2, *args, **kwargs)
     return line[0].get_xydata(), [line]
 
 @public
@@ -810,10 +934,11 @@ def plotSkewnessVsLvls(ax, runs, *args, **kwargs):
                              direction=kwargs.pop('direction',
                                                   None),
                              fnNorm=fnNorm)
+    x, sorted_ind = _get_x_axis(ax, ret, kwargs)
     Vl = ret.central_delta_moments[:, 1]
     E3l = np.abs(ret.central_delta_moments[:, 2])
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    line = ax.plot(np.arange(0, len(Vl)), E3l/Vl**1.5, *args, **kwargs)
+    line = ax.plot(x[sorted_ind], E3l[sorted_ind]/Vl[sorted_ind]**1.5, *args, **kwargs)
     return line[0].get_xydata(), [line]
 
 @public
@@ -829,13 +954,14 @@ def plotTimeVsLvls(ax, runs, *args, **kwargs):
                              seed=kwargs.pop('seed', None),
                              direction=kwargs.pop('direction', None), fnNorm=fnNorm)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    x, sorted_ind = _get_x_axis(ax, ret, kwargs)
 
     min_tl = np.nanpercentile(ret.Tl, 5, axis=1)
     med    = np.nanpercentile(ret.Tl, 50, axis=1)
     max_tl = np.nanpercentile(ret.Tl, 95, axis=1)
-    line = ax.errorbar(np.arange(0, len(ret.Tl)), med,
-                       yerr=[med-min_tl, max_tl-med],
-                       *args, **kwargs)
+    line = ax.errorbar(x[sorted_ind], med[sorted_ind],
+                       yerr=[med[sorted_ind]-min_tl[sorted_ind],
+                             max_tl[sorted_ind]-med[sorted_ind]], *args, **kwargs)
     return line[0].get_xydata(), [line]
 
 @public
@@ -851,13 +977,14 @@ def plotWorkVsLvls(ax, runs, *args, **kwargs):
                              seed=kwargs.pop('seed', None),
                              direction=kwargs.pop('direction', None), fnNorm=fnNorm)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-
+    x, sorted_ind = _get_x_axis(ax, ret, kwargs)
     min_wl = np.nanpercentile(ret.Wl, 5, axis=1)
     med    = np.nanpercentile(ret.Wl, 50, axis=1)
     max_wl = np.nanpercentile(ret.Wl, 95, axis=1)
-    line = ax.errorbar(np.arange(0, len(ret.Wl)), med,
-                       yerr=[med-min_wl, max_wl-med],
-                       *args, **kwargs)
+    line = ax.errorbar(x[sorted_ind], med[sorted_ind],
+                       yerr=[med[sorted_ind]-min_wl[sorted_ind],
+                             max_wl[sorted_ind]-med[sorted_ind]], *args,
+                       **kwargs)
     return line[0].get_xydata(), [line]
 
 @public
@@ -1277,40 +1404,15 @@ def genBooklet(runs, **kwargs):
         except:
             __plot_except(ax_est)
 
-    def formatPower(rate):
-        rate = "{:.2g}".format(rate)
-        if rate == "-1":
-            return "-"
-        elif rate == "1":
-            return ""
-        return rate
-
-    def getLevelRate(rate):
-        if has_beta:
-            func = lambda x, r=rate, b=params.beta[0]: b ** (r*x)
-            label = r'${:.2g}^{{ {}\ell }}$'.format(params.beta[0],
-                                                    formatPower(rate))
-        else:
-            func = lambda x, r=rate: np.exp(-r*x)
-            label = r'$\exp({}\ell)$'.format(formatPower(rate))
-        return func, label
-
     lvl_funcs = [[0, False, False, plotTimeVsLvls, np.array(params.gamma)
                   if has_gamma_rate else None],
-                 [0, False, False, plotWorkVsLvls, np.array(params.gamma)
-                  if has_gamma_rate else None],
+                 [0, False, False, plotWorkVsLvls, None],
                  [1, True, False, plotExpectVsLvls, -np.array(params.w)
                   if has_w_rate else None],
                  [2, True, any_bayesian, plotVarVsLvls, -np.array(params.s)
                   if has_s_rate else None],
                  [3, False, False, plotSkewnessVsLvls, None],
                  [4, False, False, plotKurtosisVsLvls, None]]
-    directions = np.eye(np.minimum(5, max_dim), dtype=np.int).tolist()
-    cur = np.array(directions[0])
-    for i in range(1, len(directions)):
-        cur += np.array(directions[i])
-        directions.append(cur.tolist())
-
     max_moment = runs[0].last_itr.psums_delta.shape[1]
     for min_moment, plotFine, plotEstimate, plotFunc, rate in lvl_funcs:
         if min_moment > max_moment:
@@ -1318,57 +1420,12 @@ def genBooklet(runs, **kwargs):
         try:
             print_msg(plotFunc.__name__)
             ax = add_fig()
-            add_rates = dict()
-            from itertools import cycle
-            markers = cycle(['o', 'v', '^', '<', '>', '8', 's', 'p',
-                             '*', 'h', 'H', 'D', 'd'])
-            linestyles = cycle(['--', '-.', '-', ':', '-'])
-            cycler = ax._get_lines.prop_cycler
-            for j, direction in enumerate(directions):
-                mrk = next(markers)
-                prop = next(cycler)
-                labal = '$\Delta$' if len(directions)==1 \
-                        else "$[{}]$".format(",".join(["0" if d==0
-                                                       else ("" if d==1 else str(d))
-                                                       +"\ell" for d in direction]))
-                cur_kwargs = {'ax' : ax, 'runs': runs,
-                              'linestyle' : '-',
-                              'marker' : mrk,
-                              'label': label_fmt.format(label=labal),
-                              'direction' : direction}
-                cur_kwargs.update(prop)
-                if plotFine:
-                    cur_kwargs['fine_kwargs'] = {'linestyle': '--',
-                                                 'marker' : mrk}
-                    cur_kwargs['fine_kwargs'].update(prop)
-
-                if max_dim == 1 and plotEstimate:
-                    cur_kwargs['estimate_kwargs'] = {'linestyle': ':',
-                                                     'marker' : mrk,
-                                                     'label' : label_fmt.format(label='Corrected estimate')}
-
-                line_data, _ = plotFunc(fnNorm=fnNorm, **cur_kwargs)
-                if rate is None:
-                    # Fit rate
-                    if len(line_data[1:, :]) > 0:
-                        if has_beta:
-                            cur_rate = ratefit(np.log(params.beta[0]) * line_data[1:, 0],
-                                               np.log(line_data[1:, 1]))[0]
-                        else:
-                            cur_rate = ratefit(line_data[1:, 0],
-                                               np.log(line_data[1:, 1]))[0]
-                        add_rates[cur_rate] = line_data
-                else:
-                    ind = np.nonzero(np.array(direction) != 0)[0]
-                    if np.all(ind < len(rate)):
-                        add_rates[np.sum(rate[ind])] = line_data
-
-            for j, r in enumerate(sorted(add_rates.keys(), key=lambda x:
-                                         np.abs(x))):
-                func, label = getLevelRate(r)
-                ax.add_line(FunctionLine2D(fn=func, data=add_rates[r][1:, :],
-                                           linestyle=next(linestyles),
-                                           c='k', label=label_fmt.format(label=label)))
+            plotDirections(ax, runs, plotFunc,
+                           fnNorm=fnNorm,
+                           label_fmt=label_fmt,
+                           plot_fine=plotFine, plot_estimate=plotEstimate,
+                           beta=None,#params.beta if has_beta else None,
+                           rate=rate)
         except:
             __plot_except(ax)
 
@@ -1382,7 +1439,7 @@ def genBooklet(runs, **kwargs):
                     rate = 1./np.min(np.array(params.w) * np.log(params.beta))
                 else:
                     rate = 1./np.min(np.array(params.w))
-                label = r'${}\log\left(\textrm{{TOL}}^{{-1}}\right)$'.format(formatPower(rate))
+                label = r'${}\log\left(\textrm{{TOL}}^{{-1}}\right)$'.format(_formatPower(rate))
                 ax.add_line(FunctionLine2D(fn=lambda x, r=rate: -rate*np.log(x),
                                            data=line_data,
                                            log_data=False,
@@ -1408,7 +1465,7 @@ def genBooklet(runs, **kwargs):
                 add_legend(ax, outside=legend_outside)
     return figures
 
-def set_exact_errors(runs, fnExactErr, filteritr):
+def set_exact_errors(runs, fnExactErr, filteritr=filteritr_all):
     itrs = [itr for _, itr in enum_iter(runs, filteritr)]
     errs = fnExactErr(itrs)
     for i, itr in enumerate(itrs):

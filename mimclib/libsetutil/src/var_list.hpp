@@ -184,13 +184,6 @@ public:
     const_iterator begin() const { return m_indices.begin(); }
     const_iterator end() const { return m_indices.end(); }
 
-    std::vector<ind_t> dense(ind_t dim) const{
-        std::vector<ind_t> ret(dim, SET_BASE);
-        for (auto itr=begin();itr!=end();itr++)
-            ret[itr->ind] = itr->value;
-        return ret;
-    }
-
     bool operator<(const SparseMIndex& b) const {
         const SparseMIndex& a = *this;
         auto itr_b = b.begin();
@@ -222,6 +215,15 @@ public:
         return itr_a == a.end();
     }
 
+    SparseMIndex sub_index(const ind_t *dims, ind_t dims_count) const {
+        SparseMIndex newInd;
+        const_iterator ind_itr;
+        for (ind_t i=0;i<dims_count;i++) {
+            if (get_itr(dims[i], ind_itr))
+                newInd.set(ind_itr->ind, ind_itr->value);
+        }
+        return newInd;
+    }
 private:
     iterator begin() { return m_indices.begin(); }
     iterator end() { return m_indices.end(); }
@@ -395,6 +397,10 @@ public:
     VarSizeList expand_set(const double *profits, uint32 count,
                            uint32 max_added,
                            ind_t seedLookahead) const;
+    VarSizeList reduce_set(const ind_t *keep_dim,
+                           ind_t keep_dim_count,
+                           uint32* out_indices,
+                           uint32 out_indices_count) const;
 
     double get_min_outer_profit(const PProfitCalculator profCalc, ind_t max_dim) const;
     void check_admissibility(ind_t d_start, ind_t d_end,

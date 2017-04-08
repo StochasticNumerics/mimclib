@@ -963,11 +963,154 @@ estimate optimal number of levels"
                    or (TOL < finalTOL and self.totalErrorEst() < finalTOL):
                     break
 
-            print_info("MIMC iteration for TOL={} took {} seconds (time since start {})".format(TOL, timer.toc(), self.iter_total_times[-1]))
+            print_info("MIMC iteration for TOL={} took {} seconds".format(TOL, timer.toc()))
             print_info("################################################")
             if less(TOL, finalTOL) and self.totalErrorEst() <= finalTOL:
                 break
         print_info("MIMC run for TOL={} took {} seconds".format(finalTOL, timer.toc()))
+
+    def reduceDims(self, dim_to_keep, profits, bins=np.inf):
+        new_run = MIMCRun()
+        new_run.fn = self.fn
+        new_run.params = self.params
+
+        itr = self.last_itr
+        new_run.iters.append(MIMCItrData(parent=new_run,
+                                         min_dim=self.params.min_dim,
+                                         moments=self.params.moments))
+        new_itr = new_run.last_itr
+        new_itr.bias = itr.bias
+        new_itr.stat_error = itr.stat_error
+        new_itr.exact_error = itr.exact_error
+        new_itr.TOL = itr.exact_error
+        new_itr.totalTime = itr.exact_error
+        new_itr.Q = itr.Q
+        if hasattr(itr, "db_data"):
+            new_itr.db_data = itr.db_data
+
+        # The new index is the index of the iteration
+        if isinstance(dim_to_keep, np.ndarray) and dim_to_keep.dtype == np.bool:
+            dim_to_keep = np.nonzero(dim_to_keep)[0]
+        else:
+            dim_to_keep = np.array(dim_to_keep, np.uint)
+
+        dim_to_discard = np.ones(self.last_itr.lvls_max_dim(), dtype=np.bool)
+        dim_to_discard[dim_to_keep] = False
+        dim_to_discard = np.nonzero(dim_to_discard)[0]
+
+        dicard_indset, discard_indices = self.last_itr._lvls.reduce_set(dim_to_discard)
+        keep_indset, keep_indices = self.last_itr._lvls.reduce_set(dim_to_keep)
+
+        max_dim = len(dim_to_keep)
+        prev_new_count = 0
+        prev_old_count = 0
+
+        # adjust profits
+        min_dist = 0
+        for ii, ind in enumerate(keep_indset):
+            sel = keep_indices == ii
+            prof_base = profits[self.last_itr.lvls_find(ind)]
+            profits[sel] -= prof_base
+            if np.sum(sel) > 1:
+                min_dist = np.maximum(min_dist, np.max(np.diff(np.sort(profits[sel]))))
+
+        max_profits, min_profits = np.max(profits), np.min(profits)
+        max_bins = np.floor((max_profits-min_profits) / min_dist)
+        bins = np.minimum(bins, max_bins)
+        prof_step = (max_profits-min_profits) / bins
+
+        for ind_idx in xrange(len(keep_indset)):
+            keep_sel = np.nonzero(keep_indices == ind_idx)[0]
+            ind_profits = profits[keep_sel]
+            min_prof = min_profits
+            set_idx = 0
+            while True:
+                sel_prof = np.logical_and(ind_profits > min_prof,
+                                          ind_profits <= min_prof+prof_step)
+                if np.sum(sel_prof) == 0:
+                    assert(np.sum(ind_profits > min_prof) == 0)
+                    break
+                # Add index to set
+                j, data = keep_indset.get_item(ind_idx, dim=-1)
+                new_itr.lvls_add_from_list(j=[np.concatenate((j, [max_dim]))],
+                                           inds=[np.concatenate((data, [set_idx]))])
+                # Combine these
+                ##### Combine deltas
+                sel = keep_sel[sel_prof]
+                scale = (1./itr.M[sel])[[slice(None)] + [np.newaxis]*(len(itr.psums_delta.shape)-1)]
+                lvl_idx = new_itr.lvls_count-1
+                new_itr.addSamples(lvl_idx, 1,
+                                   np.sum(itr.psums_delta[sel] * scale, axis=0),
+                                   np.sum(itr.psums_fine[sel] * scale, axis=0),
+                                   np.sum(itr.tT[sel]),
+                                   np.sum(itr.tW[sel]))
+                new_itr.Vl_estimate[lvl_idx] = np.sum(itr.Vl_estimate[sel])
+                new_itr.Wl_estimate[lvl_idx] = np.sum(itr.Wl_estimate[sel])
+                set_idx += 1
+                min_prof += prof_step
+        assert(np.all(new_itr._lvls.check_admissibility())) # TEMP
+        return new_run
+
+    def reduceDims_old(self, dim_to_keep):
+        new_run = MIMCRun()
+        new_run.fn = self.fn
+        new_run.params = self.params
+        # The new index is the index of the iteration
+        if isinstance(dim_to_keep, np.ndarray) and dim_to_keep.dtype == np.bool:
+            dim_to_keep = np.nonzero(dim_to_keep)[0]
+        else:
+            dim_to_keep = np.array(dim_to_keep, np.uint)
+
+        dim_to_discard = np.ones(self.last_itr.lvls_max_dim(), dtype=np.bool)
+        dim_to_discard[dim_to_keep] = False
+        dim_to_discard = np.nonzero(dim_to_discard)[0]
+
+        dicard_indset, discard_indices = self.last_itr._lvls.reduce_set(dim_to_discard)
+
+        max_dim = len(dim_to_keep)
+        prev_new_count = 0
+        prev_old_count = 0
+        for itr_idx, itr in enumerate(self.iters):
+            if len(new_run.iters) == 0:
+                new_run.iters.append(MIMCItrData(parent=new_run,
+                                                 min_dim=self.params.min_dim,
+                                                 moments=self.params.moments))
+            else:
+                new_run.iters.append(new_run.last_itr.next_itr())
+
+            new_itr = new_run.last_itr
+            ##### First add new levels
+            # Add missing levels, if any (adding current iteration index as
+            # an extra dimension)
+            newj, newdata = [], []
+            for ind_idx in xrange(prev_old_count, itr.lvls_count):
+                j, data = itr._lvls.get_item(ind_idx, -1)
+                keep = np.nonzero([jj in dim_to_keep for jj in j])[0]
+                discard = np.nonzero([jj in dim_to_discard for jj in j])[0]
+                # TODO: Discard dim_to_discard from j and data
+                newj.append(np.concatenate((j[keep], [max_dim])))
+                newdata.append(np.concatenate((data[keep],
+                                               [discard_indices[ind_idx]])))
+            new_itr.lvls_add_from_list(inds=newdata, j=newj)
+            assert(np.all(new_itr._lvls.check_admissibility())) # TEMP
+            ##### Copy properties
+            new_itr.bias = itr.bias
+            new_itr.stat_error = itr.stat_error
+            new_itr.exact_error = itr.exact_error
+            new_itr.TOL = itr.exact_error
+            new_itr.totalTime = itr.exact_error
+            new_itr.Q = itr.Q
+            if hasattr(itr, "db_data"):
+                new_itr.db_data = itr.db_data
+            new_itr.Vl_estimate = itr.Vl_estimate
+            new_itr.Wl_estimate = itr.Wl_estimate
+            new_itr.tT = itr.tT
+            new_itr.tW = itr.tW
+            new_itr.M = itr.M
+            new_itr.psums_delta = itr.psums_delta
+            new_itr.psums_fine = itr.psums_fine
+            prev_old_count = itr.lvls_count
+        return new_run
 
 
 @public

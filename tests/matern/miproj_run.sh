@@ -2,119 +2,99 @@
 
 # make
 # rm -f data.sql
-PROBLEM='matern'
+VERBOSE="-db True -mimc_verbose 0 "
+SEL_CMD="$1"
+EXAMPLE="$2"
+if [ -z "$EXAMPLE" ]; then
+    EXAMPLE='sf-kink'
+fi
 DB_CONN='-db_engine mysql -db_name mimc -db_host 129.67.187.118 '
-BASETAG="$PROBLEM-reuse-"
-COMMON="-qoi_seed 0 -qoi_sigma 0.2  \
-       -qoi_x0 0.3 0.4 0.6 -ksp_rtol 1e-25 -ksp_type gmres -qoi_a0 0 -qoi_f0 1 \
-       -qoi_scale 10 -qoi_df_sig 0.5 -mimc_beta 2 -mimc_gamma 1 -mimc_h0inv 3  \
-       -mimc_verbose 1 -qoi_set_xi 2 -qoi_set_dexp 2.08 \
-       $DB_CONN "
+BASETAG="$EXAMPLE-"
+COMMON="-qoi_seed 0 -ksp_rtol 1e-15 -ksp_type gmres  $DB_CONN "
 EST_CMD="python miproj_esterr.py $COMMON "
-RUN_CMD="OPENBLAS_NUM_THREADS=1 python miproj_run.py -qoi_problem $PROBLEM \
-       -mimc_TOL 0 -qoi_seed 0 -mimc_beta 2 -mimc_gamma 1 \
-       -qoi_set_xi 2 -qoi_set_dexp 2.08 \
-       -miproj_reuse_samples True -db True $COMMON "
+RUN_CMD="OPENBLAS_NUM_THREADS=1 python miproj_run.py -qoi_example $EXAMPLE \
+       -mimc_TOL 0 -qoi_seed 0 -mimc_gamma 1 -mimc_h0inv 3 \
+       -miproj_reuse_samples True $VERBOSE $COMMON "
 
 function run_cmd {
-    # d max_lvl nu set extra_args
-    echo  $RUN_CMD -mimc_max_lvl $3 -mimc_min_dim $2 \
-          -qoi_dim $2 -qoi_df_nu $4 -db_tag $BASETAG$2-$4$1 \
-          -miproj_pts_sampler optimal ${@:5}
-
-    # echo python miproj_run.py $COMMON -mimc_max_lvl $3 -mimc_min_dim $2 \
-    #      -qoi_dim $2 -qoi_df_nu $4 -db_tag $BASETAG$2-$4$1-arcsine \
-    #      -miproj_pts_sampler arcsine ${@:5}
+    echo  $RUN_CMD -mimc_max_lvl $3 \
+          -qoi_dim $2 -qoi_df_nu $4 \
+          ${@:5} -db_tag $BASETAG$2-$4$1
 }
 
 function plot_cmd {
     echo ../plot_prog.py $DB_CONN \
-         -db_tag $BASETAG$2-$4$1 -o output/self-$BASETAG$2-$4$1.pdf \
-         -verbose True -all_itr True -qoi_exact_tag $BASETAG$2-$4$1
-
-    # echo ./plot_cond.py $DB_CONN -db_tag $BASETAG$1
-    # echo ../plot_prog.py $DB_CONN \
-    #      -db_tag $BASETAG$1-arcsine -o output/$BASETAG$1-arcsine.pdf \
-    #      -verbose True -all_itr True #-qoi_exact_tag $BASETAG$1-arcsine
-    #echo ./plot_cond.py $DB_CONN -db_tag $BASETAG$1-arcsine
+         -o output/self-$BASETAG$2-$4$1.pdf \
+         -verbose True -all_itr True -qoi_exact_tag $BASETAG$2-$4$1 \
+         -db_tag $BASETAG$2-$4$1
 }
 
 function plotest_cmd {
     echo ../plot_prog.py "$DB_CONN" \
-         -db_tag "$BASETAG$2-$4$1" -o "output/$BASETAG$2-$4$1.pdf" \
-         -verbose True -all_itr True
-
-    # echo ./plot_cond.py $DB_CONN -db_tag $BASETAG$1-optimal
-    # echo ../plot_prog.py $DB_CONN \
-    #      -db_tag $BASETAG$1-arcsine -o output/$BASETAG$1-arcsine.pdf \
-    #      -verbose True -all_itr True #-qoi_exact_tag $BASETAG$1-arcsine
-    #echo ./plot_cond.py $DB_CONN -db_tag $BASETAG$1-arcsine
+         -o "output/$BASETAG$2-$4$1.pdf" \
+         -verbose True -all_itr True \
+         -db_tag "$BASETAG$2-$4$1"
 }
 
 
 function errest_cmd {
-    echo $EST_CMD -mimc_max_lvl "$3" -mimc_min_dim "$2" \
-         -mimc_fix_lvl 10 \
-         -qoi_dim "$2" -qoi_df_nu "$4" -db_tag "$BASETAG$2-$4$1" \
-         -miproj_pts_sampler optimal "${@:5}" \
+    echo $EST_CMD -mimc_max_lvl "$3" \
+         -qoi_dim "$2" -qoi_df_nu "$4" \
+         "${@:5}" -db_tag "$BASETAG$2-$4$1" \
          "; " ../plot_prog.py "$DB_CONN" \
-         -db_tag "$BASETAG$2-$4$1" -o "output/$BASETAG$2-$4$1.pdf" \
-         -verbose True -all_itr True
-
-    # echo python miproj_esterr.py $COMMON_EST -mimc_max_lvl $3 -mimc_min_dim $2 -qoi_dim $2 -qoi_df_nu $4 \
-    #      -db_tag $BASETAG$1-$2-$4-arcsine \
-    #      -miproj_pts_sampler arcsine ${@:5}
+         -o "output/$BASETAG$2-$4$1.pdf" \
+         -verbose True -all_itr True -db_tag "$BASETAG$2-$4$1"
 }
 
 function all_cmds {
-    if [ "$1" = "plot" ]; then
-        plot_cmd "${@:2}"
-    elif [ "$1" = "est" ]; then
-        errest_cmd ${@:2}
-    elif [ "$1" = "plot_est" ]; then
+    if [ "$SEL_CMD" = "plot" ]; then
+        plot_cmd "${@:1}"
+    elif [ "$SEL_CMD" = "est" ]; then
+        errest_cmd ${@:1}
+    elif [ "$SEL_CMD" = "plot_est" ]; then
         plotest_cmd "${@:2}"
-    elif [ "$1" = "run" ]; then
-        run_cmd "${@:2}"
+    elif [ "$SEL_CMD" = "run" ]; then
+        run_cmd "${@:1}"
     fi;
 }
 
-#all_cmds $1 adapt-finite 1 10 2.5 -mimc_min_dim 0 -miproj_min_dim 5 -miproj_max_dim 5
-#all_cmds $1 finite 1 10 2.5 -mimc_min_dim 0 -miproj_min_dim 5 -qoi_set_sexp 1 -miproj_max_dim 5 -qoi_set_adaptive False
+if [ "$EXAMPLE" = "sf-matern" ]; then
+    CMN='-mimc_beta 2'
+    for nu in 2.5 3.5 4.5 6.5
+    do
+        max_lvl=10
+        z=`echo "$nu+0.5" | bc`
+        all_cmds -adapt 1 $max_lvl $nu -mimc_min_dim 1 $CMN
+        all_cmds "" 1 $max_lvl $nu -miproj_set_sexp $z -miproj_set xi_exp -mimc_min_dim 1 $CMN
+        for (( i=0; i<=$max_lvl; i++ ))
+        do
+            all_cmds -fix-$i 1 $(($i+1)) $nu -miproj_fix_lvl $i \
+                     -miproj_set_sexp 11. -miproj_set xi_exp -mimc_min_dim 0 $CMN
+        done
+    done
+fi;
 
-# all_cmds $1 adapt-fixproj 1 10 10.5 -mimc_min_dim 0 -miproj_min_dim 5
-# all_cmds $1 adapt-fixproj 1 10 8.5 -mimc_min_dim 0 -miproj_min_dim 5
-# all_cmds $1 adapt-fixproj 1 10 6.5 -mimc_min_dim 0 -miproj_min_dim 5
-# all_cmds $1 adapt-fixproj 1 10 4.5 -mimc_min_dim 0 -miproj_min_dim 5
-# all_cmds $1 adapt-fixproj 1 10 3.5 -mimc_min_dim 0 -miproj_min_dim 5
-# all_cmds $1 adapt-fixproj 1 10 2.5 -mimc_min_dim 0 -miproj_min_dim 5
+if [ "$EXAMPLE" = "sf-kink" ]; then
+    CMN='-qoi_sigma -1 -mimc_beta 1.4142135623730951 -qoi_scale 0.5'
+    for N in 1 2
+    do
+        max_lvl=12
+        if [ "$N" = "1" ]; then
+            DEXP=0.770949720670391  # (gamma_space + beta_space) / (N + kappa)
+        else
+            DEXP=0.5714285714285714
+        fi;
 
-# all_cmds $1 fixproj 1 10 10.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 11. -qoi_set_adaptive False
-# all_cmds $1 fixproj 1 10 8.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 9.0 -qoi_set_adaptive False
-# all_cmds $1 fixproj 1 10 6.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 7.0 -qoi_set_adaptive False
-# all_cmds $1 fixproj 1 10 4.5 -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 5.0 -qoi_set_adaptive False
-# all_cmds $1 fixproj 1 10 3.5 -mimc_min_dim 0 -miproj_min_dim 5 -qoi_set_sexp 4.0 -qoi_set_adaptive False
-# all_cmds $1 fixproj 1 10 2.5 -mimc_min_dim 0 -miproj_min_dim 5 -qoi_set_sexp 3.0 -qoi_set_adaptive False
+        all_cmds -adapt 2 $max_lvl $N -miproj_max_var $N -mimc_min_dim 1 -miproj_set_maxadd 1 $CMN
+        all_cmds "" 2 $max_lvl $N -miproj_max_var $N -miproj_set_sexp 1. \
+                 -miproj_set_dexp $DEXP -miproj_set td_ft -mimc_min_dim 1 $CMN
 
-all_cmds $1 -adapt 1 10 10.5 -miproj_min_dim 5
-all_cmds $1 -adapt 1 10 8.5 -miproj_min_dim 5
-all_cmds $1 -adapt 1 10 6.5 -miproj_min_dim 5
-all_cmds $1 -adapt 1 10 4.5 -miproj_min_dim 5
-all_cmds $1 -adapt 1 10 3.5 -miproj_min_dim 5
-all_cmds $1 -adapt 1 10 2.5 -miproj_min_dim 5
-
-all_cmds $1 "" 1 10 10.5 -miproj_min_dim 5 -qoi_set_sexp 11. -qoi_set_adaptive False
-all_cmds $1 "" 1 10 8.5 -miproj_min_dim 5 -qoi_set_sexp 9. -qoi_set_adaptive False
-all_cmds $1 "" 1 10 6.5 -miproj_min_dim 5 -qoi_set_sexp 7. -qoi_set_adaptive False
-all_cmds $1 "" 1 10 4.5 -miproj_min_dim 5 -qoi_set_sexp 5. -qoi_set_adaptive False
-all_cmds $1 "" 1 10 3.5 -miproj_min_dim 5 -qoi_set_sexp 4. -qoi_set_adaptive False
-all_cmds $1 "" 1 10 2.5 -miproj_min_dim 5 -qoi_set_sexp 3. -qoi_set_adaptive False
-
-for i in {0..8}
-do
-    all_cmds $1 -fix-$i 1 6 10.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 11. -qoi_set_adaptive False
-    all_cmds $1 -fix-$i 1 6 8.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 9.0 -qoi_set_adaptive False
-    all_cmds $1 -fix-$i 1 6 6.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 7.0 -qoi_set_adaptive False
-    all_cmds $1 -fix-$i 1 6 4.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5  -qoi_set_sexp 5.0 -qoi_set_adaptive False
-    all_cmds $1 -fix-$i 1 6 3.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5 -qoi_set_sexp 4.0 -qoi_set_adaptive False
-    all_cmds $1 -fix-$i 1 6 2.5 -miproj_fix_lvl $i -mimc_min_dim 0 -miproj_min_dim 5 -qoi_set_sexp 3.0 -qoi_set_adaptive False
-done
+        for (( i=0; i<=$max_lvl; i++ ))
+        do
+            all_cmds -fix-$i 2 $(($i)) $N -mimc_min_dim 0 -miproj_max_var $N \
+                     -miproj_fix_lvl $i \
+                     -miproj_set_sexp 1. -miproj_set_dexp $DEXP -miproj_set td_ft \
+                     $CMN
+        done
+    done
+fi;

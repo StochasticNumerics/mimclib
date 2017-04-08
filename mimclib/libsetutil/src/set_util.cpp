@@ -390,6 +390,18 @@ double VarSizeList_estimate_bias(const PVarSizeList pset,
     return pset->estimate_bias(err_contributions, count,
                                rates, rates_size);
 }
+
+PVarSizeList VarSizeList_reduce_set(const PVarSizeList pset,
+                                    const ind_t *keep_dim,
+                                    ind_t keep_dim_count,
+                                    uint32* out_indices,
+                                    uint32 out_indices_count){
+    PVarSizeList pnew_set = new VarSizeList();
+    *pnew_set = pset->reduce_set(keep_dim, keep_dim_count, out_indices,
+                                 out_indices_count);
+    return pnew_set;
+}
+
 ind_t GetDefaultSetBase(){
     return SparseMIndex::SET_BASE;
 }

@@ -10,7 +10,7 @@ import time
 
 warnings.filterwarnings("always")
 
-def l2_error_mc(itrs, fnSample, rel_tol=0.01, maxM=1000, max_L=10):
+def l2_error_mc(itrs, fnSample, rel_tol=0.01, maxM=1000, max_L=None):
     if len(itrs) == 0:
         return np.array([])
 
@@ -29,11 +29,10 @@ def l2_error_mc(itrs, fnSample, rel_tol=0.01, maxM=1000, max_L=10):
     if N < 0:
         N = np.max([itr.parent.last_itr.lvls_max_dim()-itr.parent.params.min_dim for itr in itrs])
         N += 10
-
     try:
-        N = np.minimum(N, np.max([itr.parent.params.miproj_max_dim for itr in itrs]))
+        N = np.minimum(N, np.max([itr.parent.params.miproj_max_var for itr in itrs]))
     except:
-        pass
+        N = np.minimum(N, np.max([itr.parent.params.miproj_max_dim-itr.parent.params.min_dim for itr in itrs]))
 
     tStart = time.clock()
     print("MaxL:", max_L, ", N:", N)
@@ -76,7 +75,7 @@ if __name__ == "__main__":
     def fnSample(run, iters):
         if sampler.params is None:
             sampler.params = run.params
-            if sampler.params.qoi_problem == 'matern':
+            if sampler.params.qoi_example.startswith('sf'):
                 from matern import SField_Matern
                 SField_Matern.Init()
                 sampler.sf = SField_Matern(sampler.params)
@@ -86,6 +85,6 @@ if __name__ == "__main__":
     ipdb.set_excepthook()
     from mimclib import test
     test.run_errors_est_program(fnSample)
-    if sampler.params.qoi_problem == 'matern':
+    if sampler.params.qoi_example.startswith('sf'):
         from matern import SField_Matern
         SField_Matern.Final()

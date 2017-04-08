@@ -148,7 +148,7 @@ class TensorExpansion(object):
                                self.coefficients*scale)
 
     def __str__(self):
-        return "<Polynomial expansion>"
+        return "<Polynomial expansion, norm={}>".format(self.norm())
 
 """
 Maintains polynomial approximation of given function on :math:`[a,b]^d`.
@@ -276,6 +276,9 @@ class MIWProjSampler(object):
                                                       [sam_col.beta_count]*len(new_b)))
                 sam_col.beta_count += 1
 
+            if len(sam_col.basis) > 8000:
+                raise MemoryError("Too many basis functions {}".format(len(sam_col.basis)))
+
             if not self.reuse_samples or self.min_dim < sam_col.basis.max_dim():
                 sam_col.clear_samples()
 
@@ -285,16 +288,17 @@ class MIWProjSampler(object):
             N_per_basis = self.fnSamplesCount(sam_col.basis)
             assert(np.all(sam_col.basis.check_admissibility()))
             mods, sub_alphas = mimc.expand_delta(alpha)
-
             N_todo = N_per_basis.copy()
             if len(sam_col.N_per_basis) > 0:
                 N_todo[:len(sam_col.N_per_basis)] -= sam_col.N_per_basis
 
             todoN_per_beta = np.zeros(sam_col.beta_count)
             totalN_per_beta = np.zeros(sam_col.beta_count)
+            totalBasis_per_beta = np.zeros(sam_col.beta_count)
             for i in xrange(0, sam_col.beta_count):
                 todoN_per_beta[i] = np.sum(N_todo[sam_col.pols_to_beta == i])
                 totalN_per_beta[i] = np.sum(N_per_basis[sam_col.pols_to_beta == i])
+                totalBasis_per_beta[i] = np.sum(sam_col.pols_to_beta == i)
 
             if np.sum(N_todo) > 0:
                 X, N_done = self.fnSamplePoints(N_todo, sam_col.basis, self.min_dim)
@@ -311,18 +315,16 @@ class MIWProjSampler(object):
                 sampling_time = 0
 
             tStart = time.clock()
-
             # sam_col.basis_values.re size(len(sam_col.X), len(sam_col.basis))
             # TODO: should only compute new basis_values
-            sam_col.basis_values = TensorExpansion.evaluate_basis(
+            basis_values = TensorExpansion.evaluate_basis(
                 self.fnBasis, sam_col.basis, sam_col.X)
-            sam_col.W = self.fnWeightPoints(sam_col.X, sam_col.basis_values)
+            W = self.fnWeightPoints(sam_col.X, basis_values)
             assembly_time_1 = time.clock() - tStart
-
             tStart = time.clock()
             from scipy.linalg import solve
             from scipy.sparse.linalg import gmres, LinearOperator
-            BW = np.sqrt(sam_col.W)[:, None] * sam_col.basis_values
+            BW = np.sqrt(W)[:, None] * basis_values
             if self.direct:
                 G = BW.transpose().dot(BW)
             else:
@@ -342,14 +344,13 @@ class MIWProjSampler(object):
             tStart = time.clock()
             for i in xrange(0, len(sub_alphas)):
                 # Add each element separately
-                R = np.dot(sam_col.basis_values.transpose(), (sam_col.Y[i] * sam_col.W))
+                R = np.dot(basis_values.transpose(), (sam_col.Y[i] * W))
                 if self.direct:
                     coeffs = solve(G, R, sym_pos=True)
                 else:
                     coeffs, info = gmres(G, R, tol=1e-12)
                     assert(info == 0)
                 projections = np.empty(sam_col.beta_count, dtype=TensorExpansion)
-
                 for j in xrange(0, sam_col.beta_count):
                     # if len(beta_indset[j]) == 0:
                     #     sel_coeff = np.ones(len(coeffs), dtype=np.Boole)

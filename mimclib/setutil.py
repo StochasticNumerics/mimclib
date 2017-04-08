@@ -104,6 +104,13 @@ __lib__.VarSizeList_estimate_bias.argtypes = [ct.c_voidp,
                                               __arr_double__, ct.c_uint32,
                                               __arr_double__, ct.c_uint32]
 
+__lib__.VarSizeList_reduce_set.restype = ct.c_voidp
+__lib__.VarSizeList_reduce_set.argtypes = [ct.c_voidp,
+                                           __arr_ind_t__,
+                                           __ct_ind_t__,
+                                           __arr_uint32__,
+                                           ct.c_uint32]
+
 __lib__.VarSizeList_max_dim.restype = __ct_ind_t__
 __lib__.VarSizeList_max_dim.argtypes = [ct.c_voidp]
 
@@ -250,14 +257,16 @@ class VarSizeList(object):
                            min_dim=min_dim if min_dim is not None else self.min_dim)
 
     def get_item(self, i, dim=None):
-        if dim is None:
-            dim = np.maximum(self.min_dim, self.get_dim(i))
-        item = np.empty(dim, dtype=ind_t)
         data = np.empty(self.get_active_dim(i), dtype=ind_t)
         j    = np.empty(len(data), dtype=ind_t)
         if i < 0:
             i = len(self) + i
         __lib__.VarSizeList_get(self._handle, i, data, j, len(data))
+        if dim is not None and dim <= 0:
+            return j, data
+        if dim is None:
+            dim = np.maximum(self.min_dim, self.get_dim(i))
+        item = np.empty(dim, dtype=ind_t)
         item.fill(__lib__.GetDefaultSetBase())
         item[j] = data
         return item
@@ -481,6 +490,14 @@ class VarSizeList(object):
         return __lib__.VarSizeList_estimate_bias(self._handle,
                                                  err_contributions, len(err_contributions),
                                                  rates, len(rates))
+
+    def reduce_set(self, dims):
+        indices = np.empty(len(self), dtype=np.uint32)
+        new_handle = __lib__.VarSizeList_reduce_set(self._handle,
+                                                    np.array(dims, dtype=ind_t),
+                                                    len(dims),
+                                                    indices, len(indices))
+        return VarSizeList(_handle=new_handle, min_dim=self.min_dim), indices
 
 class ProfCalculator(object):
     # def GetIndexSet(self, max_prof):
