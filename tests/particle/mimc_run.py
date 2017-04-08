@@ -25,6 +25,7 @@ class ParticleField(object):
         self.gen = kuramoto.RandGen(run.params.qoi_seed)
 
     def SampleQoI(self, run, inds, M):
+        M = np.maximum(M, 10000)
         meshes = (1./run.fn.Hierarchy(inds)).astype(np.int)
         import time
         tStart = time.clock()
