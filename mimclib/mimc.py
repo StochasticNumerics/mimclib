@@ -891,6 +891,7 @@ estimate optimal number of levels"
         for TOL in TOLs:
             print_info("TOL", TOL)
             timer.tic()
+            samples_added = False
             while True:
                 # Skip adding an iteration if the previous one is empty
                 timer.tic()
@@ -911,7 +912,6 @@ estimate optimal number of levels"
                     self.iters.append(self.last_itr.next_itr())
 
                 self.last_itr.TOL = TOL
-                samples_added = False
                 gc.collect()
                 if self.params.bayesian and self.last_itr.lvls_count > 0:
                     L = self._estimateOptimalL(TOL)
@@ -952,17 +952,17 @@ estimate optimal number of levels"
                 self.last_itr.totalTime = timer.toc()
                 self.output(verbose=verbose)
                 print_info("------------------------------------------------")
-                if samples_added:
-                    if self.fn.ItrDone is not None:
-                        self.fn.ItrDone()
-                else:
-                    # remove last iteration since it is empty
-                    assert(self.params.bayesian or self.totalErrorEst() < TOL)
-                    self.iters.pop()
                 if self.params.bayesian or self.totalErrorEst() < TOL \
                    or (TOL < finalTOL and self.totalErrorEst() < finalTOL):
                     break
 
+            if samples_added:
+                if self.fn.ItrDone is not None:
+                    self.fn.ItrDone()
+            else:
+                # remove last iteration since it is empty
+                assert(self.params.bayesian or self.totalErrorEst() < TOL)
+                self.iters.pop()
             print_info("MIMC iteration for TOL={} took {} seconds".format(TOL, timer.toc()))
             print_info("################################################")
             if less(TOL, finalTOL) and self.totalErrorEst() <= finalTOL:
