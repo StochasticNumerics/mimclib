@@ -748,7 +748,7 @@ def plotTotalWorkVsLvls(ax, runs, *args, **kwargs):
                 inds.append(ii)
                 cur = cur + direction
             for j, ind in enumerate(inds):
-                data_tw.append([ind, curIter.M[ind] * curIter.Wl_estimate[ind]])
+                data_tw.append([ind, curIter.tW[ind]])
         lvls, total_work = __get_stats(data_tw)
         plotObj.append(ax.errorbar(lvls, total_work[:, 1],
                                    yerr=[total_work[:, 1]-total_work[:, 0],
@@ -1008,11 +1008,11 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
             raise ValueError("Cannot estimate real time of Monte Carlo")
 
         xy = [[itr.TOL, r.iter_total_times[i],
-               np.max(itr.Wl_estimate) * r.estimateMonteCarloSampleCount(itr.TOL)]
+               np.max(itr.calcWl()) * r.estimateMonteCarloSampleCount(itr.TOL)]
               for i, r, itr in enum_iter_i(runs, filteritr)]
     elif work_estimate:
-        xy = [[itr.TOL, np.sum(itr.M*itr.Wl_estimate),
-               np.max(itr.Wl_estimate) * r.estimateMonteCarloSampleCount(itr.TOL)]
+        xy = [[itr.TOL, np.sum(itr.tW),
+               np.max(itr.calcWl()) * r.estimateMonteCarloSampleCount(itr.TOL)]
               for r, itr in enum_iter(runs, filteritr)]
     else:
         xy = [[itr.TOL, np.sum(itr.tT),

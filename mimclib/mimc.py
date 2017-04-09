@@ -163,7 +163,6 @@ class MIMCItrData(object):
         self.totalTime = None
         self.Q = None
         self.Vl_estimate = np.zeros(0)
-        self.Wl_estimate = np.zeros(0)
         self._lvls_count = 0
         self._levels_added()
 
@@ -183,7 +182,6 @@ class MIMCItrData(object):
         ret.TOL = self.TOL
         ret.Q = copy.copy(self.Q)
         ret.Vl_estimate = self.Vl_estimate.copy() if self.Vl_estimate is not None else None
-        ret.Wl_estimate = self.Wl_estimate.copy() if self.Wl_estimate is not None else None
         return ret
 
 
@@ -284,13 +282,12 @@ class MIMCItrData(object):
             self.psums_fine.resize((new_count, ) + self.psums_fine.shape[1:], refcheck=False)
 
         self.Vl_estimate.resize(new_count, refcheck=False)
-        self.Wl_estimate.resize(new_count, refcheck=False)
         self.tT.resize(new_count, refcheck=False)
         self.tW.resize(new_count, refcheck=False)
         self.M.resize(new_count, refcheck=False)
 
     def calcTotalWork(self):
-        return np.sum(self.Wl_estimate * self.M, axis=0)
+        return np.sum(self.tW, axis=0)
 
     def totalErrorEst(self):
         return self.bias + (self.stat_error if not np.isnan(self.stat_error) else 0)
@@ -412,12 +409,12 @@ class MIMCRun(object):
         return self.last_itr.Vl_estimate
 
     @property
-    def Q(self):
-        return self.last_itr.Q
+    def Wl_estimate(self):
+        return self.last_itr.calcWl()
 
     @property
-    def Wl_estimate(self):
-        return self.last_itr.Wl_estimate
+    def Q(self):
+        return self.last_itr.Q
 
     @property
     def bias(self):
@@ -456,9 +453,6 @@ class MIMCRun(object):
         if self.params.bayesian and not hasattr(self.fn, "WorkModel"):
             raise NotImplementedError("Bayesian parameter fitting is only \
 supported with a given work model")
-
-        if not hasattr(self.fn, "WorkModel"):
-            self.fn.WorkModel = lambda lvls: self.last_itr.calcWl()
 
         if self.fn.SampleAll is None:
             raise ValueError("Must set the sampling functions fnSampleAll")
@@ -500,7 +494,9 @@ supported with a given work model")
             if kk == "SampleLvl":
                 if kwargs[k] is not None:
                     self.fn.SampleAll = lambda lvls, M, moments: \
-                                        default_sample_all(lvls, M, moments, kwargs[k])
+                                        default_sample_all(lvls, M,
+                                                           moments, kwargs[k],
+                                                           fnWorkModel=self.fn.WorkModel)
             else:
                 setattr(self.fn, kk, kwargs[k])
 
@@ -625,7 +621,7 @@ Bias={:.12e}\nStatErr={:.12e}\
 
         has_var = self.last_itr.moments >= 2
 
-        Wl = self.Wl_estimate
+        Wl = self.last_itr.calcWl()
         if has_var:
             V = self.Vl_estimate
         if has_var and self.params.bayesian:
@@ -798,7 +794,6 @@ estimate optimal number of levels"
             self.iters[-1].Vl_estimate = np.empty(len(self.last_itr.get_lvls()))
             self.iters[-1].Vl_estimate.fill(np.nan)
 
-        self.iters[-1].Wl_estimate = self.fn.WorkModel(lvls=self.last_itr.get_lvls())
         self.iters[-1].bias = self._estimateBias()
         self.iters[-1].stat_error = np.inf if np.any(self.last_itr.M == 0) \
                                     else self._Ca * \
@@ -942,7 +937,7 @@ estimate optimal number of levels"
 
                 todoM = self._calcTheoryM(TOL, self.Q.theta,
                                           self.Vl_estimate,
-                                          self.Wl_estimate)
+                                          self.last_itr.calcWl())
                 print_debug("theta", self.Q.theta)
                 print_debug("New M: ", todoM)
                 if not self.params.reuse_samples:
@@ -1045,7 +1040,6 @@ estimate optimal number of levels"
                                    np.sum(itr.tT[sel]),
                                    np.sum(itr.tW[sel]))
                 new_itr.Vl_estimate[lvl_idx] = np.sum(itr.Vl_estimate[sel])
-                new_itr.Wl_estimate[lvl_idx] = np.sum(itr.Wl_estimate[sel])
                 set_idx += 1
                 min_prof += prof_step
         assert(np.all(new_itr._lvls.check_admissibility())) # TEMP
@@ -1103,7 +1097,6 @@ estimate optimal number of levels"
             if hasattr(itr, "db_data"):
                 new_itr.db_data = itr.db_data
             new_itr.Vl_estimate = itr.Vl_estimate
-            new_itr.Wl_estimate = itr.Wl_estimate
             new_itr.tT = itr.tT
             new_itr.tW = itr.tW
             new_itr.M = itr.M
@@ -1198,7 +1191,7 @@ def extend_prof_lvls(lvls, profCalc, min_lvl):
         added += 1
 
 
-def default_sample_all(lvls, M, moments, fnSample):
+def default_sample_all(lvls, M, moments, fnSample, fnWorkModel=None):
     # fnSampleLvl(inds, M) -> Returns a matrix of size (M, len(ind)) and
     # the time estimate
     lvls_count = len(lvls)
@@ -1207,6 +1200,8 @@ def default_sample_all(lvls, M, moments, fnSample):
     calcM = np.zeros(lvls_count, dtype=np.int)
     total_time = np.zeros(lvls_count)
     total_work = np.zeros(lvls_count)
+    if fnWorkModel is not None:
+        work_per_lvl = fnWorkModel(lvls)
     for i in range(0, lvls_count):
         if M[i] <= 0:
             continue
@@ -1223,7 +1218,8 @@ def default_sample_all(lvls, M, moments, fnSample):
             values = ret[0]
             samples_time = ret[1]
             if len(ret) < 3:  # Backward compatibility
-                samples_work = samples_time
+                assert(fnWorkModel is not None)
+                samples_work = work_per_lvl[i] * len(values)
             else:
                 samples_work = ret[2]
             total_time[i] += samples_time

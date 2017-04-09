@@ -117,7 +117,6 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     lvl_hash      varchar(35) NOT NULL,
     El            REAL,
     Vl            REAL,
-    Wl            REAL,
     tT            REAL,
     tW            REAL,
     Ml            BIGINT,
@@ -127,7 +126,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     UNIQUE KEY idx_run_lvl (iter_id, lvl_hash)
 );
 
-CREATE VIEW vw_lvls AS SELECT iter_id, lvl, El, Vl, Wl, tT, tW, Ml FROM tbl_lvls;
+CREATE VIEW vw_lvls AS SELECT iter_id, lvl, El, Vl, tT, tW, Ml FROM tbl_lvls;
 
 -- CREATE USER 'USER'@'%';
 -- GRANT ALL PRIVILEGES ON *.* TO 'USER'@'%' WITH GRANT OPTION;
@@ -231,7 +230,6 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     lvl_hash      varchar(35) NOT NULL,
     El            REAL,
     Vl            REAL,
-    Wl            REAL,
     tT            REAL,
     tW            REAL,
     Ml            INTEGER,
@@ -241,7 +239,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     CONSTRAINT idx_run_lvl UNIQUE (iter_id, lvl_hash)
 );
 
-CREATE VIEW vw_lvls AS SELECT iter_id, lvl, El, Vl, Wl, tT, tW, Ml FROM tbl_lvls;
+CREATE VIEW vw_lvls AS SELECT iter_id, lvl, El, Vl, tT, tW, Ml FROM tbl_lvls;
 '''
         return script
 
@@ -305,7 +303,6 @@ class MIMCDatabase(object):
         Vl = iteration.Vl_estimate
         tT = iteration.tT
         tW = iteration.tW
-        Wl = iteration.Wl_estimate
         Ml = iteration.M
 
         prev_iter = mimc_run.iters[iteration_idx-1] if iteration_idx >= 1 else None
@@ -313,7 +310,6 @@ class MIMCDatabase(object):
             prev_Vl = iteration.Vl_estimate
             prev_tT = iteration.tT
             prev_tW = iteration.tW
-            prev_Wl = iteration.Wl_estimate
             prev_Ml = iteration.M
 
         with self.DBConn(**self.connArgs) as cur:
@@ -331,21 +327,21 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             # Only add levels that are different from the
             #       previous iteration
             for k in range(0, iteration.lvls_count):
-                lvl_data = _nan2none([El[k], Vl[k], Wl[k], tT[k], tW[k], Ml[k]])
+                lvl_data = _nan2none([El[k], Vl[k], tT[k], tW[k], Ml[k]])
                 if prev_iter is not None:
                     if k < prev_iter.lvls_count:
                         if np.all(prev_iter.psums_delta[k, :] == iteration.psums_delta[k, :]) and \
                            np.all(prev_iter.psums_fine[k, :] == iteration.psums_fine[k, :]) and \
                            np.all(np.array(lvl_data[1:]) ==
                                   _nan2none([prev_Vl[k],
-                                             prev_Wl[k], prev_tT[k], prev_tW[k], prev_Ml[k]])):
+                                             prev_tT[k], prev_tW[k], prev_Ml[k]])):
                             continue         # Index is repeated as is in this iteration
 
                 lvl = ",".join(["%d|%d" % (i, j) for i, j in
                                 enumerate(iteration.lvls_get(k)) if j > base])
                 cur.execute('''
-INSERT INTO tbl_lvls(lvl, lvl_hash, psums_delta, psums_fine, iter_id,  El, Vl, Wl, tT, tW, Ml)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+INSERT INTO tbl_lvls(lvl, lvl_hash, psums_delta, psums_fine, iter_id,  El, Vl, tT, tW, Ml)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                             [lvl, _md5(lvl),
                              _pickle(iteration.psums_delta[k, :]),
                              _pickle(iteration.psums_fine[k, :]), iter_id]+
@@ -372,7 +368,7 @@ ORDER BY dr.run_id, dr.iteration_idx
 
             lvlsAll = cur.execute('''
             SELECT dr.iter_id, l.lvl, l.psums_delta, l.psums_fine, l.Ml,
-                     l.tT, l.tW, l.Wl, l.Vl
+                     l.tT, l.tW, l.Vl
             FROM
             tbl_lvls l INNER JOIN tbl_iters dr ON
             dr.iter_id=l.iter_id INNER JOIN tbl_runs r on r.run_id=dr.run_id
@@ -437,8 +433,7 @@ ORDER BY dr.run_id, dr.iteration_idx
                                          tW=_none2nan(l[6]),
                                          psums_delta=_unpickle(l[2]),
                                          psums_fine=_unpickle(l[3]))
-                    iteration.Wl_estimate[k] = _none2nan(l[7])
-                    iteration.Vl_estimate[k] = _none2nan(l[8])
+                    iteration.Vl_estimate[k] = _none2nan(l[7])
         return lstruns
 
     def _fetchArray(self, query, params=None):
