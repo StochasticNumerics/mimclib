@@ -887,26 +887,25 @@ estimate optimal number of levels"
             print_info("TOL", TOL)
             timer.tic()
             samples_added = False
-            while True:
-                # Skip adding an iteration if the previous one is empty
-                timer.tic()
-                if len(self.iters) == 0:
-                    self.iters.append(MIMCItrData(parent=self,
-                                                  min_dim=self.params.min_dim,
-                                                  moments=self.params.moments))
-                    if self.params.bayesian:
-                        self.last_itr.Q = Bunch(S=np.inf, W=np.inf,
-                                                w=self.params.w,
-                                                s=self.params.s,
-                                                theta=self.params.theta)
-                    else:
-                        self.last_itr.Q = Bunch(theta=self.params.theta)
-                    if not self.params.reuse_samples:
-                        self._all_itr = self.last_itr.next_itr()
+            timer.tic()
+            if len(self.iters) == 0:
+                self.iters.append(MIMCItrData(parent=self,
+                                              min_dim=self.params.min_dim,
+                                              moments=self.params.moments))
+                if self.params.bayesian:
+                    self.last_itr.Q = Bunch(S=np.inf, W=np.inf,
+                                            w=self.params.w,
+                                            s=self.params.s,
+                                            theta=self.params.theta)
                 else:
-                    self.iters.append(self.last_itr.next_itr())
+                    self.last_itr.Q = Bunch(theta=self.params.theta)
+                if not self.params.reuse_samples:
+                    self._all_itr = self.last_itr.next_itr()
+            else:
+                self.iters.append(self.last_itr.next_itr())
+            self.last_itr.TOL = TOL
 
-                self.last_itr.TOL = TOL
+            while True:
                 gc.collect()
                 if self.params.bayesian and self.last_itr.lvls_count > 0:
                     L = self._estimateOptimalL(TOL)
