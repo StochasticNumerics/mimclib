@@ -846,7 +846,8 @@ estimate optimal number of levels"
 
     def _calcTheta(self, TOL, bias_est):
         if not self.params.const_theta:
-            return (1 - bias_est/TOL) if TOL > 0 else np.inf
+            return np.maximum((1 - bias_est/TOL) if TOL > 0 else
+                              np.inf, self.params.theta)
         return self.params.theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
@@ -918,8 +919,7 @@ estimate optimal number of levels"
                             self.last_itr.lvls_count, L+1).reshape((-1, 1)))
                         self._estimateAll()
 
-                self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
-                                          self.params.theta)
+                self.Q.theta = self._calcTheta(TOL, self.bias)
 
                 if self.last_itr.lvls_count == 0 or \
                    (not self.params.bayesian and
@@ -932,8 +932,7 @@ estimate optimal number of levels"
                         print_info("WARNING: MIMC did not converge with the maximum number of levels")
                         break
                     samples_added = self._genSamples(newTodoM) or samples_added
-                    self.Q.theta = np.maximum(self._calcTheta(TOL, self.bias),
-                                              self.params.theta)
+                    self.Q.theta = self._calcTheta(TOL, self.bias)
 
                 todoM = self._calcTheoryM(TOL, self.Q.theta,
                                           self.Vl_estimate,

@@ -24,7 +24,7 @@ def _format_latex_sci(x):
         return ss
     parts = [float(s) for s in ss.split('e')]
     assert(len(parts) == 2)
-    return "{:.2g} \\times 10^{{ {:g} }}".format(parts[0], parts[1])
+    return "${:.2g} \\times 10^{{ {:g} }}$".format(parts[0], parts[1])
 
 def _formatPower(rate):
     rate = "{:.2g}".format(rate)
@@ -490,7 +490,7 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     num_kwargs = kwargs.pop('num_kwargs', None)
     modifier = kwargs.pop('modifier', 1.)
     relative = modifier != 1.
-    filteritr = kwargs.pop("filteritr", filteritr_all)
+    filteritr = kwargs.pop("filteritr", filteritr_convergent)
 
     ax.set_xlabel('TOL')
     ax.set_ylabel('Relative error' if relative else 'Error')

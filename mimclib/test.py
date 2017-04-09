@@ -63,9 +63,6 @@ def RunStandardTest(fnSampleLvl=None,
     parser.add_argument("-qoi_seed", type=int,
                         action="store", help="Seed for random generator")
     parser.add_argument("-db_name", type=str, action="store", help="")
-    parser.add_argument("-db_conv_only", type="bool", action="store",
-                        default=True,
-                        help="Only save convergent iterations")
 
     if fnAddExtraArgs is not None:
         fnAddExtraArgs(parser)
@@ -108,8 +105,7 @@ def RunStandardTest(fnSampleLvl=None,
                               tag=mimcRun.params.db_tag)
         if fnItrDone is None:
             def ItrDone(db=db, r_id=run_id, r=mimcRun):
-                if not r.params.db_conv_only or r.totalErrorEst() < r.last_itr.TOL:
-                    db.writeRunData(r_id, r, iteration_idx=len(r.iters)-1)
+                db.writeRunData(r_id, r, iteration_idx=len(r.iters)-1)
             fnItrDone = ItrDone
         else:
             fnItrDone = lambda db=db, r_id=run_id, r=mimcRun, fn=fnItrDone: \
