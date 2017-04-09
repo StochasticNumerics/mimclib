@@ -60,7 +60,7 @@ function all_cmds {
 
 if [ "$EXAMPLE" = "sf-matern" ]; then
     CMN='-mimc_beta 2'
-    for nu in 2.5 3.5 4.5 6.5
+    for nu in 3.5 4.5 6.5 2.5 
     do
         max_lvl=10
         z=`echo "$nu+0.5" | bc`

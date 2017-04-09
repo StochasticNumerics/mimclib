@@ -105,12 +105,6 @@ void SFieldCreate(SField *_sf,
     ind_t m[sf->d];
     for (i=0;i<sf->d;i++) m[i]=1;
     TensorGrid(d, 0, m, sf->d_multi_idx, total);
-
-    KSP ksp;
-    KSPCreate(PETSC_COMM_WORLD,&ksp);
-    KSPSetFromOptions(ksp);
-
-    sf->ksp = ksp;
 }
 
 int linIdx_Sys(int d, const int* mesh, int* pt, int i, int m){
@@ -323,7 +317,11 @@ int SFieldBeginRuns(SField sfv,
     VecSetFromOptions(F);
     VecSetUp(F);
     VecDuplicate(F,&U);
+    KSP ksp;
+    KSPCreate(PETSC_COMM_WORLD,&ksp);
+    KSPSetFromOptions(ksp);
 
+    sf->ksp = ksp;
     sf->J = J; sf->F = F; sf->U = U;
     return 0;
 }
@@ -430,6 +428,7 @@ void SFieldEndRuns(SField sfv) {
     mySField sf = static_cast<mySField>(sfv);
     assert(sf->running);
     PetscErrorCode ierr;
+    ierr = KSPDestroy(&sf->ksp);CHKERRV(ierr);
     ierr = MatDestroy(&sf->J);CHKERRV(ierr);
     ierr = VecDestroy(&sf->F);CHKERRV(ierr);
     ierr = VecDestroy(&sf->U);CHKERRV(ierr);
@@ -440,14 +439,12 @@ void SFieldEndRuns(SField sfv) {
 }
 
 void SFieldDestroy(SField *_sf) {
-    PetscErrorCode ierr;
     mySField sf = static_cast<mySField>(*_sf);
     *_sf = 0;
     if (sf->running){
         fprintf(stderr, "WARNING: must end runs before\n");
         SFieldEndRuns(sf);
     }
-    ierr = KSPDestroy(&sf->ksp);CHKERRV(ierr);
     delete[] sf->d_multi_idx;
     delete sf;
 }

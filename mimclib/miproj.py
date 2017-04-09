@@ -101,18 +101,17 @@ class TensorExpansion(object):
         :rtype: `len(X) x len(mis)` np.array
         '''
         # M Number of samples, dim is dimensions
-        dim = np.max([len(x) for x in X])
-        max_deg = np.max(base_indices.to_dense_matrix(), axis=0)
-        rdim = np.minimum(dim, len(max_deg))
+        X = np.array(X)
+        if len(X.shape) == 1:
+            X.reshape((-1, 1))
+        max_deg = base_indices.to_sparse_matrix().max(axis=0).toarray()[0]
+        assert len(max_deg) >= base_indices.max_dim(), "TEMP: Strange error"
+        rdim = np.minimum(X.shape[1], base_indices.max_dim())
         values = np.ones((len(X), len(base_indices)))
         basis_values = np.empty(rdim, dtype=object)
-        pt_dim = np.array([len(x) for x in X])
+
         for d in xrange(0, rdim):
-            #vals = np.array([x[d] for x in X if d < len(x)])
-            vals = np.array([x[d] if d < len(x) else 0 for x in X])
-            #basis_values[d] = np.ones((len(X), max_deg[d]+1))
-            #basis_values[d][pt_dim > d] = fnBasis(vals, max_deg[d]+1)
-            basis_values[d] = fnBasis(vals, max_deg[d]+1)
+            basis_values[d] = fnBasis(X[:, d], max_deg[d]+1)
 
         for i, mi in enumerate(base_indices):
             for d, j in enumerate(mi):
@@ -157,7 +156,8 @@ Supposed to take function and maintain polynomial coefficients
 @public
 class MIWProjSampler(object):
     class SamplesCollection(object):
-        def __init__(self):
+        def __init__(self, min_dim=1):
+            self.min_dim = 1
             self.beta_count = 0
             self.pols_to_beta = np.empty(0)
             self.basis = setutil.VarSizeList()
@@ -210,7 +210,7 @@ class MIWProjSampler(object):
         self.alpha_dict = defaultdict(count(0).next)
         self.lvls = None
 
-        self.prev_samples = defaultdict(lambda: MIWProjSampler.SamplesCollection())
+        self.prev_samples = defaultdict(lambda: MIWProjSampler.SamplesCollection(self.min_dim))
         self.reuse_samples = reuse_samples
         self.direct = False
         self.user_data = []
@@ -279,14 +279,14 @@ class MIWProjSampler(object):
             if len(sam_col.basis) > 8000:
                 raise MemoryError("Too many basis functions {}".format(len(sam_col.basis)))
 
-            if not self.reuse_samples or self.min_dim < sam_col.basis.max_dim():
+            if not self.reuse_samples or sam_col.min_dim < sam_col.basis.max_dim():
                 sam_col.clear_samples()
 
-            if self.min_dim < sam_col.basis.max_dim():
-                self.min_dim *= 2**int(np.ceil(np.log2(sam_col.basis.max_dim() / self.min_dim)))
+            if sam_col.min_dim < sam_col.basis.max_dim():
+                sam_col.min_dim *= 2**int(np.ceil(np.log2(sam_col.basis.max_dim() / sam_col.min_dim)))
+                assert(len(sam_col.X) == 0)
 
             N_per_basis = self.fnSamplesCount(sam_col.basis)
-            assert(np.all(sam_col.basis.check_admissibility()))
             mods, sub_alphas = mimc.expand_delta(alpha)
             N_todo = N_per_basis.copy()
             if len(sam_col.N_per_basis) > 0:
@@ -301,8 +301,7 @@ class MIWProjSampler(object):
                 totalBasis_per_beta[i] = np.sum(sam_col.pols_to_beta == i)
 
             if np.sum(N_todo) > 0:
-                X, N_done = self.fnSamplePoints(N_todo, sam_col.basis, self.min_dim)
-                assert(len(X) >= np.sum(N_todo))
+                X, N_done = self.fnSamplePoints(N_todo, sam_col.basis, sam_col.min_dim)
                 N_done[:len(sam_col.N_per_basis)] += sam_col.N_per_basis
                 sam_col.N_per_basis = N_done
                 pt_sampling_time = time.clock() - tStart

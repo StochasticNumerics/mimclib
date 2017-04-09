@@ -1161,7 +1161,7 @@ def plotErrorsQQ(ax, runs, label_fmt='{TOL}', *args, **kwargs):
     ec = ECDF(x)
     plotObj = []
     Ref_kwargs = kwargs.pop('Ref_kwargs', None)
-    label = label.format(TOL=_format_latex_sci(tol))
+    label = label_fmt.format(TOL=_format_latex_sci(tol))
     plotObj.append(ax.scatter(norm.cdf(x), ec(x), label=label, *args, **kwargs))
     if Ref_kwargs is not None:
         plotObj.append(ax.add_line(FunctionLine2D.ExpLine(rate=1, **Ref_kwargs)))
@@ -1349,7 +1349,6 @@ def genBooklet(runs, **kwargs):
         try:
             # This plot only makes sense for convergent plots
             plotErrorsQQ(ax, runs, filteritr=filteritr_convergent,
-                         fnNorm=fnNorm,
                          Ref_kwargs={'ls': '--', 'c': 'k'})
         except:
             __plot_except(ax)
@@ -1420,11 +1419,10 @@ def genBooklet(runs, **kwargs):
         try:
             print_msg(plotFunc.__name__)
             ax = add_fig()
-            plotDirections(ax, runs, plotFunc,
-                           fnNorm=fnNorm,
-                           label_fmt=label_fmt,
-                           plot_fine=plotFine, plot_estimate=plotEstimate,
-                           beta=None,#params.beta if has_beta else None,
+            plotDirections(ax, runs, plotFunc, fnNorm=fnNorm,
+                           label_fmt=label_fmt, plot_fine=plotFine,
+                           plot_estimate=plotEstimate,
+                           beta=params.beta if has_beta else None,
                            rate=rate)
         except:
             __plot_except(ax)
