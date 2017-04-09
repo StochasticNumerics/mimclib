@@ -400,7 +400,6 @@ ORDER BY dr.run_id, dr.iteration_idx
                 continue
             for i, data in enumerate(dictIters[run.db_data.run_id]):
                 iter_id = data[1]
-                assert(i == data[9])  # Should be the same as the iteration index
                 if run.last_itr is not None:
                     iteration = run.last_itr.next_itr()
                 else:
@@ -412,6 +411,7 @@ ORDER BY dr.run_id, dr.iteration_idx
                 iteration.db_data.iter_id = iter_id
                 iteration.db_data.user_data = _unpickle(data[8])
                 iteration.db_data.creation_date = data[3]
+                iteration.db_data.iter_idx = data[9]
                 iteration.totalTime = data[4]
                 iteration.bias = _none2nan(data[5])
                 iteration.stat_error = _none2nan(data[6])

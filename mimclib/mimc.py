@@ -887,25 +887,26 @@ estimate optimal number of levels"
             print_info("TOL", TOL)
             timer.tic()
             samples_added = False
-            timer.tic()
-            if len(self.iters) == 0:
-                self.iters.append(MIMCItrData(parent=self,
-                                              min_dim=self.params.min_dim,
-                                              moments=self.params.moments))
-                if self.params.bayesian:
-                    self.last_itr.Q = Bunch(S=np.inf, W=np.inf,
-                                            w=self.params.w,
-                                            s=self.params.s,
-                                            theta=self.params.theta)
-                else:
-                    self.last_itr.Q = Bunch(theta=self.params.theta)
-                if not self.params.reuse_samples:
-                    self._all_itr = self.last_itr.next_itr()
-            else:
-                self.iters.append(self.last_itr.next_itr())
-            self.last_itr.TOL = TOL
-
             while True:
+                # Skip adding an iteration if the previous one is empty
+                timer.tic()
+                if len(self.iters) == 0:
+                    self.iters.append(MIMCItrData(parent=self,
+                                                  min_dim=self.params.min_dim,
+                                                  moments=self.params.moments))
+                    if self.params.bayesian:
+                        self.last_itr.Q = Bunch(S=np.inf, W=np.inf,
+                                                w=self.params.w,
+                                                s=self.params.s,
+                                                theta=self.params.theta)
+                    else:
+                        self.last_itr.Q = Bunch(theta=self.params.theta)
+                    if not self.params.reuse_samples:
+                        self._all_itr = self.last_itr.next_itr()
+                else:
+                    self.iters.append(self.last_itr.next_itr())
+
+                self.last_itr.TOL = TOL
                 gc.collect()
                 if self.params.bayesian and self.last_itr.lvls_count > 0:
                     L = self._estimateOptimalL(TOL)
@@ -946,17 +947,17 @@ estimate optimal number of levels"
                 self.last_itr.totalTime = timer.toc()
                 self.output(verbose=verbose)
                 print_info("------------------------------------------------")
+                if samples_added:
+                    if self.fn.ItrDone is not None:
+                        self.fn.ItrDone()
+                else:
+                    # remove last iteration since it is empty
+                    assert(self.params.bayesian or self.totalErrorEst() < TOL)
+                    self.iters.pop()
+
                 if self.params.bayesian or self.totalErrorEst() < TOL \
                    or (TOL < finalTOL and self.totalErrorEst() < finalTOL):
                     break
-
-            if samples_added:
-                if self.fn.ItrDone is not None:
-                    self.fn.ItrDone()
-            else:
-                # remove last iteration since it is empty
-                assert(self.params.bayesian or self.totalErrorEst() < TOL)
-                self.iters.pop()
             print_info("MIMC iteration for TOL={} took {} seconds".format(TOL, timer.toc()))
             print_info("################################################")
             if less(TOL, finalTOL) and self.totalErrorEst() <= finalTOL:
