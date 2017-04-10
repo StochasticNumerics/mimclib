@@ -955,7 +955,6 @@ def plotTimeVsLvls(ax, runs, *args, **kwargs):
                              direction=kwargs.pop('direction', None), fnNorm=fnNorm)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     x, sorted_ind = _get_x_axis(ax, ret, kwargs)
-
     min_tl = np.nanpercentile(ret.Tl, 5, axis=1)
     med    = np.nanpercentile(ret.Tl, 50, axis=1)
     max_tl = np.nanpercentile(ret.Tl, 95, axis=1)

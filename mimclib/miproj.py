@@ -161,6 +161,8 @@ class MIWProjSampler(object):
             self.beta_count = 0
             self.pols_to_beta = np.empty(0)
             self.basis = setutil.VarSizeList()
+            self.pt_sampling_time = 0
+            self.sampling_time = 0
             self.clear_samples()
 
         def max_dim(self):
@@ -170,8 +172,9 @@ class MIWProjSampler(object):
             self.X = []
             self.W = np.empty(0)
             self.Y = None
-            self.total_time = 0
             self.N_per_basis = np.empty(0, dtype=np.uint32)
+            self.sampling_time = 0
+            self.pt_sampling_time = 0
 
         def add_points(self, fnSample, alphas, X):
             self.X.extend(X.tolist())
@@ -256,8 +259,6 @@ class MIWProjSampler(object):
         total_work = np.zeros(len(lvls))
 
         # Add previous times and works from previous iteration
-        if self.reuse_samples and len(run.iters) >= 2:
-            total_time[:len(run.iters[-2].tT)] = run.iters[-2].tT
         from .mimc import Bunch
         for alpha, ind in self.alpha_dict.iteritems():
             tStart = time.clock()
@@ -305,14 +306,13 @@ class MIWProjSampler(object):
                 X, N_done = self.fnSamplePoints(N_todo, sam_col.basis, sam_col.min_dim)
                 N_done[:len(sam_col.N_per_basis)] += sam_col.N_per_basis
                 sam_col.N_per_basis = N_done
-                pt_sampling_time = time.clock() - tStart
+                sam_col.pt_sampling_time += time.clock() - tStart
 
                 tStart = time.clock()
                 sam_col.add_points(fnSample, sub_alphas, X)
-                sampling_time = time.clock() - tStart
+                sam_col.sampling_time += time.clock() - tStart
             else:
-                pt_sampling_time = time.clock() - tStart
-                sampling_time = 0
+                sam_col.pt_sampling_time += time.clock() - tStart
 
             tStart = time.clock()
             # sam_col.basis_values.re size(len(sam_col.X), len(sam_col.basis))
@@ -368,17 +368,17 @@ class MIWProjSampler(object):
                     psums_delta[sel_lvls, 0] += projections*mods[i]
             projection_time = time.clock() - tStart
             # For now, only compute sampling time
-            time_taken = sampling_time + pt_sampling_time + assembly_time_1 + \
-                         assembly_time_2 + projection_time
-            if np.sum(todoN_per_beta) > 0:
-                total_time[sel_lvls] += time_taken * todoN_per_beta / np.sum(todoN_per_beta)
+            time_taken = sam_col.sampling_time + sam_col.pt_sampling_time
+            time_taken += assembly_time_1 + assembly_time_2 + projection_time
+
+            total_time[sel_lvls] = time_taken * totalN_per_beta / np.sum(totalN_per_beta)
             total_work[sel_lvls] = work_per_sample * totalN_per_beta
             self.user_data.append(Bunch(alpha=alpha,
                                         max_cond=max_cond,
                                         matrix_size=BW.shape[1],
                                         todoN_per_beta=todoN_per_beta,
-                                        sampling_time=sampling_time,
-                                        pt_sampling_time=pt_sampling_time,
+                                        sampling_time=sam_col.sampling_time,
+                                        pt_sampling_time=sam_col.pt_sampling_time,
                                         assembly_time_1=assembly_time_1,
                                         assembly_time_2=assembly_time_2,
                                         projection_time=projection_time))

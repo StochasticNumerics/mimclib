@@ -264,6 +264,7 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
 
     fig_W = plt.figure()
     fig_T = plt.figure()
+    fig_Tc = plt.figure()
     fix_runs = []
     while True:
         fix_tag = input_args.db_tag + "-fix-" + str(len(fix_runs))
@@ -283,16 +284,15 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
         fix_runs.append(run_data[0])
 
     fnWork = lambda run, i: run.iters[i].calcTotalWork()
-    if not hasattr(runs[0].params, 'miproj_reuse_samples') \
-       or runs[0].params.miproj_reuse_samples:
+    if runs[0].params.miproj_reuse_samples:
         fnTime = lambda run, i: run.iter_total_times[i]
     else:
         fnTime = lambda run, i: run.iters[i].totalTime #run.iter_total_times[i]
+    fnTime_calc = lambda run, i: run.iters[i].calcTotalTime()
 
     work_bins = 50
     work_spacing = np.sqrt(2)
     runs_adaptive = db.readRuns(tag=input_args.db_tag + "-adapt", done_flag=input_args.done_flag)
-
 
     if input_args.qoi_exact is not None:
         print("Setting errors")
@@ -309,6 +309,13 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                                       label='\\ell={}'.format(i), alpha=0.7)
             miplot.plotWorkVsMaxError(fig_T.gca(), [rr],
                                       fnWork=fnTime,
+                                      modifier=modifier, fmt='--x',
+                                      fnAggError=np.min,
+                                      work_bins=1000, Ref_kwargs=None,
+                                      label='\\ell={}'.format(i),
+                                      alpha=0.7)
+            miplot.plotWorkVsMaxError(fig_Tc.gca(), [rr],
+                                      fnWork=fnTime_calc,
                                       modifier=modifier, fmt='--x',
                                       fnAggError=np.min,
                                       work_bins=1000, Ref_kwargs=None,
@@ -332,10 +339,17 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                                   work_bins=work_bins,
                                   Ref_kwargs=Ref_kwargs if rr==runs else None,
                                   work_spacing=work_spacing, label=label)
+        miplot.plotWorkVsMaxError(fig_Tc.gca(), rr, fnWork=fnTime_calc,
+                                  modifier=modifier, fmt='-*',
+                                  fnAggError=np.min,
+                                  work_bins=work_bins,
+                                  Ref_kwargs=Ref_kwargs if rr==runs else None,
+                                  work_spacing=work_spacing, label=label)
 
     fig_W.gca().set_xlabel('Avg. Iteration Work')
     fig_T.gca().set_xlabel('Avg. Iteration Time (tic/toc)')
-    return [fig_W, fig_T]
+    fig_Tc.gca().set_xlabel('Avg. Iteration Time (calculated)')
+    return [fig_W, fig_T, fig_Tc]
 
 if __name__ == "__main__":
     from mimclib import ipdb
