@@ -291,6 +291,7 @@ class MIWProjSampler(object):
             N_todo = N_per_basis.copy()
             if len(sam_col.N_per_basis) > 0:
                 N_todo[:len(sam_col.N_per_basis)] -= sam_col.N_per_basis
+                N_todo = np.maximum(0, N_todo)
 
             todoN_per_beta = np.zeros(sam_col.beta_count)
             totalN_per_beta = np.zeros(sam_col.beta_count)
