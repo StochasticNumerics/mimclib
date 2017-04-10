@@ -274,12 +274,12 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
         assert(len(run_data) == 1)
         # Modify work estimates to account for space discretization
         # TODO: WARNING: Different behavior between poisson and matern
-        ell = len(fix_runs)
+        # ell = len(fix_runs)
         #work_per_sample = run_data[0].params.beta ** (run_data[0].params.gamma * ell)  # matern
-        work_per_sample = run_data[0].params.beta ** (run_data[0].params.gamma * ell/2.0) # poisson
-        for itr in run_data[0].iters:
-            itr.tW *= work_per_sample
-            itr.Wl_estimate = itr.tW
+        # work_per_sample = run_data[0].params.beta ** (run_data[0].params.gamma * ell/2.0) # poisson
+        # for itr in run_data[0].iters:
+        #     itr.tW *= work_per_sample
+        #     itr.Wl_estimate = itr.tW
         fix_runs.append(run_data[0])
 
     fnWork = lambda run, i: run.iters[i].calcTotalWork()

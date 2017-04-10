@@ -332,13 +332,13 @@ class MIWProjSampler(object):
                                    rmatvec=lambda v: np.dot(BW, np.dot(BW.transpose(), v)))
             assembly_time_2 = time.clock() - tStart
 
-            # This following operation is only needed for diagnosis purposes
-            try:
-                GFull = G if self.direct else BW.transpose().dot(BW)
-                max_cond = np.linalg.cond(GFull)
-            except:
-                max_cond = np.nan
-                pass
+            max_cond = np.nan
+            # # This following operation is only needed for diagnosis purposes
+            # try:
+            #     GFull = G if self.direct else BW.transpose().dot(BW)
+            #     max_cond = np.linalg.cond(GFull)
+            # except:
+            #     pass
 
             tStart = time.clock()
             for i in xrange(0, len(sub_alphas)):
