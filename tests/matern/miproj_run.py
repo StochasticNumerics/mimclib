@@ -127,7 +127,7 @@ class MyRun:
         if self.profit_calc is None:
             # Adaptive
             error = run.fn.Norm(run.last_itr.calcDeltaEl())
-            work = run.last_itr.Wl_estimate
+            work = run.last_itr.calcWl()
             prof = setutil.calc_log_prof_from_EW(error, work)
             max_added = run.params.miproj_set_maxadd
             lvls.expand_set(prof, max_dim=max_dim, max_added=max_added)
@@ -174,10 +174,8 @@ class MyRun:
                             action="store")
         migrp.add_argument(pre + "set_mul", type=float, default=1.,
                             action="store")
-        migrp.add_argument(pre + "set_sexp", type=float, default=4.,
-                            action="store")
-        migrp.add_argument(pre + "set_dexp", type=float,
-                            default=3*np.log(2.), action="store")
+        migrp.add_argument(pre + "set_sexp", type=float, action="store")
+        migrp.add_argument(pre + "set_dexp", type=float, action="store")
         migrp.add_argument(pre + "set_maxadd", type=int,
                             default=30, action="store")
         migrp.add_argument(pre + "pts_sampler", type=str,

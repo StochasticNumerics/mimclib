@@ -528,6 +528,7 @@ of levels in every iteration. This is based on CMLMC.")
         add_store('reuse_samples', type='bool', default=True,
                   help="Reuse samples between iterations")
         add_store('bias_calc', type=str, default='new',
+                  choices=['new', 'bnd', 'abs-bnd'],
                   help="new, bnd or abs-bnd")
         add_store('const_theta', type='bool', default=False,
                   help="Use the same theta for all iterations")
@@ -675,9 +676,11 @@ Bias={:.12e}\nStatErr={:.12e}\
             elif bias_calc == 'bnd':
                 El_bnd = El[self.last_itr.get_lvls().is_boundary()]
                 bias = self.fnNorm1(np.sum(El_bnd))
-            elif bias_calc == 'abs_bnd':
+            elif bias_calc == 'abs-bnd':
                 El_bnd = El[self.last_itr.get_lvls().is_boundary()]
                 bias = np.sum(self.fnNorm(El_bnd))
+            else:
+                raise ValueError("bias_calc")
             return bias
         return self._estimateBayesianBias()
 

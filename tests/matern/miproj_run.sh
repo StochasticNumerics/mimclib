@@ -59,8 +59,8 @@ function all_cmds {
 }
 
 if [ "$EXAMPLE" = "sf-matern" ]; then
-    CMN='-mimc_beta 2'
-    for nu in 3.5 4.5 6.5 2.5 
+    CMN='-mimc_beta 2 -miproj_set_dexp 2.0794'
+    for nu in 3.5 4.5 6.5 2.5
     do
         max_lvl=10
         z=`echo "$nu+0.5" | bc`
@@ -69,13 +69,13 @@ if [ "$EXAMPLE" = "sf-matern" ]; then
         for (( i=0; i<=$max_lvl; i++ ))
         do
             all_cmds -fix-$i 1 $(($i+1)) $nu -miproj_fix_lvl $i \
-                     -miproj_set_sexp 11. -miproj_set xi_exp -mimc_min_dim 0 $CMN
+                     -miproj_set_sexp $z -miproj_set xi_exp -mimc_min_dim 0 $CMN
         done
     done
 fi;
 
 if [ "$EXAMPLE" = "sf-kink" ]; then
-    CMN='-qoi_sigma -1 -mimc_beta 1.4142135623730951 -qoi_scale 0.5'
+    CMN='-qoi_sigma -1 -mimc_beta 1.4142135623730951 -qoi_scale 0.5 -miproj_set_sexp 1.'
     for N in 1 2
     do
         max_lvl=12
@@ -86,14 +86,14 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
         fi;
 
         all_cmds -adapt 2 $max_lvl $N -miproj_max_var $N -mimc_min_dim 1 -miproj_set_maxadd 1 $CMN
-        all_cmds "" 2 $max_lvl $N -miproj_max_var $N -miproj_set_sexp 1. \
+        all_cmds "" 2 $max_lvl $N -miproj_max_var $N \
                  -miproj_set_dexp $DEXP -miproj_set td_ft -mimc_min_dim 1 $CMN
 
         for (( i=0; i<=$max_lvl; i++ ))
         do
             all_cmds -fix-$i 2 $(($i)) $N -mimc_min_dim 0 -miproj_max_var $N \
                      -miproj_fix_lvl $i \
-                     -miproj_set_sexp 1. -miproj_set_dexp $DEXP -miproj_set td_ft \
+                     -miproj_set_dexp $DEXP -miproj_set td_ft \
                      $CMN
         done
     done
