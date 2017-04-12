@@ -5,6 +5,7 @@ from __future__ import print_function
 import numpy as np
 import cPickle
 from . import setutil
+import sys
 
 import hashlib
 __all__ = []
@@ -514,3 +515,45 @@ UPDATE tbl_iters SET exact_error = ? WHERE iter_id = ?''',
             cur.execute("DELETE from tbl_runs where run_id in ?",
                         [np.array(run_ids).astype(np.int).reshape(-1).tolist()])
             return cur.getRowCount()
+
+def export_db(tag, from_db, to_db, verbose=False):
+    with from_db.DBConn(**from_db.connArgs) as from_cur:
+        with to_db.DBConn(**to_db.connArgs) as to_cur:
+            if verbose:
+                print("Getting runs")
+            runs = np.array(from_cur.execute(
+                'SELECT run_id, creation_date, TOL, done_flag, tag, totalTime,\
+ comment, fn, params FROM tbl_runs WHERE tag LIKE ?',
+                [tag]).fetchall())
+            for i, r in enumerate(runs):
+                to_cur.execute('INSERT INTO tbl_runs(creation_date, TOL, \
+done_flag, tag, totalTime, comment, fn, params)\
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?)', r[1:])
+                new_run_id = to_cur.getLastRowID()
+
+                iters = np.array(from_cur.execute(
+                    'SELECT iter_id, TOL, bias, stat_error, creation_date, \
+totalTime, Qparams, userdata, iteration_idx, exact_error \
+FROM tbl_iters WHERE run_id=?',
+                    [r[0]]).fetchall())
+                for j, itr in enumerate(iters):
+                    if verbose:
+                        sys.stdout.write("\rDoing itr {}/{} {}/{}".format(i, len(runs), j, len(iters)))
+                        sys.stdout.flush()
+                    to_cur.execute('INSERT INTO tbl_iters(run_id, TOL, bias, \
+stat_error, creation_date, totalTime, Qparams, userdata, \
+iteration_idx, exact_error) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                   [new_run_id] + itr[1:].tolist())
+                    new_iter_id = to_cur.getLastRowID()
+
+                    lvls = np.array(from_cur.execute(
+                        'SELECT lvl, lvl_hash, El, Vl, tT, tW, Ml, psums_delta, \
+psums_fine FROM tbl_lvls WHERE iter_id=?',
+                        [itr[0]]).fetchall())
+                    for lvl in lvls:
+                        to_cur.execute('INSERT INTO tbl_lvls(iter_id, lvl, \
+lvl_hash, El, Vl, tT, tW, Ml, psums_delta, psums_fine)\
+                        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                       [new_iter_id] + lvl.tolist())
+                if verbose:
+                    sys.stdout.write('\n')

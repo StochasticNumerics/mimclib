@@ -24,7 +24,7 @@ def _format_latex_sci(x):
         return ss
     parts = [float(s) for s in ss.split('e')]
     assert(len(parts) == 2)
-    return "${:.2g} \\times 10^{{ {:g} }}$".format(parts[0], parts[1])
+    return "{:.2g} \\times 10^{{ {:g} }}".format(parts[0], parts[1])
 
 def _formatPower(rate):
     rate = "{:.2g}".format(rate)
@@ -1120,7 +1120,7 @@ def plotThetaRefVsTOL(ax, runs, eta, chi, *args, **kwargs):
     return summary, [line]
 
 @public
-def plotErrorsQQ(ax, runs, label_fmt='{TOL}', *args, **kwargs):
+def plotErrorsPP(ax, runs, label_fmt='${TOL}$', *args, **kwargs):
     """Plots Normal vs Empirical CDF of @runs, as
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
@@ -1133,7 +1133,6 @@ def plotErrorsQQ(ax, runs, label_fmt='{TOL}', *args, **kwargs):
     ax.set_ylim([0, 1.])
 
     filteritr = kwargs.pop("filteritr", filteritr_convergent)
-
     if "tol" not in kwargs:
         TOLs = [itr.TOL for _, itr in enum_iter(runs, filteritr)]
         unTOLs = np.unique(TOLs)
@@ -1153,15 +1152,19 @@ def plotErrorsQQ(ax, runs, label_fmt='{TOL}', *args, **kwargs):
     except:
         plot_failed(ax)
         import warnings
-        warnings.warn("QQ plots require the object to implement __float__")
+        warnings.warn("PP plots require the object to implement __float__")
         return
 
     x /= np.std(x)
     ec = ECDF(x)
     plotObj = []
     Ref_kwargs = kwargs.pop('Ref_kwargs', None)
-    label = label_fmt.format(TOL=_format_latex_sci(tol))
-    plotObj.append(ax.scatter(norm.cdf(x), ec(x), label=label, *args, **kwargs))
+    if labal_fmt is None:
+        plotObj.append(ax.scatter(norm.cdf(x), ec(x), *args, **kwargs))
+    else:
+        label = label_fmt.format(TOL=_format_latex_sci(tol))
+        plotObj.append(ax.scatter(norm.cdf(x), ec(x), label=label, *args, **kwargs))
+
     if Ref_kwargs is not None:
         plotObj.append(ax.add_line(FunctionLine2D.ExpLine(rate=1, **Ref_kwargs)))
     return plotObj[0].get_offsets(), plotObj
@@ -1343,11 +1346,11 @@ def genBooklet(runs, **kwargs):
         __plot_except(ax)
 
     if (convergent_count > 10):   # Need at least 10 plots for this plot to be significant
-        print_msg("plotErrorsQQ")
+        print_msg("plotErrorsPP")
         ax = add_fig()
         try:
             # This plot only makes sense for convergent plots
-            plotErrorsQQ(ax, runs, filteritr=filteritr_convergent,
+            plotErrorsPP(ax, runs, filteritr=filteritr_convergent,
                          Ref_kwargs={'ls': '--', 'c': 'k'})
         except:
             __plot_except(ax)
