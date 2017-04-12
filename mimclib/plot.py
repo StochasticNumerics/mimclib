@@ -524,15 +524,18 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
                                                           const=modifier, **Ref_kwargs)))
 
     if num_kwargs is not None:
+        shift = num_kwargs.pop("shift", 1.5)
         import itertools
         xy = xy[xy[:,0].argsort(), :]
         for TOL, itr in itertools.groupby(xy, key=lambda x: x[0]):
             curItr = np.array(list(itr))
             invalid = np.sum(curItr[:, 0]*modifier <= curItr[:, 1])
+            #print("for ", TOL, ":", invalid, "out of", len(curItr), "are wrong")
+            invalid = np.round(100.*invalid / len(curItr))
             if invalid == 0:
                 continue
-            ax.text(TOL, 1.5*TOL*modifier,
-                    "{:g}\%".format(np.round(100.*invalid / len(curItr))),
+            ax.text(TOL, shift*TOL*modifier,
+                    "{:g}".format(invalid),
                     horizontalalignment='center',
                     verticalalignment='center',
                     **num_kwargs)
@@ -996,27 +999,38 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
     work_estimate = kwargs.pop("work_estimate", False)
     MC_kwargs = kwargs.pop("MC_kwargs", None)
     real_time = kwargs.pop("real_time", False)
+    min_samples = kwargs.pop("min_samples", None)
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel('TOL')
 
+    scalar = lambda itr: 1
+    if min_samples is not None:
+        scalar = lambda itr: np.ceil(np.maximum(np.float(min_samples),
+                                        itr.parent._calcTheoryM(
+                                            itr.TOL,
+                                            theta=itr.parent._calcTheta(itr.TOL, itr.bias),
+                                            Vl=itr.calcDeltaVl(),
+                                            Wl=itr.calcWl(),
+                                            ceil=False))) / itr.M
     if real_time:
         if work_estimate:
             raise ValueError("real_time and work_estimate cannot be both True")
         if MC_kwargs is not None:
             raise ValueError("Cannot estimate real time of Monte Carlo")
-
+        assert(min_samples is None)
         xy = [[itr.TOL, r.iter_total_times[i],
                np.max(itr.calcWl()) * r.estimateMonteCarloSampleCount(itr.TOL)]
               for i, r, itr in enum_iter_i(runs, filteritr)]
     elif work_estimate:
-        xy = [[itr.TOL, np.sum(itr.tW),
+        xy = [[itr.TOL, np.sum(itr.tW * scalar(itr)),
                np.max(itr.calcWl()) * r.estimateMonteCarloSampleCount(itr.TOL)]
               for r, itr in enum_iter(runs, filteritr)]
     else:
-        xy = [[itr.TOL, np.sum(itr.tT),
+        xy = [[itr.TOL, np.sum(itr.tT * scalar(itr)),
                np.max(itr.calcTl()) * r.estimateMonteCarloSampleCount(itr.TOL)]
               for r, itr in enum_iter(runs, filteritr)]
+    
     if work_estimate:
         ax.set_ylabel('Work estimate')
     elif real_time:
