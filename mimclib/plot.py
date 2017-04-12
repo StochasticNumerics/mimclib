@@ -1159,7 +1159,7 @@ def plotErrorsPP(ax, runs, label_fmt='${TOL}$', *args, **kwargs):
     ec = ECDF(x)
     plotObj = []
     Ref_kwargs = kwargs.pop('Ref_kwargs', None)
-    if labal_fmt is None:
+    if label_fmt is None:
         plotObj.append(ax.scatter(norm.cdf(x), ec(x), *args, **kwargs))
     else:
         label = label_fmt.format(TOL=_format_latex_sci(tol))
