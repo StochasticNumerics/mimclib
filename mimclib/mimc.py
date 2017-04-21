@@ -493,10 +493,11 @@ supported with a given work model")
                 raise KeyError("Invalid function name")
             if kk == "SampleLvl":
                 if kwargs[k] is not None:
+                    fnWorkModel = self.fn.WorkModel if hasattr(self.fn, "WorkModel") else None
                     self.fn.SampleAll = lambda lvls, M, moments: \
                                         default_sample_all(lvls, M,
                                                            moments, kwargs[k],
-                                                           fnWorkModel=self.fn.WorkModel)
+                                                           fnWorkModel=fnWorkModel)
             else:
                 setattr(self.fn, kk, kwargs[k])
 
