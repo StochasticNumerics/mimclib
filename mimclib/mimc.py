@@ -497,7 +497,8 @@ supported with a given work model")
                     self.fn.SampleAll = lambda lvls, M, moments: \
                                         default_sample_all(lvls, M,
                                                            moments, kwargs[k],
-                                                           fnWorkModel=fnWorkModel)
+                                                           fnWorkModel=fnWorkModel,
+                                                           verbose=self.params.verbose)
             else:
                 setattr(self.fn, kk, kwargs[k])
 
@@ -1194,7 +1195,8 @@ def extend_prof_lvls(lvls, profCalc, min_lvl):
         added += 1
 
 
-def default_sample_all(lvls, M, moments, fnSample, fnWorkModel=None):
+def default_sample_all(lvls, M, moments, fnSample, fnWorkModel=None,
+                       verbose=0):
     # fnSampleLvl(inds, M) -> Returns a matrix of size (M, len(ind)) and
     # the time estimate
     lvls_count = len(lvls)
@@ -1208,6 +1210,8 @@ def default_sample_all(lvls, M, moments, fnSample, fnWorkModel=None):
     for i in range(0, lvls_count):
         if M[i] <= 0:
             continue
+        if verbose >= VERBOSE_DEBUG:
+            print("Sampling", M[i], " at level ", i)
         mods, inds = expand_delta(lvls[i])
         calcM[i] = 0
         total_time[i] = 0
