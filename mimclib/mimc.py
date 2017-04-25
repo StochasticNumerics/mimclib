@@ -184,7 +184,6 @@ class MIMCItrData(object):
         ret.Vl_estimate = self.Vl_estimate.copy() if self.Vl_estimate is not None else None
         return ret
 
-
     def calcEg(self):
         """
         Return the sum of the sample estimators for
@@ -459,9 +458,9 @@ supported with a given work model")
 
         if not hasattr(self.fn, "ExtendLvls"):
             if np.all(np.array([hasattr(self.params, a) for a in ["w", "s", "gamma", "beta"]])):
-                weights = self.params.beta * (self.params.w +
-                                              (self.params.s -
-                                               self.params.gamma)/2.)
+                weights = np.log(self.params.beta) * (self.params.w +
+                                                      (self.params.gamma -
+                                                       self.params.s)/2.)
                 weights /= np.sum(weights, axis=0)
             elif self._get_dim() is not None or self.params.min_dim > 0:
                 d = self._get_dim()

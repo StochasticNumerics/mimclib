@@ -996,47 +996,55 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
     ax is in instance of matplotlib.axes
     """
     filteritr = kwargs.pop("filteritr", filteritr_all)
-    work_estimate = kwargs.pop("work_estimate", False)
+    fnTime = kwargs.pop("fnTime", None)
     MC_kwargs = kwargs.pop("MC_kwargs", None)
-    real_time = kwargs.pop("real_time", False)
     min_samples = kwargs.pop("min_samples", None)
+
+    if fnTime == "work":
+        ax.set_ylabel('Work estimate')
+        fnTime = lambda r, itr: np.sum(itr.tW * scalar(itr))
+        fnMCWork = lambda r, itr: np.max(itr.calcWl())
+    elif fnTime == "real_time":
+        assert min_samples is None
+        assert MC_kwargs is None
+        ax.set_ylabel('Wall clock time (s)')
+        fnTime = lambda r, itr: r.iter_total_times[i]
+    elif fnTime is None:
+        ax.set_ylabel('Running time (s)')
+        fnTime = lambda r, itr: np.sum(itr.tT * scalar(itr))
+        fnMCWork = lambda r, itr: np.max(itr.calcTl())
+    elif fnTime == "max_work":
+        assert min_samples is None
+        ax.set_ylabel('Work estimate')
+        fnMCWork = lambda r, itr: np.max(itr.calcWl())
+        fnTime = fnMCWork
+    elif fnTime == "max_time":
+        assert min_samples is None
+        ax.set_ylabel('Running time (s)')
+        fnMCWork = lambda r, itr: np.max(itr.calcTl())
+        fnTime = fnMCWork
+
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel('TOL')
 
     scalar = lambda itr: 1
     if min_samples is not None:
-        scalar = lambda itr: np.ceil(np.maximum(np.float(min_samples),
-                                        itr.parent._calcTheoryM(
-                                            itr.TOL,
-                                            theta=itr.parent._calcTheta(itr.TOL, itr.bias),
-                                            Vl=itr.calcDeltaVl(),
-                                            Wl=itr.calcWl(),
-                                            ceil=False))) / itr.M
-    if real_time:
-        if work_estimate:
-            raise ValueError("real_time and work_estimate cannot be both True")
-        if MC_kwargs is not None:
-            raise ValueError("Cannot estimate real time of Monte Carlo")
-        assert(min_samples is None)
-        xy = [[itr.TOL, r.iter_total_times[i],
-               np.max(itr.calcWl()) * r.estimateMonteCarloSampleCount(itr.TOL)]
-              for i, r, itr in enum_iter_i(runs, filteritr)]
-    elif work_estimate:
-        xy = [[itr.TOL, np.sum(itr.tW * scalar(itr)),
-               np.max(itr.calcWl()) * r.estimateMonteCarloSampleCount(itr.TOL)]
-              for r, itr in enum_iter(runs, filteritr)]
-    else:
-        xy = [[itr.TOL, np.sum(itr.tT * scalar(itr)),
-               np.max(itr.calcTl()) * r.estimateMonteCarloSampleCount(itr.TOL)]
-              for r, itr in enum_iter(runs, filteritr)]
-    
-    if work_estimate:
-        ax.set_ylabel('Work estimate')
-    elif real_time:
-        ax.set_ylabel('Wall clock time (s)')
-    else:
-        ax.set_ylabel('Running time (s)')
+        new_samples = lambda itr: np.maximum(np.float(min_samples),
+                                             itr.parent._calcTheoryM(
+                                             itr.TOL,
+                                             theta=itr.parent._calcTheta(itr.TOL, itr.bias),
+                                             Vl=itr.parent.fn.Norm(itr.calcDeltaVl()),
+                                             Wl=itr.calcWl(),
+                                             ceil=False))
+        if min_samples == 0:
+            scalar = lambda itr: new_samples(itr) / itr.M
+        else:
+            scalar = lambda itr: np.ceil(new_samples(itr)) / itr.M
+
+    xy = [[itr.TOL, fnTime(r, itr),
+           fnMCWork(r, itr) * r.estimateMonteCarloSampleCount(itr.TOL)]
+          for i, r, itr in enum_iter_i(runs, filteritr)]
 
     plotObj = []
     TOLs, times = __get_stats(xy)
@@ -1058,6 +1066,7 @@ def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
+    lvl_index = kwargs.pop('lvl_index', None)
     ax.set_xscale('log')
     ax.set_xlabel('TOL')
     ax.set_ylabel(r'$L$')
@@ -1072,7 +1081,12 @@ def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
             if not filteritr(r, i):
                 continue
             itr = r.iters[i]
-            stats = [np.sum(data) for j, data in itr.lvls_sparse_itr(prev)]
+            if lvl_index is None:
+                stats = [np.sum(data) for _, data in itr.lvls_sparse_itr(prev)]
+            else:
+                stats = [np.sum(data[lvl_index == j])
+                         for j, data in itr.lvls_sparse_itr(prev)
+                         if len(data[lvl_index == j]) > 0]
             if len(stats) == 0:
                 assert(prev > 0)
                 newMax = prevMax
@@ -1083,6 +1097,13 @@ def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
             prevMax = newMax
 
     summary = np.array(summary)
+
+    a = summary
+    b = np.ascontiguousarray(a).view(np.dtype((np.void, a.dtype.itemsize * a.shape[1])))
+    _, idx = np.unique(b, return_index=True)
+    unique_a = a[idx]
+    summary = a
+
     scatter = ax.scatter(summary[:, 0], summary[:, 1], *args, **kwargs)
     return summary, [scatter]
 
@@ -1146,6 +1167,7 @@ def plotErrorsPP(ax, runs, label_fmt='${TOL}$', *args, **kwargs):
     ax.set_xlim([0, 1.])
     ax.set_ylim([0, 1.])
 
+    smooth = kwargs.pop("smooth", False)
     filteritr = kwargs.pop("filteritr", filteritr_convergent)
     if "tol" not in kwargs:
         TOLs = [itr.TOL for _, itr in enum_iter(runs, filteritr)]
@@ -1173,33 +1195,39 @@ def plotErrorsPP(ax, runs, label_fmt='${TOL}$', *args, **kwargs):
     ec = ECDF(x)
     plotObj = []
     Ref_kwargs = kwargs.pop('Ref_kwargs', None)
-    if label_fmt is None:
-        plotObj.append(ax.scatter(norm.cdf(x), ec(x), *args, **kwargs))
+    if label_fmt is not None:
+        if 'label' in kwargs:
+            raise ValueError('Cannot specify both label and label_fmt')
+        kwargs['label'] = label_fmt.format(TOL=_format_latex_sci(tol))
+
+    if smooth:
+        xx = norm.cdf(x)
+        arg = np.argsort(xx)
+        plotObj.append(ax.plot(xx[arg], ec(x)[arg], *args, **kwargs)[0])
     else:
-        label = label_fmt.format(TOL=_format_latex_sci(tol))
-        plotObj.append(ax.scatter(norm.cdf(x), ec(x), label=label, *args, **kwargs))
+        plotObj.append(ax.scatter(norm.cdf(x), ec(x), *args, **kwargs))
 
     if Ref_kwargs is not None:
         plotObj.append(ax.add_line(FunctionLine2D.ExpLine(rate=1, **Ref_kwargs)))
-    return plotObj[0].get_offsets(), plotObj
+    return (plotObj[0].get_offsets() if not smooth else plotObj[0].get_xydata()), plotObj
 
 
 def add_legend(ax, handles=None, labels=None, alpha=0.5,
-                 outside=None, loc='best', *args, **kwargs):
+               outside=None, loc='best', *args, **kwargs):
     if not handles:
         handles, labels = ax.get_legend_handles_labels()
         if not handles:
-            return
+            return None
     if outside is not None and len(handles) >= outside:
         # Shrink current axis by 20%
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(handles, labels, loc='center left', fancybox=False,
-                  frameon=False, shadow=False,
-                  bbox_to_anchor=(1, 0.5)).draggable(True)
+        return ax.legend(handles, labels, loc='center left', fancybox=False,
+                         frameon=False, shadow=False,
+                         bbox_to_anchor=(1, 0.5))
     else:
-        ax.legend(handles, labels, loc=loc, fancybox=True,
-                  shadow=True).draggable(True)
+        return ax.legend(handles, labels, loc=loc, fancybox=True,
+                         shadow=False)
 
 
 def __formatMIMCRate(rate, log_rate, lbl_base=r"\textrm{TOL}", lbl_log_base=None):
@@ -1395,6 +1423,7 @@ def genBooklet(runs, **kwargs):
         ax_est = add_fig()
         try:
             data_est, _ = plotTimeVsTOL(ax_est, runs, label=label_MIMC,
+                                        filteritr=filteritr,
                                         work_estimate=True,
                                         MC_kwargs= None if max_dim > 1
                                         else {"label": label_fmt.format(label="MC Estimate"),

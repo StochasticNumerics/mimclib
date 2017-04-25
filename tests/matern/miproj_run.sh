@@ -60,9 +60,9 @@ function all_cmds {
 
 if [ "$EXAMPLE" = "sf-matern" ]; then
     CMN='-mimc_beta 2 -miproj_set_dexp 2.0794'
-    for nu in 3.5 4.5 6.5 2.5
+    for nu in 6.5 #3.5 6.5 4.5 2.5
     do
-        max_lvl=10
+        max_lvl=9
         z=`echo "$nu+0.5" | bc`
         all_cmds -adapt 1 $max_lvl $nu -mimc_min_dim 1 $CMN
         all_cmds "" 1 $max_lvl $nu -miproj_set_sexp $z -miproj_set xi_exp -mimc_min_dim 1 $CMN

@@ -127,19 +127,12 @@ class TensorExpansion(object):
     def __add__(self, other):
         if not isinstance(other, TensorExpansion):
             raise NotImplementedError();
-        result = TensorExpansion(self.fnBasis,
-                                 self.base_indices.copy(),
-                                 self.coefficients.copy())
-        for i, new_ind in enumerate(other.base_indices):
-            j = result.base_indices.find(new_ind)
-            if j is not None:
-                # Not really new
-                result.coefficients[j] += other.coefficients[i]
-            else:
-                # new index
-                result.base_indices.add_from_list([new_ind])
-                result.coefficients = np.hstack((result.coefficients, other.coefficients[i]))
-        return result
+        res_base = self.base_indices.copy()
+        ind_other = res_base.set_union(other.base_indices)
+        coeffs = np.zeros(len(res_base))
+        coeffs[:len(self.base_indices)] = self.coefficients
+        coeffs[ind_other] += other.coefficients
+        return TensorExpansion(self.fnBasis, res_base, coeffs)
 
     def __mul__(self, scale):
         return TensorExpansion(self.fnBasis,

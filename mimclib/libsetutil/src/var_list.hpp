@@ -423,7 +423,7 @@ public:
     DECLARE_ARR_ACCESSOR(is_parent_of_admissible, unsigned char);  // std::vector<bool> is broken
 
     bool is_ind_admissible(const mul_ind_t& ind) const;
-    void set_union(const VarSizeList& rhs);
+    void set_union(const VarSizeList& rhs, uint32* new_index);
     VarSizeList set_diff(const VarSizeList& rhs) const;
 
     void get_adaptive_order(const double *profits,

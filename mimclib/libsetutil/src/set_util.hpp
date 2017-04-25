@@ -48,7 +48,8 @@ extern "C"{
                                              double **p_profits);
     PVarSizeList VarSizeList_copy(const PVarSizeList from);
     PVarSizeList VarSizeList_set_diff(const PVarSizeList lhs, const PVarSizeList rhs);
-    void VarSizeList_set_union(PVarSizeList lhs, const PVarSizeList rhs);
+    void VarSizeList_set_union(PVarSizeList lhs, const PVarSizeList rhs,
+                               uint32 *ind);
 
     void VarSizeList_get_adaptive_order(const PVarSizeList pset,
                                         const double *profits,

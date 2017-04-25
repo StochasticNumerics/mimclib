@@ -169,7 +169,7 @@ __lib__.VarSizeList_expand_set_calc.argtypes = [ct.c_voidp, ct.c_voidp,
 __lib__.VarSizeList_set_diff.restype = ct.c_voidp
 __lib__.VarSizeList_set_diff.argtypes = [ct.c_voidp, ct.c_voidp]
 __lib__.VarSizeList_set_union.restype = None
-__lib__.VarSizeList_set_union.argtypes = [ct.c_voidp, ct.c_voidp]
+__lib__.VarSizeList_set_union.argtypes = [ct.c_voidp, ct.c_voidp, __arr_uint32__]
 
 __lib__.VarSizeList_copy.restype = ct.c_voidp
 __lib__.VarSizeList_copy.argtypes = [ct.c_voidp]
@@ -420,8 +420,9 @@ class VarSizeList(object):
                            min_dim=self.min_dim)
 
     def set_union(self, rhs):
-        __lib__.VarSizeList_set_union(self._handle, rhs._handle)
-        return self
+        ind = np.empty(len(rhs), dtype=np.uint32)
+        __lib__.VarSizeList_set_union(self._handle, rhs._handle, ind)
+        return ind
 
     def get_adaptive_order(self, profits, max_added=5, seedLookahead=5):
         assert(len(self) == len(profits))

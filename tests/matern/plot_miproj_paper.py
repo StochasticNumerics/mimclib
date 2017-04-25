@@ -46,7 +46,7 @@ def plotSeeds(ax, runs, *args, **kwargs):
 def plotBestNTerm(ax, runs, *args, **kwargs):
     ax.set_yscale('log')
     ax.set_xscale('log')
-    ax.set_xlabel('N')
+    ax.set_xlabel('$N$')
     ax.set_ylabel('Error')
     Ref_kwargs = kwargs.pop('Ref_kwargs', None)
     iter_idx = kwargs.pop('iter_idx', None)
@@ -61,10 +61,11 @@ def plotBestNTerm(ax, runs, *args, **kwargs):
     error = np.cumsum(np.abs(sorted_coeff[::-1]))[::-1]
     N = 2 * np.arange(1, len(sorted_coeff)+1)
     N[1] = 4
-    line = ax.plot(np.log(N)*N, error, *args, **kwargs)
+    line = ax.plot(N, error, *args, **kwargs)
     if Ref_kwargs is not None:
         sel = np.zeros(len(N), dtype=np.bool)
-        sel[np.arange(int(0.01*len(N)), int(0.03*len(N)))] = True
+        #sel[np.arange(int(0.01*len(N)), int(0.03*len(N)))] = True
+        sel[50:500] = True
         sel = np.logical_and(sel, error > 1e-8)
         ax.add_line(miplot.FunctionLine2D.ExpLine(data=line[0].get_xydata()[sel, :],
                                                   **Ref_kwargs))

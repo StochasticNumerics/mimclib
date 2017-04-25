@@ -385,10 +385,17 @@ VarSizeList VarSizeList::set_diff(const VarSizeList& rhs) const {
     return result;
 }
 
-void VarSizeList::set_union(const VarSizeList& rhs) {
-    for (auto itr=rhs.m_ind_set.begin();itr!=rhs.m_ind_set.end();itr++)
-        if (!this->has_ind(*itr))
+void VarSizeList::set_union(const VarSizeList& rhs,
+                            uint32* new_index) {
+    uint32 i=0;
+    for (auto itr=rhs.m_ind_set.begin();itr!=rhs.m_ind_set.end();itr++, i++){
+        uint32 ind;
+        if (!this->find_ind(*itr, ind)){
             this->push_back_unsafe(*itr);
+            ind = this->count()-1;
+        }
+        if (new_index) new_index[i] = ind;
+    }
 }
 
 
@@ -410,7 +417,7 @@ void VarSizeList::get_adaptive_order(const double *profits,
         size_t prev_count = curList.count();
         curList.set_union(curList.expand_set(&profits_in_set[0],
                                              curList.count(),
-                                             max_added, seedLookahead));
+                                             max_added, seedLookahead), NULL);
         bool all_found = true;
         for (auto itr=curList.m_ind_set.begin()+prev_count;
              itr!=curList.m_ind_set.end();

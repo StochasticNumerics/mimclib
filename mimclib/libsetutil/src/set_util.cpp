@@ -262,8 +262,8 @@ PVarSizeList VarSizeList_set_diff(const PVarSizeList lhs, const PVarSizeList rhs
     return result;
 }
 
-void VarSizeList_set_union(PVarSizeList lhs, const PVarSizeList rhs){
-    lhs->set_union(*rhs);
+void VarSizeList_set_union(PVarSizeList lhs, const PVarSizeList rhs, uint32* ind){
+    lhs->set_union(*rhs, ind);
 }
 
 
