@@ -40,17 +40,6 @@ class Timer():
         assert(len(self._tics) > 0)
         print(msg.format(self.toc(pop=pop)))
 
-class LevelSample(object):
-    def __init__(self):
-        self.M = None
-        self.psums_fine = None
-        self.psums_fine = None
-        self.total_work = None
-        self.total_time = None
-
-    def add_samples(sample_values, moments):
-        self.M += len(sample_values)
-
 
 @public
 class custom_obj(object):
@@ -492,11 +481,10 @@ supported with a given work model")
                 raise KeyError("Invalid function name")
             if kk == "SampleLvl":
                 if kwargs[k] is not None:
-                    fnWorkModel = self.fn.WorkModel if hasattr(self.fn, "WorkModel") else None
                     self.fn.SampleAll = lambda lvls, M, moments: \
                                         default_sample_all(lvls, M,
                                                            moments, kwargs[k],
-                                                           fnWorkModel=fnWorkModel,
+                                                           fnWorkModel=self.fn.WorkModel if hasattr(self.fn, "WorkModel") else None,
                                                            verbose=self.params.verbose)
             else:
                 setattr(self.fn, kk, kwargs[k])
