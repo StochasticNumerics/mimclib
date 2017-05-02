@@ -930,6 +930,8 @@ estimate optimal number of levels"
                                           self.Vl_estimate,
                                           self.last_itr.calcWl())
                 print_debug("theta", self.Q.theta)
+                print_debug("Wl: ", self.Wl_estimate)
+                print_debug("Vl: ", self.Vl_estimate)
                 print_debug("New M: ", todoM)
                 if not self.params.reuse_samples:
                     self.last_itr.zero_samples()

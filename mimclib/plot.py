@@ -534,11 +534,11 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
             invalid = np.round(100.*invalid / len(curItr))
             if invalid == 0:
                 continue
-            ax.text(TOL, shift*TOL*modifier,
-                    "{:g}".format(invalid),
-                    horizontalalignment='center',
-                    verticalalignment='center',
-                    **num_kwargs)
+            plotObj.append(ax.text(TOL, shift*TOL*modifier,
+                                   "{:g}".format(invalid),
+                                   horizontalalignment='center',
+                                   verticalalignment='center',
+                                   **num_kwargs))
 
     return xy[sel, :2], plotObj
 
@@ -947,7 +947,7 @@ def plotSkewnessVsLvls(ax, runs, *args, **kwargs):
 @public
 def plotTimeVsLvls(ax, runs, *args, **kwargs):
     ax.set_xlabel(r'$\ell$')
-    ax.set_ylabel('Time (s)')
+    ax.set_ylabel('Time, [s]')
     ax.set_yscale('log')
     fnNorm = kwargs.pop("fnNorm", np.abs)
     if "__calc_moments" in kwargs:
@@ -1007,10 +1007,10 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
     elif fnTime == "real_time":
         assert min_samples is None
         assert MC_kwargs is None
-        ax.set_ylabel('Wall clock time (s)')
+        ax.set_ylabel('Wall clock time, [s]')
         fnTime = lambda r, itr: r.iter_total_times[i]
     elif fnTime is None:
-        ax.set_ylabel('Running time (s)')
+        ax.set_ylabel('Running time, [s]')
         fnTime = lambda r, itr: np.sum(itr.tT * scalar(itr))
         fnMCWork = lambda r, itr: np.max(itr.calcTl())
     elif fnTime == "max_work":
@@ -1020,7 +1020,7 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
         fnTime = fnMCWork
     elif fnTime == "max_time":
         assert min_samples is None
-        ax.set_ylabel('Running time (s)')
+        ax.set_ylabel('Running time, [s]')
         fnMCWork = lambda r, itr: np.max(itr.calcTl())
         fnTime = fnMCWork
 
@@ -1224,10 +1224,10 @@ def add_legend(ax, handles=None, labels=None, alpha=0.5,
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         return ax.legend(handles, labels, loc='center left', fancybox=False,
                          frameon=False, shadow=False,
-                         bbox_to_anchor=(1, 0.5))
+                         bbox_to_anchor=(1, 0.5), *args, **kwargs)
     else:
         return ax.legend(handles, labels, loc=loc, fancybox=True,
-                         shadow=False)
+                         shadow=False, *args, **kwargs)
 
 
 def __formatMIMCRate(rate, log_rate, lbl_base=r"\textrm{TOL}", lbl_log_base=None):
