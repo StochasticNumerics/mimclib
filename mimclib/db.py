@@ -553,12 +553,12 @@ iteration_idx, exact_error) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
 
                     lvls = np.array(from_cur.execute(
                         'SELECT lvl, lvl_hash, El, Vl, tT, tW, Ml, psums_delta, \
-psums_fine FROM tbl_lvls WHERE iter_id=?',
+psums_fine, active FROM tbl_lvls WHERE iter_id=?',
                         [itr[0]]).fetchall())
                     for lvl in lvls:
                         to_cur.execute('INSERT INTO tbl_lvls(iter_id, lvl, \
-lvl_hash, El, Vl, tT, tW, Ml, psums_delta, psums_fine)\
-                        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+lvl_hash, El, Vl, tT, tW, Ml, psums_delta, psums_fine, active)\
+                        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                                        [new_iter_id] + lvl.tolist())
                 if verbose:
                     sys.stdout.write('\n')
