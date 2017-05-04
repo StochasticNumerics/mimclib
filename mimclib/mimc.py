@@ -919,6 +919,7 @@ estimate optimal number of levels"
 
         def less(a, b, rel_tol=1e-09, abs_tol=0.0):
             return a-b <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
+        add_new_iteration = True
         for TOL in TOLs:
             self.print_info("TOL", TOL)
             timer.tic()
@@ -940,10 +941,11 @@ estimate optimal number of levels"
                         self.last_itr.Q = Bunch(theta=self.params.theta)
                     if not self.params.reuse_samples:
                         self._all_itr = self.last_itr.next_itr()
-                else:
+                elif add_new_iteration:
                     self.iters.append(self.last_itr.next_itr())
-                self.last_itr.TOL = TOL
 
+                add_new_iteration = False
+                self.last_itr.TOL = TOL
                 gc.collect()
                 # Added levels if bayesian
                 if self.params.bayesian and self.last_itr.lvls_count > 0:
@@ -992,10 +994,7 @@ estimate optimal number of levels"
                 if samples_added:
                     if self.fn.ItrDone is not None:
                         self.fn.ItrDone()
-                else:
-                    # remove last iteration since it is empty
-                    assert(self.params.bayesian or self.totalErrorEst() < TOL)
-                    self.iters.pop()
+                    add_new_iteration = True
 
                 if self.params.bayesian or self.totalErrorEst() < TOL \
                    or (TOL < finalTOL and self.totalErrorEst() < finalTOL):
