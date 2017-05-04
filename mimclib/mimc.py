@@ -135,7 +135,6 @@ class MIMCItrData(object):
     In a MIMC Run object, the data is stored in a MIMCItrData object
 
     """
-
     def __init__(self, parent=None, min_dim=0, moments=None, lvls=None):
         self.parent = parent
         self.moments = moments
@@ -153,6 +152,9 @@ class MIMCItrData(object):
         self.Q = None
         self.Vl_estimate = np.zeros(0)
         self._lvls_count = 0
+
+        # Any level < start_lvl is not active
+        self.active_lvls = np.array([])  # -1: inactive, 0: base, 1: active
         self._levels_added()
 
     def next_itr(self):
@@ -171,6 +173,8 @@ class MIMCItrData(object):
         ret.TOL = self.TOL
         ret.Q = copy.copy(self.Q)
         ret.Vl_estimate = self.Vl_estimate.copy() if self.Vl_estimate is not None else None
+
+        ret.active_lvls = self.active_lvls.copy()
         return ret
 
     def calcEg(self):
@@ -178,7 +182,18 @@ class MIMCItrData(object):
         Return the sum of the sample estimators for
         all the levels
         """
-        return np.sum(self.calcDeltaEl(), axis=0)
+        return np.sum(self.calcEl(active_only=True))
+
+    def calcEl(self, moment=1, active_only=False):
+        El = self.calcDeltaCentralMoment(moment=moment)
+        El[self.active_lvls==0] = self.calcFineCentralMoment(moment=moment)[self.active_lvls==0]
+        El[self.active_lvls<0] = None
+        if active_only:
+            return El[self.active_lvls >= 0];
+        return El
+
+    def calcVl(self, active_only=False):
+        return self.calcEl(moment=2, active_only=active_only)
 
     def computedMoments(self):
         return self.moments
@@ -186,21 +201,16 @@ class MIMCItrData(object):
     def calcDeltaVl(self):
         return self.calcDeltaCentralMoment(2)
 
-    def calcDeltaEl(self, moment=1):
+    def calcDeltaEl(self):
         '''
-        Returns the sample estimators for moments
-        for each level.
+        Returns the sample estimators for moments for each level.
         '''
         if self.psums_delta is None:
             return np.array([])
-
-        if moment > self.psums_delta.shape[1]:
-            raise ValueError("The {}'th moment was not computed".format(moment))
-        assert(moment > 0)
         idx = self.M != 0
-        val = np.empty_like(self.psums_delta[:, moment-1])
-        val[idx] = self.psums_delta[idx, moment-1] * \
-                   (1./_expand(self.M[idx], 0 ,self.psums_delta[idx, moment-1].shape))
+        val = np.empty_like(self.psums_delta[:, 0])
+        val[idx] = self.psums_delta[idx, 0] * \
+                   (1./_expand(self.M[idx], 0 ,self.psums_delta[idx, 0].shape))
         val[np.logical_not(idx)] = None
         return val
 
@@ -263,7 +273,6 @@ class MIMCItrData(object):
         assert(new_count >= self._lvls_count)
         if new_count == self._lvls_count:
             return  # Levels were not really added
-        self._lvls_count = new_count
         if self.psums_delta is not None:
             self.psums_delta.resize((new_count, ) + self.psums_delta.shape[1:], refcheck=False)
         if self.psums_fine is not None:
@@ -273,6 +282,10 @@ class MIMCItrData(object):
         self.tT.resize(new_count, refcheck=False)
         self.tW.resize(new_count, refcheck=False)
         self.M.resize(new_count, refcheck=False)
+        self.active_lvls.resize(new_count, refcheck=False)
+        self.active_lvls[self._lvls_count:new_count] = 1 # Make all active
+
+        self._lvls_count = new_count
 
     def calcTotalWork(self):
         return np.sum(self.tW, axis=0)
@@ -333,7 +346,6 @@ class MIMCItrData(object):
         if self.lvls_count != len(self._lvls):
             raise Exception("Iteration does not use all levels!")
         return self._lvls
-
 
 
 class Bunch(object):
@@ -422,7 +434,7 @@ class MIMCRun(object):
 
     @property
     def _Ca(self):
-        return norm.ppf((1+self.params.confidence)/2)   # TODO: TEMP. UNCOMMENT
+        return norm.ppf((1+self.params.confidence)/2)
 
     def calcEg(self):
         return self.last_itr.calcEg()
@@ -513,6 +525,8 @@ supported with a given work model")
         add_store('bayesian', type='bool', default=False,
                   help="Use Bayesian fitting to estimate bias, variance and optimize number \
 of levels in every iteration. This is based on CMLMC.")
+        add_store('dynamic_first_lvl', type='bool', default=False,
+                  help="If true, the first level will be found dynamically")
         add_store('moments', type=int, default=4, help="Number of moments to compute")
         add_store('reuse_samples', type='bool', default=True,
                   help="Reuse samples between iterations")
@@ -614,37 +628,34 @@ Bias={:.12e}\nStatErr={:.12e}\
         Wl = self.last_itr.calcWl()
         if has_var:
             V = self.Vl_estimate
-        if has_var and self.params.bayesian:
+            V_fine = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
             sample_V = self.fn.Norm(self.last_itr.calcDeltaVl())
 
         E = self.fn.Norm(self.last_itr.calcDeltaEl())
         T = self.last_itr.calcTl()
 
+        columns = []
+
+        def add_column(title, fmt, value_fmt, fn):
+            columns.append([title, fmt, value_fmt, fn])
+
+        add_column("Level", "<8", "<8", lambda i: str(self.last_itr.lvls_get(i)))
+        add_column("E", "^20", ">20.12e", lambda i: E[i])
         if has_var:
-            if self.params.bayesian:
-                output += ("{:<8}{:^20}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
-                    "Level", "E", "V", "sampleV", "W", "M", "Time"))
-            else:
-                output += ("{:<8}{:^20}{:^20}{:^20}{:>8}{:>15}\n".format(
-                    "Level", "E", "V", "W", "M", "Time"))
-        else:
-            output += ("{:<8}{:^20}{:^20}{:>8}{:>15}\n".format(
-                "Level", "E", "W", "M", "Time"))
+            add_column("V", "^20", ">20.12e", lambda i: V[i])
+            add_column("fineV", "^20", ">20.12e", lambda i: V_fine[i])
+            add_column("sampleV", "^20", ">20.12e", lambda i: sample_V[i])
+        add_column("W", "^20", ">20.12e", lambda i: Wl[i])
+        add_column("M", "^8", ">8", lambda i: self.last_itr.M[i])
+        add_column("Time", "^15", ">15.6e", lambda i: T[i])
+
+        header_fmt = "".join(sum([["{:", c[1], "}"] for c in columns], [])) + "\n"
+        value_fmt = "".join(sum([["{:", c[2], "}"] for c in columns], [])) + "\n"
+        output += header_fmt.format(*[c[0] for c in columns])
 
         for i in range(0, self.last_itr.lvls_count):
             #,100 * np.sqrt(V[i]) / np.abs(E[i])
-            if has_var:
-                if self.params.bayesian:
-                    output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
-                        str(self.last_itr.lvls_get(i)), E[i], V[i], Wl[i], sample_V[i], self.last_itr.M[i], T[i]))
-                else:
-                    output += ("{:<8}{:>+20.12e}{:>20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
-                        str(self.last_itr.lvls_get(i)), E[i], V[i], Wl[i], self.last_itr.M[i], T[i]))
-            else:
-                output += ("{:<8}{:>+20.12e}{:>20.12e}{:>8}{:>15.6e}\n".format(
-                    str(self.last_itr.lvls_get(i)), E[i], Wl[i], self.last_itr.M[i], T[i]))
-
-
+            output += value_fmt.format(*[c[3](i) for c in columns])
         print(output, end="")
 
     def fnNorm1(self, x):
@@ -656,24 +667,34 @@ Bias={:.12e}\nStatErr={:.12e}\
         if self.last_itr.lvls_count <= 1:
             # Cannot estimate bias with only one level
             return np.inf
-
         if not self.params.bayesian:
-            El = self.last_itr.calcDeltaEl()
+            El = self.last_itr.calcEl()
             bias_calc = self.params.bias_calc.lower()
             if bias_calc == 'new':
-                bias = self.last_itr.get_lvls().estimate_bias(self.fn.Norm(El))
+                El_norm = np.empty(self.last_itr.lvls_count)
+                El_norm.fill(np.inf)
+                act = self.last_itr.active_lvls >= 0
+                El_norm[act] = self.fn.Norm(El[act])
+                bias = self.last_itr.get_lvls().estimate_bias(El_norm)
             elif bias_calc == 'bnd':
                 El_bnd = El[self.last_itr.get_lvls().is_boundary()]
-                bias = self.fnNorm1(np.sum(El_bnd))
+                if np.any([e is None for e in El_bnd]):
+                    bias = np.inf
+                else:
+                    bias = self.fnNorm1(np.sum(El_bnd))
             elif bias_calc == 'abs-bnd':
+                El_norm = np.empty(len(self.last_itr.lvls_count))
+                El_norm.fill(np.inf)
+                act = self.last_itr.active_lvls >= 0
                 El_bnd = El[self.last_itr.get_lvls().is_boundary()]
-                bias = np.sum(self.fnNorm(El_bnd))
+                bias = np.sum(El_norm[El_bnd])
             else:
                 raise ValueError("bias_calc")
             return bias
         return self._estimateBayesianBias()
 
     def estimateMonteCarloSampleCount(self, TOL):
+        # TODO: Should only be based on base_level
         theta = self._calcTheta(TOL, self.bias)
         V = self.Vl_estimate[self.last_itr.lvls_find([])]
         if np.isnan(V):
@@ -693,6 +714,7 @@ Bias={:.12e}\nStatErr={:.12e}\
         return  self.fn.Hierarchy(lvls=lvls).reshape(1, -1)[0]
 
     def _estimateBayesianVl(self, L=None):
+        # TODO: active_lvls are not accounted for
         if np.sum(self.all_itr.M, axis=0) == 0:
             return self.fn.Norm(self.all_itr.calcDeltaVl())
         oL = self.all_itr.lvls_count-1
@@ -774,22 +796,24 @@ estimate optimal number of levels"
                 minL = L
                 minWork = totalWork
         return minL
-
     ################## END: Bayesian specific function
+
     def _estimateAll(self):
         self._estimateQParams()
-        if self.iters[-1].moments >= 2:
-            self.iters[-1].Vl_estimate = self.fn.Norm(self.all_itr.calcDeltaVl()) \
-                                         if not self.params.bayesian \
-                                            else self._estimateBayesianVl()
-        else:
-            self.iters[-1].Vl_estimate = np.empty(len(self.last_itr.get_lvls()))
-            self.iters[-1].Vl_estimate.fill(np.nan)
-
+        self.iters[-1].Vl_estimate = np.empty(len(self.last_itr.get_lvls()))
+        self.iters[-1].Vl_estimate.fill(np.nan)
+        self.iters[-1].stat_error = np.nan
         self.iters[-1].bias = self._estimateBias()
-        self.iters[-1].stat_error = np.inf if np.any(self.last_itr.M == 0) \
+        if self.iters[-1].moments >= 2:
+            act = self.last_itr.active_lvls >= 0
+            if self.params.bayesian:
+                self.iters[-1].Vl_estimate = self._estimateBayesianVl()
+            else:
+                self.iters[-1].Vl_estimate[act] = self.fn.Norm(self.all_itr.calcVl()[act])
+            self.iters[-1].stat_error = np.inf if np.any(self.last_itr.M[act] == 0) \
                                     else self._Ca * \
-                                         np.sqrt(np.sum(self.Vl_estimate / self.last_itr.M))
+                                         np.sqrt(np.sum(self.Vl_estimate[act]
+                                                        / self.last_itr.M[act]))
 
     def _extendLevels(self, new_lvls=None):
         prev = self.last_itr.lvls_count
@@ -843,46 +867,66 @@ estimate optimal number of levels"
         return self.params.theta
 
     def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
+        act = self.last_itr.active_lvls >= 0
         with np.errstate(divide='ignore', invalid='ignore'):
             M = (theta * TOL / self._Ca)**-2 *\
-                np.sum(np.sqrt(Wl * Vl)) * np.sqrt(Vl / Wl)
+                np.sum(np.sqrt(Wl[act] * Vl[act])) * np.sqrt(Vl / Wl)
         M = np.maximum(M, minM)
         M[np.isnan(M)] = minM
+        M[np.logical_not(act)] = 0
         if ceil:
             M = np.ceil(M).astype(np.int)
         return M
 
-    def doRun(self, finalTOL=None, TOLs=None):
-        timer = Timer()
+    def _check_levels(self):
+        if not self.params.dynamic_first_lvl:
+            return
+        if self.last_itr.lvls_max_dim() > 1:
+            raise NotImplementedError("Dynamic first level is not implemented for more than one dimension")
+        deltaVl = self.fn.Norm(self.last_itr.calcDeltaVl())
+        fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
+        if not hasattr(self, "cur_start_level"):
+            self.cur_start_level = 0
+        if np.minimum(fineVl[self.cur_start_level],
+                      fineVl[self.cur_start_level+1]) < deltaVl[self.cur_start_level+1]:
+            self.cur_start_level += 1   # Increase minimum level one at a time.
+            self.print_info("New start level", self.cur_start_level)
+        lvls = self.last_itr.get_lvls().to_dense_matrix()
+        self.last_itr.active_lvls = -1*np.ones(len(lvls))
+        self.last_itr.active_lvls[lvls[:, 0] > self.cur_start_level] = 1
+        self.last_itr.active_lvls[lvls[:, 0] == self.cur_start_level] = 0
+        self._estimateAll()
 
+    def print_info(self, *args, **kwargs):
+        if self.params.verbose >= VERBOSE_INFO:
+            print(*args, **kwargs)
+    def print_debug(self, *args, **kwargs):
+        if self.params.verbose >= VERBOSE_DEBUG:
+            print(*args, **kwargs)
+
+    def doRun(self, TOLs=None):
+        timer = Timer()
         self._checkFunctions()
-        finalTOL = finalTOL or self.params.TOL
+        finalTOL = self.params.TOL
         if TOLs is None:
             TOLs = [finalTOL] if not hasattr(self.params, "max_TOL") \
                    else get_tol_sequence(finalTOL, self.params.max_TOL,
                                          max_additional_itr=self.params.max_add_itr,
                                          r1=self.params.r1,
                                          r2=self.params.r2)
-        verbose = self.params.verbose
-        def print_info(*args, **kwargs):
-            if verbose >= VERBOSE_INFO:
-                print(*args, **kwargs)
-        def print_debug(*args, **kwargs):
-            if verbose >= VERBOSE_DEBUG:
-                print(*args, **kwargs)
-
         if not all(x >= y for x, y in zip(TOLs, TOLs[1:])):
             raise Exception("Tolerances must be decreasing")
 
         def less(a, b, rel_tol=1e-09, abs_tol=0.0):
             return a-b <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
         for TOL in TOLs:
-            print_info("TOL", TOL)
+            self.print_info("TOL", TOL)
             timer.tic()
             samples_added = False
             while True:
                 # Skip adding an iteration if the previous one is empty
                 timer.tic()
+                ## Add new iteration
                 if len(self.iters) == 0:
                     self.iters.append(MIMCItrData(parent=self,
                                                   min_dim=self.params.min_dim,
@@ -898,13 +942,14 @@ estimate optimal number of levels"
                         self._all_itr = self.last_itr.next_itr()
                 else:
                     self.iters.append(self.last_itr.next_itr())
-
                 self.last_itr.TOL = TOL
+
                 gc.collect()
+                # Added levels if bayesian
                 if self.params.bayesian and self.last_itr.lvls_count > 0:
                     L = self._estimateOptimalL(TOL)
                     if L > self.params.max_lvl:
-                        print_info("WARNING: MIMC did not converge with the maximum number of levels")
+                        self.print_info("WARNING: MIMC did not converge with the maximum number of levels")
                         break
                     if L > self.last_itr.lvls_count:
                         self._extendLevels(new_lvls=np.arange(
@@ -913,6 +958,7 @@ estimate optimal number of levels"
 
                 self.Q.theta = self._calcTheta(TOL, self.bias)
 
+                # Added levels if not bayesian
                 if self.last_itr.lvls_count == 0 or \
                    (not self.params.bayesian and
                     self.bias > (1 - self.params.theta) * TOL):
@@ -921,25 +967,28 @@ estimate optimal number of levels"
                     newTodoM = self._extendLevels()
                     data = np.hstack(self.last_itr._lvls.to_list()[0])
                     if data.size > 0 and np.max(data) > self.params.max_lvl:
-                        print_info("WARNING: MIMC did not converge with the maximum number of levels")
+                        self.print_info("WARNING: MIMC did not converge with the maximum number of levels")
                         break
+                    # TODO: We might not need newTodoM is some of the
+                    # levels are inactive. This is needed for MIMC, not MLMC
                     samples_added = self._genSamples(newTodoM) or samples_added
                     self.Q.theta = self._calcTheta(TOL, self.bias)
 
+                self._check_levels()
                 todoM = self._calcTheoryM(TOL, self.Q.theta,
                                           self.Vl_estimate,
                                           self.last_itr.calcWl())
-                print_debug("theta", self.Q.theta)
-                print_debug("Wl: ", self.Wl_estimate)
-                print_debug("Vl: ", self.Vl_estimate)
-                print_debug("New M: ", todoM)
+                self.print_debug("theta", self.Q.theta)
+                self.print_debug("Wl: ", self.Wl_estimate)
+                self.print_debug("Vl: ", self.Vl_estimate)
+                self.print_debug("New M: ", todoM)
                 if not self.params.reuse_samples:
                     self.last_itr.zero_samples()
 
                 samples_added = self._genSamples(todoM) or samples_added
                 self.last_itr.totalTime = timer.toc()
-                self.output(verbose=verbose)
-                print_info("------------------------------------------------")
+                self.output(verbose=self.params.verbose)
+                self.print_info("------------------------------------------------")
                 if samples_added:
                     if self.fn.ItrDone is not None:
                         self.fn.ItrDone()
@@ -951,11 +1000,11 @@ estimate optimal number of levels"
                 if self.params.bayesian or self.totalErrorEst() < TOL \
                    or (TOL < finalTOL and self.totalErrorEst() < finalTOL):
                     break
-            print_info("MIMC iteration for TOL={} took {} seconds".format(TOL, timer.toc()))
-            print_info("################################################")
+            self.print_info("MIMC iteration for TOL={} took {} seconds".format(TOL, timer.toc()))
+            self.print_info("################################################")
             if less(TOL, finalTOL) and self.totalErrorEst() <= finalTOL:
                 break
-        print_info("MIMC run for TOL={} took {} seconds".format(finalTOL, timer.toc()))
+        self.print_info("MIMC run for TOL={} took {} seconds".format(finalTOL, timer.toc()))
 
     def reduceDims(self, dim_to_keep, profits, bins=np.inf):
         new_run = MIMCRun()
@@ -1170,13 +1219,15 @@ def calcMIMCRate(w, s, gamma):
         log_rate = d-1 + 2*(dz-1)*(1+zeta)
     return rate, log_rate
 
-def extend_prof_lvls(lvls, profCalc, min_lvl):
+def extend_prof_lvls(lvls, profCalc, min_lvls):
+    # TODO: Do we need to add more levels that are beyond the minimum
+    # number of levels
     added = 0
     if len(lvls) == 0:
         # add seed
         lvls.add_from_list([[]])
         added += 1
-    while added < 1 or (len(lvls) < min_lvl):
+    while added < 1 or (len(lvls) < min_lvls):
         if hasattr(profCalc, "max_dim"):
             lvls.expand_set(profCalc, max_dim=profCalc.max_dim)
         else:

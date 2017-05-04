@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     iter_id       INTEGER NOT NULL,
     lvl           text NOT NULL,
     lvl_hash      varchar(35) NOT NULL,
+    active        INT,
     El            REAL,
     Vl            REAL,
     tT            REAL,
@@ -127,7 +128,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     UNIQUE KEY idx_run_lvl (iter_id, lvl_hash)
 );
 
-CREATE VIEW vw_lvls AS SELECT iter_id, lvl, El, Vl, tT, tW, Ml FROM tbl_lvls;
+CREATE VIEW vw_lvls AS SELECT iter_id, lvl, active, El, Vl, tT, tW, Ml FROM tbl_lvls;
 
 -- CREATE USER 'USER'@'%';
 -- GRANT ALL PRIVILEGES ON *.* TO 'USER'@'%' WITH GRANT OPTION;
@@ -229,6 +230,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     iter_id       INTEGER NOT NULL,
     lvl           text NOT NULL,
     lvl_hash      varchar(35) NOT NULL,
+    active        INT,
     El            REAL,
     Vl            REAL,
     tT            REAL,
@@ -240,7 +242,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     CONSTRAINT idx_run_lvl UNIQUE (iter_id, lvl_hash)
 );
 
-CREATE VIEW vw_lvls AS SELECT iter_id, lvl, El, Vl, tT, tW, Ml FROM tbl_lvls;
+CREATE VIEW vw_lvls AS SELECT iter_id, lvl, active, El, Vl, tT, tW, Ml FROM tbl_lvls;
 '''
         return script
 
@@ -331,7 +333,8 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 lvl_data = _nan2none([El[k], Vl[k], tT[k], tW[k], Ml[k]])
                 if prev_iter is not None:
                     if k < prev_iter.lvls_count:
-                        if np.all(prev_iter.psums_delta[k, :] == iteration.psums_delta[k, :]) and \
+                        if prev_iter.active_lvls[k] == iteration.active_lvls[k] and \
+                           np.all(prev_iter.psums_delta[k, :] == iteration.psums_delta[k, :]) and \
                            np.all(prev_iter.psums_fine[k, :] == iteration.psums_fine[k, :]) and \
                            np.all(np.array(lvl_data[1:]) ==
                                   _nan2none([prev_Vl[k],
@@ -341,9 +344,10 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 lvl = ",".join(["%d|%d" % (i, j) for i, j in
                                 enumerate(iteration.lvls_get(k)) if j > base])
                 cur.execute('''
-INSERT INTO tbl_lvls(lvl, lvl_hash, psums_delta, psums_fine, iter_id,  El, Vl, tT, tW, Ml)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                            [lvl, _md5(lvl),
+INSERT INTO tbl_lvls(active, lvl, lvl_hash, psums_delta, psums_fine, iter_id,  El, Vl, tT, tW, Ml)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                            [iteration.active_lvls[k],
+                             lvl, _md5(lvl),
                              _pickle(iteration.psums_delta[k, :]),
                              _pickle(iteration.psums_fine[k, :]), iter_id]+
                             lvl_data)
@@ -369,7 +373,7 @@ ORDER BY dr.run_id, dr.iteration_idx
 
             lvlsAll = cur.execute('''
             SELECT dr.iter_id, l.lvl, l.psums_delta, l.psums_fine, l.Ml,
-                     l.tT, l.tW, l.Vl
+                     l.tT, l.tW, l.Vl, l.active
             FROM
             tbl_lvls l INNER JOIN tbl_iters dr ON
             dr.iter_id=l.iter_id INNER JOIN tbl_runs r on r.run_id=dr.run_id
@@ -427,6 +431,7 @@ ORDER BY dr.run_id, dr.iteration_idx
                     k = iteration.lvls_find(ind=t[1::2], j=t[::2])
                     if k is None:
                         iteration.lvls_add_from_list(inds=[t[1::2]], j=[t[::2]])
+                        iteration.active_lvls.append(l[8])
                         k = iteration.lvls_count-1
                     iteration.zero_samples(k)
                     iteration.addSamples(k, M=_none2nan(l[4]),

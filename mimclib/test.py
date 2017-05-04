@@ -83,7 +83,9 @@ def RunStandardTest(fnSampleLvl=None,
         mimcRun.params.qoi_seed = np.random.randint(2**32-1)
 
     if fnInit is not None:
-        fnInit(mimcRun)
+        res = fnInit(mimcRun)
+        if res is not None and res < 0:
+            return res
 
     if fnSeed is not None:
         fnSeed(mimcRun.params.qoi_seed)
