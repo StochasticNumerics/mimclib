@@ -269,9 +269,6 @@ class MIMCDatabase(object):
             return cur.getLastRowID()
 
     def markRunDone(self, run_id, flag, totalTime=None, comment=''):
-        if not output_process():
-            return
-
         with self.DBConn(**self.connArgs) as cur:
             cur.execute('''UPDATE tbl_runs SET done_flag=?, totalTime=?,
             comment = {}
@@ -290,9 +287,6 @@ class MIMCDatabase(object):
         self.markRunDone(run_id, flag=0, comment=comment, totalTime=totalTime)
 
     def writeRunData(self, run_id, mimc_run, iteration_idx, userdata=None):
-        if not output_process():
-            return
-
         base = 0
         iteration = mimc_run.iters[iteration_idx]
         El = mimc_run.fn.Norm(iteration.calcDeltaEl())
@@ -494,10 +488,6 @@ ORDER BY dr.run_id, dr.iteration_idx
             errs = fnItrError(itrs)
             for i, itr in enumerate(itrs):
                 itr.exact_error = errs[i]
-
-        if not output_process():
-            return
-
         with self.DBConn(**self.connArgs) as cur:
             for run in runs:
                 for itr in run.iters:

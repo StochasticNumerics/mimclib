@@ -102,7 +102,7 @@ def RunStandardTest(fnSampleLvl=None,
     if fnSeed is not None:
         fnSeed(mimcRun.params.qoi_seed)
 
-    if mimcRun.params.db:
+    if mimcRun.params.db and output_process():
         db_args = {}
         if hasattr(mimcRun.params, "db_user"):
             db_args["user"] = mimcRun.params.db_user
@@ -119,7 +119,6 @@ def RunStandardTest(fnSampleLvl=None,
                               tag=mimcRun.params.db_tag)
         if fnItrDone is None:
             def ItrDone(db=db, r_id=run_id, r=mimcRun):
-                if output_process():
                     db.writeRunData(r_id, r, iteration_idx=len(r.iters)-1)
             fnItrDone = ItrDone
         else:
@@ -133,11 +132,11 @@ def RunStandardTest(fnSampleLvl=None,
     try:
         mimcRun.doRun()
     except:
-        if mimcRun.params.db:
+        if mimcRun.params.db and output_process():
             db.markRunFailed(run_id, totalTime=time.clock()-tStart)
         raise   # If you don't want to raise, make sure the following code is not executed
 
-    if mimcRun.params.db:
+    if mimcRun.params.db and output_process():
         db.markRunSuccessful(run_id, totalTime=time.clock()-tStart)
     return mimcRun
 
