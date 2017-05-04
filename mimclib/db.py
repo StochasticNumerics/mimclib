@@ -14,13 +14,6 @@ def public(sym):
     __all__.append(sym.__name__)
     return sym
 
-def output_process():
-    try:
-        from mpi4py import MPI
-        return MPI.COMM_WORK.rank == 0
-    except:
-        return True
-
 def _md5(string):
     return hashlib.md5(string).hexdigest()
 

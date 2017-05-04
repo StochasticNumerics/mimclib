@@ -12,6 +12,18 @@ def public(sym):
     __all__.append(sym.__name__)
     return sym
 
+try:
+    from mpi4py import MPI
+except:
+    pass
+
+@public
+def output_process():
+    try:
+        return MPI.COMM_WORK.rank == 0
+    except:
+        return True
+
 @public
 class ArgumentWarning(Warning):
     def __init__(self, message):
@@ -107,7 +119,8 @@ def RunStandardTest(fnSampleLvl=None,
                               tag=mimcRun.params.db_tag)
         if fnItrDone is None:
             def ItrDone(db=db, r_id=run_id, r=mimcRun):
-                db.writeRunData(r_id, r, iteration_idx=len(r.iters)-1)
+                if output_process():
+                    db.writeRunData(r_id, r, iteration_idx=len(r.iters)-1)
             fnItrDone = ItrDone
         else:
             fnItrDone = lambda db=db, r_id=run_id, r=mimcRun, fn=fnItrDone: \
