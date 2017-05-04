@@ -20,7 +20,7 @@ except:
 @public
 def output_process():
     try:
-        return MPI.COMM_WORK.rank == 0
+        return MPI.COMM_WORLD.rank == 0
     except:
         return True
 
