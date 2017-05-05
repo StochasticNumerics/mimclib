@@ -182,7 +182,7 @@ class MIMCItrData(object):
         Return the sum of the sample estimators for
         all the levels
         """
-        return np.sum(self.calcEl(active_only=True))
+        return np.sum(self.calcEl(active_only=True), axis=0)
 
     def calcEl(self, moment=1, active_only=False):
         El = self.calcDeltaCentralMoment(moment=moment)
@@ -588,6 +588,9 @@ the first iteration. Not needed if TOLs is provided to doRun.")
                       help="Initial number of samples used to estimate the \
 sample variance on levels when not using the Bayesian estimators. \
 Not needed if a profit calculator is provided.")
+            add_store('M0_coeff', type=float, default=0.,
+                      help="The reduction of initial number of samples from\
+previous estimates.")
             add_store('min_lvl', type=int, default=3,
                       help="The initial number of levels to run \
 the first iteration. Not needed if a profit calculator is provided.")
@@ -644,7 +647,7 @@ Bias={:.12e}\nStatErr={:.12e}\
         if has_var:
             add_column("V", "^20", ">20.12e", lambda i: V[i])
             add_column("fineV", "^20", ">20.12e", lambda i: V_fine[i])
-            add_column("sampleV", "^20", ">20.12e", lambda i: sample_V[i])
+            add_column("DeltaV", "^20", ">20.12e", lambda i: sample_V[i])
         add_column("W", "^20", ">20.12e", lambda i: Wl[i])
         add_column("M", "^8", ">8", lambda i: self.last_itr.M[i])
         add_column("Time", "^15", ">15.6e", lambda i: T[i])
@@ -827,6 +830,9 @@ estimate optimal number of levels"
         # TODO: We should allow the user to not add any new levels!
         assert(prev != self.last_itr.lvls_count)
         newTodoM = self.params.M0
+        if self.params.M0_coeff > 0:
+            newTodoM = np.maximum(newTodoM, (int)(self.params.M0_coeff *
+                                                  np.min(self.last_itr.M)))
         if len(newTodoM) < self.last_itr.lvls_count:
             newTodoM = np.pad(newTodoM,
                               (0,self.last_itr.lvls_count-len(newTodoM)), 'constant',

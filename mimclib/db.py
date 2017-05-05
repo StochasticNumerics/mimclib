@@ -412,14 +412,16 @@ ORDER BY dr.run_id, dr.iteration_idx
                 run.iters.append(iteration)
                 if iter_id not in dictLvls:
                     continue
+                active_lvls = []
                 for l in dictLvls[iter_id]:
                     t = np.array(map(int, [p for p in re.split(",|\|", l[1]) if p]),
                                  dtype=setutil.ind_t)
                     k = iteration.lvls_find(ind=t[1::2], j=t[::2])
                     if k is None:
                         iteration.lvls_add_from_list(inds=[t[1::2]], j=[t[::2]])
-                        iteration.active_lvls.append(l[8])
                         k = iteration.lvls_count-1
+
+                    iteration.active_lvls[k] = l[8]
                     iteration.zero_samples(k)
                     iteration.addSamples(k, M=_none2nan(l[4]),
                                          tT=_none2nan(l[5]),
@@ -427,6 +429,7 @@ ORDER BY dr.run_id, dr.iteration_idx
                                          psums_delta=_unpickle(l[2]),
                                          psums_fine=_unpickle(l[3]))
                     iteration.Vl_estimate[k] = _none2nan(l[7])
+
         return lstruns
 
     def _fetchArray(self, query, params=None):

@@ -1008,6 +1008,7 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
         assert min_samples is None
         assert MC_kwargs is None
         ax.set_ylabel('Wall clock time, [s]')
+        fnMCWork = lambda r, itr: 0.
         fnTime = lambda r, itr: r.iter_total_times[i]
     elif fnTime is None:
         ax.set_ylabel('Running time, [s]')
