@@ -450,7 +450,7 @@ class MIMCRun(object):
                                                              self.params.h0inv,
                                                              self.params.beta)
 
-        if self.params.bayesian and not hasattr(self.fn, "WorkModel"):
+        if self.params.dynamic_lvls and not hasattr(self.fn, "WorkModel"):
             raise NotImplementedError("Bayesian parameter fitting is only \
 supported with a given work model")
 
@@ -525,6 +525,8 @@ supported with a given work model")
         add_store('bayesian', type='bool', default=False,
                   help="Use Bayesian fitting to estimate bias, variance and optimize number \
 of levels in every iteration. This is based on CMLMC.")
+        add_store('dynamic_lvls', type='bool', default=False,
+                  help="TODO.")
         add_store('dynamic_first_lvl', type='bool', default=False,
                   help="If true, the first level will be found dynamically")
         add_store('moments', type=int, default=4, help="Number of moments to compute")
@@ -672,11 +674,12 @@ Bias={:.12e}\nStatErr={:.12e}\
             return np.inf
         if not self.params.bayesian:
             El = self.last_itr.calcEl()
+            El[self.last_itr.active_lvls == 0] = np.inf
             bias_calc = self.params.bias_calc.lower()
             if bias_calc == 'new':
                 El_norm = np.empty(self.last_itr.lvls_count)
                 El_norm.fill(np.inf)
-                act = self.last_itr.active_lvls >= 0
+                act = self.last_itr.active_lvls > 0
                 El_norm[act] = self.fn.Norm(El[act])
                 bias = self.last_itr.get_lvls().estimate_bias(El_norm)
             elif bias_calc == 'bnd':
@@ -724,10 +727,9 @@ Bias={:.12e}\nStatErr={:.12e}\
         L = L or oL
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        included = np.nonzero(np.logical_and(self.all_itr.M > 0,
-                                             np.arange(0,
-                                                       self.all_itr.lvls_count)
-                                             >= 1))[0]
+        included = np.logical_and(self.all_itr.M > 0,
+                                  self.all_itr.active_lvls > 0)
+        included = np.nonzero(included)[0]
         hl = self._get_hl(L)
         M = self.all_itr.M[included]
         s1 = self.all_itr.psums_delta[included, 0]
@@ -954,7 +956,7 @@ estimate optimal number of levels"
                 self.last_itr.TOL = TOL
                 gc.collect()
                 # Added levels if bayesian
-                if self.params.bayesian and self.last_itr.lvls_count > 0:
+                if self.params.dynamic_lvls and self.last_itr.lvls_count > 0:
                     L = self._estimateOptimalL(TOL)
                     if L > self.params.max_lvl:
                         self.print_info("WARNING: MIMC did not converge with the maximum number of levels")
@@ -968,7 +970,7 @@ estimate optimal number of levels"
 
                 # Added levels if not bayesian
                 if self.last_itr.lvls_count == 0 or \
-                   (not self.params.bayesian and
+                   (not self.params.dynamic_lvls and
                     self.bias > (1 - self.params.theta) * TOL):
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
@@ -1002,7 +1004,7 @@ estimate optimal number of levels"
                         self.fn.ItrDone()
                     add_new_iteration = True
 
-                if self.params.bayesian or self.totalErrorEst() < TOL \
+                if self.params.dynamic_lvls or self.totalErrorEst() < TOL \
                    or (TOL < finalTOL and self.totalErrorEst() < finalTOL):
                     break
             self.print_info("MIMC iteration for TOL={} took {} seconds".format(TOL, timer.toc()))
