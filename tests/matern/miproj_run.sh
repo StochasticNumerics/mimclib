@@ -76,7 +76,7 @@ fi;
 
 if [ "$EXAMPLE" = "sf-kink" ]; then
     CMN='-qoi_sigma -1 -mimc_beta 1.4142135623730951 -qoi_scale 0.5 -miproj_set_sexp 1.'
-    for N in 1 2
+    for N in 2 4 6
     do
         max_lvl=12
         if [ "$N" = "1" ]; then
@@ -85,16 +85,17 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
             DEXP=0.5714285714285714
         fi;
 
-        all_cmds -adapt 2 $max_lvl $N -miproj_max_var $N -mimc_min_dim 1 -miproj_set_maxadd 1 $CMN
-        all_cmds "" 2 $max_lvl $N -miproj_max_var $N \
-                 -miproj_set_dexp $DEXP -miproj_set td_ft -mimc_min_dim 1 $CMN
+        all_cmds -adapt 2 $max_lvl $N -miproj_max_var $N -mimc_min_dim 1 \
+                 -miproj_set_maxadd 1 $CMN
+        # all_cmds "" 2 $max_lvl $N -miproj_max_var $N \
+        #          -miproj_set_dexp $DEXP -miproj_set td_ft -mimc_min_dim 1 $CMN
 
-        for (( i=0; i<=$max_lvl; i++ ))
-        do
-            all_cmds -fix-$i 2 $(($i)) $N -mimc_min_dim 0 -miproj_max_var $N \
-                     -miproj_fix_lvl $i \
-                     -miproj_set_dexp $DEXP -miproj_set td_ft \
-                     $CMN
-        done
+        # for (( i=0; i<=$max_lvl; i++ ))
+        # do
+        #     all_cmds -fix-$i 2 $(($i)) $N -mimc_min_dim 0 -miproj_max_var $N \
+        #              -miproj_fix_lvl $i \
+        #              -miproj_set_dexp $DEXP -miproj_set td_ft \
+        #              $CMN
+        # done
     done
 fi;
