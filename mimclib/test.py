@@ -12,18 +12,6 @@ def public(sym):
     __all__.append(sym.__name__)
     return sym
 
-try:
-    from mpi4py import MPI
-except:
-    pass
-
-@public
-def output_process():
-    try:
-        return MPI.COMM_WORLD.rank == 0
-    except:
-        return True
-
 @public
 class ArgumentWarning(Warning):
     def __init__(self, message):
@@ -102,7 +90,7 @@ def RunStandardTest(fnSampleLvl=None,
     if fnSeed is not None:
         fnSeed(mimcRun.params.qoi_seed)
 
-    if mimcRun.params.db and output_process():
+    if mimcRun.params.db:
         db_args = {}
         if hasattr(mimcRun.params, "db_user"):
             db_args["user"] = mimcRun.params.db_user
@@ -132,11 +120,11 @@ def RunStandardTest(fnSampleLvl=None,
     try:
         mimcRun.doRun()
     except:
-        if mimcRun.params.db and output_process():
+        if mimcRun.params.db:
             db.markRunFailed(run_id, totalTime=time.clock()-tStart)
         raise   # If you don't want to raise, make sure the following code is not executed
 
-    if mimcRun.params.db and output_process():
+    if mimcRun.params.db:
         db.markRunSuccessful(run_id, totalTime=time.clock()-tStart)
     return mimcRun
 
