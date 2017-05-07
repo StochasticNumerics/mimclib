@@ -347,6 +347,41 @@ class MIMCItrData(object):
             raise Exception("Iteration does not use all levels!")
         return self._lvls
 
+    def to_string(self, fnNorm):
+        has_var = self.moments >= 2
+
+        Wl = self.calcWl()
+        if has_var:
+            V = self.Vl_estimate
+            V_fine = fnNorm(self.calcFineCentralMoment(moment=2))
+            sample_V = fnNorm(self.calcDeltaVl())
+
+        E = fnNorm(self.calcDeltaEl())
+        T = self.calcTl()
+
+        columns = []
+
+        def add_column(title, fmt, value_fmt, fn):
+            columns.append([title, fmt, value_fmt, fn])
+
+        add_column("Level", "<8", "<8", lambda i: str(self.lvls_get(i)))
+        add_column("E", "^20", ">20.12e", lambda i: E[i])
+        if has_var:
+            add_column("V", "^20", ">20.12e", lambda i: V[i])
+            add_column("fineV", "^20", ">20.12e", lambda i: V_fine[i])
+            add_column("DeltaV", "^20", ">20.12e", lambda i: sample_V[i])
+        add_column("W", "^20", ">20.12e", lambda i: Wl[i])
+        add_column("M", "^8", ">8", lambda i: self.M[i])
+        add_column("Time", "^15", ">15.6e", lambda i: T[i])
+
+        header_fmt = "".join(sum([["{:", c[1], "}"] for c in columns], [])) + "\n"
+        value_fmt = "".join(sum([["{:", c[2], "}"] for c in columns], [])) + "\n"
+        output = header_fmt.format(*[c[0] for c in columns])
+
+        for i in range(0, self.lvls_count):
+            #,100 * np.sqrt(V[i]) / np.abs(E[i])
+            output += value_fmt.format(*[c[3](i) for c in columns])
+        return output
 
 class Bunch(object):
     def __init__(self, **kwargs):
@@ -628,39 +663,7 @@ Bias={:.12e}\nStatErr={:.12e}\
             print(output, end="")
             return
 
-        has_var = self.last_itr.moments >= 2
-
-        Wl = self.last_itr.calcWl()
-        if has_var:
-            V = self.Vl_estimate
-            V_fine = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
-            sample_V = self.fn.Norm(self.last_itr.calcDeltaVl())
-
-        E = self.fn.Norm(self.last_itr.calcDeltaEl())
-        T = self.last_itr.calcTl()
-
-        columns = []
-
-        def add_column(title, fmt, value_fmt, fn):
-            columns.append([title, fmt, value_fmt, fn])
-
-        add_column("Level", "<8", "<8", lambda i: str(self.last_itr.lvls_get(i)))
-        add_column("E", "^20", ">20.12e", lambda i: E[i])
-        if has_var:
-            add_column("V", "^20", ">20.12e", lambda i: V[i])
-            add_column("fineV", "^20", ">20.12e", lambda i: V_fine[i])
-            add_column("DeltaV", "^20", ">20.12e", lambda i: sample_V[i])
-        add_column("W", "^20", ">20.12e", lambda i: Wl[i])
-        add_column("M", "^8", ">8", lambda i: self.last_itr.M[i])
-        add_column("Time", "^15", ">15.6e", lambda i: T[i])
-
-        header_fmt = "".join(sum([["{:", c[1], "}"] for c in columns], [])) + "\n"
-        value_fmt = "".join(sum([["{:", c[2], "}"] for c in columns], [])) + "\n"
-        output += header_fmt.format(*[c[0] for c in columns])
-
-        for i in range(0, self.last_itr.lvls_count):
-            #,100 * np.sqrt(V[i]) / np.abs(E[i])
-            output += value_fmt.format(*[c[3](i) for c in columns])
+        output += self.last_itr.to_string(self.fn.Norm)
         print(output, end="")
 
     def fnNorm1(self, x):

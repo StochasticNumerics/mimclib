@@ -93,8 +93,7 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
         # for (( i=0; i<=$max_lvl; i++ ))
         # do
         #     all_cmds -fix-$i 2 $(($i)) $N -mimc_min_dim 0 -miproj_max_var $N \
-        #              -miproj_fix_lvl $i \
-        #              -miproj_set_dexp $DEXP -miproj_set td_ft \
+        #              -miproj_fix_lvl $i -miproj_set td_ft \
         #              $CMN
         # done
     done

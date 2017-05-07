@@ -263,12 +263,18 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
     db = mimcdb.MIMCDatabase(**input_args.db_args)
     print("Reading data")
 
+    db_tag = input_args.db_tag
+    adaptive_runs = False
+    if db_tag.endswith('-adapt'):
+        adaptive_runs = True
+        db_tag = db_tag[:-len('-adapt')]
+
     fig_W = plt.figure()
     fig_T = plt.figure()
     fig_Tc = plt.figure()
     fix_runs = []
     while True:
-        fix_tag = input_args.db_tag + "-fix-" + str(len(fix_runs))
+        fix_tag = db_tag + "-fix-" + str(len(fix_runs))
         run_data = db.readRuns(tag=fix_tag, done_flag=input_args.done_flag)
         if len(run_data) == 0:
             break
@@ -293,7 +299,12 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
 
     work_bins = 50
     work_spacing = np.sqrt(2)
-    runs_adaptive = db.readRuns(tag=input_args.db_tag + "-adapt", done_flag=input_args.done_flag)
+    if adaptive_runs:
+        runs_adaptive = runs
+        runs_priori = db.readRuns(tag=db_tag, done_flag=input_args.done_flag)
+    else:
+        runs_adaptive = db.readRuns(tag=db_tag + "-adapt", done_flag=input_args.done_flag)
+        runs_priori = runs
 
     if input_args.qoi_exact is not None:
         print("Setting errors")
@@ -325,8 +336,8 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
 
 
     for rr, label in [[fix_runs, 'SL'],
-                       [runs_adaptive, 'ML Adaptive'], [runs, 'ML']]:
-        if len(rr) == 0:
+                       [runs_adaptive, 'ML Adaptive'], [runs_priori, 'ML']]:
+        if rr is None or len(rr) == 0:
             continue
         miplot.plotWorkVsMaxError(fig_W.gca(), rr,
                                   modifier=modifier, fnWork=fnWork,
