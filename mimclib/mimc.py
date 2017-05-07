@@ -1097,66 +1097,6 @@ estimate optimal number of levels"
         assert(np.all(new_itr._lvls.check_admissibility())) # TEMP
         return new_run
 
-    def reduceDims_old(self, dim_to_keep):
-        new_run = MIMCRun()
-        new_run.fn = self.fn
-        new_run.params = self.params
-        # The new index is the index of the iteration
-        if isinstance(dim_to_keep, np.ndarray) and dim_to_keep.dtype == np.bool:
-            dim_to_keep = np.nonzero(dim_to_keep)[0]
-        else:
-            dim_to_keep = np.array(dim_to_keep, np.uint)
-
-        dim_to_discard = np.ones(self.last_itr.lvls_max_dim(), dtype=np.bool)
-        dim_to_discard[dim_to_keep] = False
-        dim_to_discard = np.nonzero(dim_to_discard)[0]
-
-        dicard_indset, discard_indices = self.last_itr._lvls.reduce_set(dim_to_discard)
-
-        max_dim = len(dim_to_keep)
-        prev_new_count = 0
-        prev_old_count = 0
-        for itr_idx, itr in enumerate(self.iters):
-            if len(new_run.iters) == 0:
-                new_run.iters.append(MIMCItrData(parent=new_run,
-                                                 min_dim=self.params.min_dim,
-                                                 moments=self.params.moments))
-            else:
-                new_run.iters.append(new_run.last_itr.next_itr())
-
-            new_itr = new_run.last_itr
-            ##### First add new levels
-            # Add missing levels, if any (adding current iteration index as
-            # an extra dimension)
-            newj, newdata = [], []
-            for ind_idx in xrange(prev_old_count, itr.lvls_count):
-                j, data = itr._lvls.get_item(ind_idx, -1)
-                keep = np.nonzero([jj in dim_to_keep for jj in j])[0]
-                discard = np.nonzero([jj in dim_to_discard for jj in j])[0]
-                # TODO: Discard dim_to_discard from j and data
-                newj.append(np.concatenate((j[keep], [max_dim])))
-                newdata.append(np.concatenate((data[keep],
-                                               [discard_indices[ind_idx]])))
-            new_itr.lvls_add_from_list(inds=newdata, j=newj)
-            assert(np.all(new_itr._lvls.check_admissibility())) # TEMP
-            ##### Copy properties
-            new_itr.bias = itr.bias
-            new_itr.stat_error = itr.stat_error
-            new_itr.exact_error = itr.exact_error
-            new_itr.TOL = itr.exact_error
-            new_itr.totalTime = itr.exact_error
-            new_itr.Q = itr.Q
-            if hasattr(itr, "db_data"):
-                new_itr.db_data = itr.db_data
-            new_itr.Vl_estimate = itr.Vl_estimate
-            new_itr.tT = itr.tT
-            new_itr.tW = itr.tW
-            new_itr.M = itr.M
-            new_itr.psums_delta = itr.psums_delta
-            new_itr.psums_fine = itr.psums_fine
-            prev_old_count = itr.lvls_count
-        return new_run
-
 
 @public
 def work_estimate(lvls, gamma):

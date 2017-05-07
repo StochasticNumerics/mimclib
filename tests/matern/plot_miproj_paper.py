@@ -196,14 +196,20 @@ def plot_all(runs, **kwargs):
     except:
         miplot.plot_failed(ax)
 
-    if runs[0].params.min_dim > 0 and runs[0].last_itr.lvls_max_dim() > 5:
+    if runs[0].params.min_dim > 0 and runs[0].last_itr.lvls_max_dim() > 2:
         run = runs[0]
         from mimclib import setutil
-        # For matern
-        profit_calc = setutil.MIProfCalculator([run.params.miproj_set_dexp] * run.params.min_dim,
-                                               run.params.miproj_set_xi,
-                                               run.params.miproj_set_sexp,
-                                               run.params.miproj_set_mul)
+        if run.params.qoi_example == 'sf-matern':
+            profit_calc = setutil.MIProfCalculator([0.0] * run.params.min_dim,
+                                                   run.params.miproj_set_xi,
+                                                   run.params.miproj_set_sexp,
+                                                   run.params.miproj_set_mul)
+        else:
+            qoi_N = run.params.miproj_max_var
+            td_w = [0.] * (run.params.min_dim + qoi_N)
+            ft_w = [0.] * run.params.min_dim + [1.] * qoi_N
+            self.profit_calc = setutil.TDFTProfCalculator(td_w, ft_w)
+
         profits = run.last_itr._lvls.calc_log_prof(profit_calc)
         reduced_run = runs[0].reduceDims(np.arange(0, runs[0].params.min_dim),
                                          profits)    # Keep only the spatial dimensions
