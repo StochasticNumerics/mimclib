@@ -34,16 +34,23 @@ def _formatPower(rate):
         return ""
     return rate
 
-def ratefit(x, y):
-    while True:
-        c = np.polyfit(x, y, 1)
-        err = np.abs(y-np.polyval(c, x))
-        sigma = np.std(err)
-        sel = err <= sigma
-        if np.all(sel) or np.sum(sel) < 2:
-            break
-        x, y = x[sel], y[sel]
-    return c[0], c[1]
+try:
+    import statsmodels.api as sm
+    def ratefit(x, y):
+        f = sm.RLM(y, sm.add_constant(x)).fit()
+        return f.params[1], f.params[0]
+except:
+    def ratefit(x, y):
+        # This should remove outlires on its own
+        while True:
+            c = np.polyfit(x, y, 1)
+            err = np.abs(y-np.polyval(c, x))
+            sigma = np.std(err)
+            sel = err <= sigma
+            if np.all(sel) or np.sum(sel) < 2:
+                break
+            x, y = x[sel], y[sel]
+        return c[0], c[1]
 
 @public
 class FunctionLine2D(plt.Line2D):

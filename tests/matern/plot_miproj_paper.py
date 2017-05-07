@@ -3,6 +3,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import matplotlib as mpl
+mpl.use('Agg')
 import numpy as np
 import mimclib.plot as miplot
 import matplotlib.pyplot as plt
@@ -40,7 +42,7 @@ def plotSeeds(ax, runs, *args, **kwargs):
 
     if Ref_kwargs is not None:
         ax.add_line(miplot.FunctionLine2D.ExpLine(data=line[0].get_xydata(),
-                                           **Ref_kwargs))
+                                                  **Ref_kwargs))
     return line[0].get_xydata(), [line]
 
 def plotBestNTerm(ax, runs, *args, **kwargs):
@@ -208,7 +210,7 @@ def plot_all(runs, **kwargs):
             qoi_N = run.params.miproj_max_var
             td_w = [0.] * (run.params.min_dim + qoi_N)
             ft_w = [0.] * run.params.min_dim + [1.] * qoi_N
-            self.profit_calc = setutil.TDFTProfCalculator(td_w, ft_w)
+            profit_calc = setutil.TDFTProfCalculator(td_w, ft_w)
 
         profits = run.last_itr._lvls.calc_log_prof(profit_calc)
         reduced_run = runs[0].reduceDims(np.arange(0, runs[0].params.min_dim),
