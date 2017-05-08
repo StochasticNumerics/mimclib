@@ -270,7 +270,7 @@ class MIWProjSampler(object):
                                                       [sam_col.beta_count]*len(new_b)))
                 sam_col.beta_count += 1
 
-            if len(sam_col.basis) > 8000:
+            if len(sam_col.basis) > 50000:
                 raise MemoryError("Too many basis functions {}".format(len(sam_col.basis)))
 
             if not self.reuse_samples or sam_col.min_dim < sam_col.basis.max_dim():
