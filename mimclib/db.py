@@ -364,7 +364,7 @@ ORDER BY dr.run_id, dr.iteration_idx
             FROM
             tbl_lvls l INNER JOIN tbl_iters dr ON
             dr.iter_id=l.iter_id INNER JOIN tbl_runs r on r.run_id=dr.run_id
-            WHERE dr.run_id in ? ORDER BY dr.iter_id''',
+            WHERE dr.run_id in ? ORDER BY dr.iter_id, l.lvl''',
                                   [run_ids]).fetchall()
 
         dictRuns = dict()

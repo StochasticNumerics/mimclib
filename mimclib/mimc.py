@@ -41,6 +41,21 @@ class Timer():
         print(msg.format(self.toc(pop=pop)))
 
 
+def _calcTheoryM(TOL, theta, Vl, Wl,
+                 active_lvls, ceil=True, minM=1,
+                 Ca=2):
+    act = active_lvls >= 0
+    with np.errstate(divide='ignore', invalid='ignore'):
+        M = (theta * TOL / Ca)**-2 *\
+            np.sum(np.sqrt(Wl[act] * Vl[act])) * np.sqrt(Vl / Wl)
+        M = np.maximum(M, minM)
+        M[np.isnan(M)] = minM
+        M[np.logical_not(act)] = 0
+    if ceil:
+        M = np.ceil(M).astype(np.int)
+    return M
+
+
 @public
 class custom_obj(object):
     # Used to add samples. Supposedly not used if M is fixed to 1
@@ -723,15 +738,16 @@ Bias={:.12e}\nStatErr={:.12e}\
         return  self.fn.Hierarchy(lvls=lvls).reshape(1, -1)[0]
 
     def _estimateBayesianVl(self, L=None):
-        # TODO: active_lvls are not accounted for
         if np.sum(self.all_itr.M, axis=0) == 0:
             return self.fn.Norm(self.all_itr.calcDeltaVl())
+        # TODO: This assumes that we have correct ordering
+        # of levels
         oL = self.all_itr.lvls_count-1
         L = L or oL
         if L <= 1:
             raise Exception("Must have at least 2 levels")
-        included = np.logical_and(self.all_itr.M > 0,
-                                  self.all_itr.active_lvls > 0)
+        included = self.all_itr.M > 0
+        included[0] = False
         included = np.nonzero(included)[0]
         hl = self._get_hl(L)
         M = self.all_itr.M[included]
@@ -745,13 +761,17 @@ Bias={:.12e}\nStatErr={:.12e}\
 
         tmpM = np.concatenate((self.all_itr.M[1:], np.zeros(L-oL)))
         G_3 = self.params.bayes_k1 * Lambda + tmpM/2.0
-        G_4 = self.params.bayes_k1*np.ones(L+1)
-        G_4[included] += 0.5*(self.fn.Norm(s2 - s1*m1*2 + s1*m1) + \
-                              M*self.params.bayes_k0*(
-                                  self.fn.Norm(m1)-mu)**2/
-                              (self.params.bayes_k0+M) )
-        return np.concatenate((
-            self.fn.Norm(self.all_itr.calcDeltaVl()[0:1]),G_4[1:] / G_3))
+        G_4 = self.params.bayes_k1*np.ones(L)
+        G_4[included-1] += 0.5*(self.fn.Norm(s2 - s1*m1*2 + s1*m1) + \
+                                M*self.params.bayes_k0*(
+                                    self.fn.Norm(m1)-mu)**2/
+                                (self.params.bayes_k0+M) )
+        Vl = np.empty(L+1)
+        act = self.all_itr.active_lvls
+        Vl[1:] = (G_4 / G_3)
+        Vl[np.nonzero(act==0)[0]] = self.fn.Norm(self.all_itr.calcFineCentralMoment(moment=2)[act==0])
+        Vl[act < 0] = np.nan
+        return Vl
 
     def _estimateQParams(self):
         if not self.params.bayesian:
@@ -796,9 +816,12 @@ estimate optimal number of levels"
                 continue
             lvls = setutil.VarSizeList(np.arange(0, L+1).reshape((-1, 1)), min_dim=1)
             Wl = self.fn.WorkModel(lvls=lvls)
-            M = self._calcTheoryM(TOL,
-                                  theta=self._calcTheta(TOL, bias_est),
-                                  Vl=self._estimateBayesianVl(L), Wl=Wl)
+            M = _calcTheoryM(TOL, theta=self._calcTheta(TOL,
+                                                        bias_est),
+                             Vl=self._estimateBayesianVl(L),
+                             Wl=Wl,
+                             active_lvls=self.last_itr.active_lvls,
+                             Ca=self._Ca)
             totalWork = np.sum(Wl*M)
             if totalWork < minWork:
                 minL = L
@@ -877,18 +900,6 @@ estimate optimal number of levels"
                               np.inf, self.params.theta)
         return self.params.theta
 
-    def _calcTheoryM(self, TOL, theta, Vl, Wl, ceil=True, minM=1):
-        act = self.last_itr.active_lvls >= 0
-        with np.errstate(divide='ignore', invalid='ignore'):
-            M = (theta * TOL / self._Ca)**-2 *\
-                np.sum(np.sqrt(Wl[act] * Vl[act])) * np.sqrt(Vl / Wl)
-        M = np.maximum(M, minM)
-        M[np.isnan(M)] = minM
-        M[np.logical_not(act)] = 0
-        if ceil:
-            M = np.ceil(M).astype(np.int)
-        return M
-
     def _check_levels(self):
         if not self.params.dynamic_first_lvl:
             return
@@ -896,17 +907,21 @@ estimate optimal number of levels"
             raise NotImplementedError("Dynamic first level is not implemented for more than one dimension")
         deltaVl = self.fn.Norm(self.last_itr.calcDeltaVl())
         fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
-        if not hasattr(self, "cur_start_level"):
-            self.cur_start_level = 0
         if np.minimum(fineVl[self.cur_start_level],
                       fineVl[self.cur_start_level+1]) < deltaVl[self.cur_start_level+1]:
             self.cur_start_level += 1   # Increase minimum level one at a time.
             self.print_info("New start level", self.cur_start_level)
         lvls = self.last_itr.get_lvls().to_dense_matrix()
+        self._update_active_lvls()
+        self._estimateAll()
+
+    def _update_active_lvls(self):
+        if not hasattr(self, "cur_start_level"):
+            self.cur_start_level = 0
+        lvls = self.last_itr.get_lvls().to_dense_matrix()
         self.last_itr.active_lvls = -1*np.ones(len(lvls))
         self.last_itr.active_lvls[lvls[:, 0] > self.cur_start_level] = 1
         self.last_itr.active_lvls[lvls[:, 0] == self.cur_start_level] = 0
-        self._estimateAll()
 
     def print_info(self, *args, **kwargs):
         if self.params.verbose >= VERBOSE_INFO:
@@ -967,6 +982,7 @@ estimate optimal number of levels"
                     if L > self.last_itr.lvls_count:
                         self._extendLevels(new_lvls=np.arange(
                             self.last_itr.lvls_count, L+1).reshape((-1, 1)))
+                        self._update_active_lvls()
                         self._estimateAll()
 
                 self.Q.theta = self._calcTheta(TOL, self.bias)
@@ -978,6 +994,7 @@ estimate optimal number of levels"
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
                     newTodoM = self._extendLevels()
+                    self._update_active_lvls()
                     data = np.hstack(self.last_itr._lvls.to_list()[0])
                     if data.size > 0 and np.max(data) > self.params.max_lvl:
                         self.print_info("WARNING: MIMC did not converge with the maximum number of levels")
@@ -988,9 +1005,10 @@ estimate optimal number of levels"
                     self.Q.theta = self._calcTheta(TOL, self.bias)
 
                 self._check_levels()
-                todoM = self._calcTheoryM(TOL, self.Q.theta,
+                todoM = _calcTheoryM(TOL, self.Q.theta,
                                           self.Vl_estimate,
-                                          self.last_itr.calcWl())
+                                          self.last_itr.calcWl(),
+                                          self.last_itr.active_lvls, Ca=self._Ca)
                 self.print_debug("theta", self.Q.theta)
                 self.print_debug("Wl: ", self.Wl_estimate)
                 self.print_debug("Vl: ", self.Vl_estimate)

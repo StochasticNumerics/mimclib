@@ -104,13 +104,14 @@ class MyRun:
                          fnNorm=lambda arr: np.array([x.norm() for x in arr]))
 
         self.profit_calc = None
-        miproj_set_dexp = run.params.miproj_set_dexp if run.params.min_dim > 0 else 0
         if run.params.miproj_set == 'xi_exp':
+            miproj_set_dexp = run.params.miproj_set_dexp if run.params.min_dim > 0 else 0
             self.profit_calc = setutil.MIProfCalculator([miproj_set_dexp] * run.params.min_dim,
                                                         run.params.miproj_set_xi,
                                                         run.params.miproj_set_sexp,
                                                         run.params.miproj_set_mul)
         elif run.params.miproj_set == 'td_ft':
+            miproj_set_dexp = run.params.miproj_set_dexp if run.params.min_dim > 0 else 0
             qoi_N = run.params.miproj_max_var
             td_w = [miproj_set_dexp] * run.params.min_dim + [0.] * qoi_N
             ft_w = [0.] * run.params.min_dim + [run.params.miproj_set_sexp] * qoi_N
