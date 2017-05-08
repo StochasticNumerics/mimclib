@@ -79,11 +79,20 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
     for N in 2 4 6
     do
         max_lvl=12
-        if [ "$N" = "1" ]; then
-            DEXP=0.770949720670391  # (gamma_space + beta_space) / (N + kappa)
-        else
-            DEXP=0.5714285714285714
+        # if [ "$N" = "1" ]; then
+        #     DEXP=0.770949720670391  # (gamma_space + beta_space) / (N + kappa)
+        # else
+        #     DEXP=0.5714285714285714
+        # fi;
+
+        if [ "$N" = "2" ]; then
+            DEXP=0.23958241226628235  # (gamma_space + w_space) / (N + kappa)
+        elif [ "$N" = "4" ]; then
+            DEXP=0.2175402213360865
+        elif [ "$N" = "6" ]; then
+            DEXP=0.29377595007776713
         fi;
+
 
         all_cmds -adapt 2 $max_lvl $N -miproj_max_var $N -mimc_min_dim 1 \
                  -miproj_set_maxadd 1 $CMN

@@ -136,10 +136,11 @@ def plot_all(runs, **kwargs):
     Ref_ErrEst_kwargs = {'ls': '-.', 'c':'k', 'label': label_fmt.format(label='{rate:.2g}')}
     try:
         miplot.plotWorkVsMaxError(ax, runs,
-                                  fnWork=lambda run, i: run.iters[i].calcTotalWork(),
-                                  filteritr=filteritr,
+                                  iter_stats_args=dict(work_spacing=np.log(np.sqrt(2)),
+                                                       filteritr=filteritr),
+                                  fnWork=lambda run, i:
+                                  run.iters[i].calcTotalWork(),
                                   modifier=modifier, fmt='-*',
-                                  work_spacing=np.sqrt(2),
                                   Ref_kwargs=Ref_kwargs)
         ax.set_xlabel('Avg. Iteration Work')
     except:
@@ -148,11 +149,12 @@ def plot_all(runs, **kwargs):
     print_msg("plotWorkVsMaxError")
     ax = add_fig()
     try:
-        miplot.plotWorkVsMaxError(ax, runs, filteritr=filteritr,
+        miplot.plotWorkVsMaxError(ax, runs,
+                                  iter_stats_args=dict(work_spacing=np.log(np.sqrt(2)),
+                                                       filteritr=filteritr),
                                   fnWork=lambda run, i:
                                   run.iters[i].calcTotalTime(),
                                   modifier=modifier, fmt='-*',
-                                  work_spacing=np.sqrt(2),
                                   Ref_kwargs=Ref_kwargs)
         ax.set_xlabel('Avg. Iteration Time')
     except:
@@ -262,6 +264,7 @@ def plot_all(runs, **kwargs):
             miplot.add_legend(ax, outside=legend_outside)
     return figures
 
+
 def plotSingleLevel(runs, input_args, *args, **kwargs):
     modifier = kwargs.pop('modifier', None)
     fnNorm = kwargs.pop('fnNorm', None)
@@ -320,51 +323,74 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                      fnNorm([v.calcEg() + e*-1 for v in itrs])
         miplot.set_exact_errors(fix_runs + runs_adaptive, fnExactErr)
 
+    def filter_dec(xy):
+        xy = xy[xy[:, 1].argsort(), :]
+        while True:
+            sel = np.ones(len(xy), dtype=np.bool)
+            desel = np.diff(xy[:, 2]) > 0
+            if not np.any(desel):
+                break
+            sel[1:][desel] = False
+            xy = xy[sel, :]
+        return xy
+
+    iter_stats_args = dict(work_bins=1000)
     if plotIndividual:
         for i, rr in enumerate(fix_runs):
             miplot.plotWorkVsMaxError(fig_W.gca(), [rr],
+                                      iter_stats_args=iter_stats_args,
                                       modifier=modifier, fnWork=fnWork,
                                       fnAggError=np.min, fmt='--x',
-                                      work_bins=1000, Ref_kwargs=None,
+                                      Ref_kwargs=None,
                                       label='\\ell={}'.format(i), alpha=0.7)
             miplot.plotWorkVsMaxError(fig_T.gca(), [rr],
+                                      iter_stats_args=iter_stats_args,
                                       fnWork=fnTime,
                                       modifier=modifier, fmt='--x',
                                       fnAggError=np.min,
-                                      work_bins=1000, Ref_kwargs=None,
+                                      Ref_kwargs=None,
                                       label='\\ell={}'.format(i),
                                       alpha=0.7)
             miplot.plotWorkVsMaxError(fig_Tc.gca(), [rr],
+                                      iter_stats_args=iter_stats_args,
                                       fnWork=fnTime_calc,
                                       modifier=modifier, fmt='--x',
                                       fnAggError=np.min,
-                                      work_bins=1000, Ref_kwargs=None,
+                                      Ref_kwargs=None,
                                       label='\\ell={}'.format(i),
                                       alpha=0.7)
-
 
     for rr, label in [[fix_runs, 'SL'],
                        [runs_adaptive, 'ML Adaptive'], [runs_priori, 'ML']]:
         if rr is None or len(rr) == 0:
             continue
+        if rr == fix_runs:
+            iter_stats_args = dict(work_bins=1000,
+                                   work_spacing=None,
+                                   fnFilterData=filter_dec)
+        else:
+            iter_stats_args = dict(work_bins=work_bins,
+                                   work_spacing=work_spacing,
+                                   fnFilterData=filter_dec)
+
         miplot.plotWorkVsMaxError(fig_W.gca(), rr,
                                   modifier=modifier, fnWork=fnWork,
                                   fnAggError=np.min, fmt='-*',
-                                  work_bins=work_bins,
+                                  iter_stats_args=iter_stats_args,
                                   Ref_kwargs=Ref_kwargs if rr==runs else None,
-                                  work_spacing=work_spacing, label=label)
+                                  label=label)
         miplot.plotWorkVsMaxError(fig_T.gca(), rr, fnWork=fnTime,
                                   modifier=modifier, fmt='-*',
+                                  iter_stats_args=iter_stats_args,
                                   fnAggError=np.min,
-                                  work_bins=work_bins,
                                   Ref_kwargs=Ref_kwargs if rr==runs else None,
-                                  work_spacing=work_spacing, label=label)
+                                  label=label)
         miplot.plotWorkVsMaxError(fig_Tc.gca(), rr, fnWork=fnTime_calc,
                                   modifier=modifier, fmt='-*',
+                                  iter_stats_args=iter_stats_args,
                                   fnAggError=np.min,
-                                  work_bins=work_bins,
                                   Ref_kwargs=Ref_kwargs if rr==runs else None,
-                                  work_spacing=work_spacing, label=label)
+                                  label=label)
 
     fig_W.gca().set_xlabel('Avg. Iteration Work')
     fig_T.gca().set_xlabel('Avg. Iteration Time (tic/toc)')

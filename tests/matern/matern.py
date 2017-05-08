@@ -82,7 +82,6 @@ class SField_Matern(object):
         self.nelem = None
         __lib__.SFieldEndRuns(self.ref)
 
-
     def Sample(self, inds, M, rand_gen):
         sample_rand = rand_gen.uniform(-np.sqrt(3), np.sqrt(3),
                                        size=(M, self.GetN()))

@@ -35,10 +35,12 @@ def _formatPower(rate):
     return rate
 
 try:
-    import statsmodels.api as sm
-    def ratefit(x, y):
-        f = sm.RLM(y, sm.add_constant(x)).fit()
-        return f.params[1], f.params[0]
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("ignore")
+        import statsmodels.api as sm
+        def ratefit(x, y):
+            f = sm.RLM(y, sm.add_constant(x)).fit()
+            return f.params[1], f.params[0]
 except:
     def ratefit(x, y):
         # This should remove outlires on its own
@@ -332,42 +334,6 @@ def __normalize_fmt(args, kwargs):
         args = (kwargs.pop('fmt'), ) + args
     return args, kwargs
 
-def computeIterationStats(runs, work_bins, filteritr, fnItrStats,
-                          arr_fnAgg, work_spacing=None):
-    mymax = lambda A: [np.max(A[:, i]) for i in xrange(0, A.shape[1])] if len(A) > 0 else None
-    xy = []
-    for r in runs:
-        prev = 0
-        for i in xrange(0, len(r.iters)):
-            if not filteritr(r, i):
-                continue
-            stats = fnItrStats(r, i)
-            assert(len(stats) == len(arr_fnAgg))
-            stats = [stats[i] if stats[i] is not None or len(xy)==0
-                     else xy[-1][i] for i in xrange(len(stats))]
-            xy.append(stats)
-    xy = np.array(xy)
-    bins = np.digitize(xy[:, 0], np.linspace(np.min(xy[:, 0]),
-                                             np.max(xy[:, 0]), work_bins))
-    bins[bins == work_bins] = work_bins-1
-    ubins = np.unique(bins)
-    xy_binned = np.zeros((len(ubins), len(arr_fnAgg)))
-    for i, b in enumerate(ubins):
-        d = xy[bins==b, :]
-        for j in range(0, len(arr_fnAgg)):
-            xy_binned[i, j] = arr_fnAgg[j](d[:, j])
-    xy_binned = xy_binned[xy_binned[:,0].argsort(), :]
-    if work_spacing is not None:
-        sel = np.zeros(xy_binned.shape[0], dtype=np.bool)
-        prevWork = xy_binned[0, 0]
-        sel[0] = True
-        for i in range(0, xy_binned.shape[0]):
-            if xy_binned[i, 0] >= prevWork + work_spacing:
-                sel[i] = True
-                prevWork = xy_binned[i, 0]
-        xy_binned = xy_binned[sel, :]
-    return xy_binned
-
 def filteritr_last(run, iter_idx):
     return len(run.iters)-1 == iter_idx
 
@@ -388,6 +354,45 @@ def enum_iter_i(runs, fnFilter=filteritr_all):
         for i in xrange(0, len(r.iters)):
             if fnFilter(r, i):
                 yield i, r, r.iters[i]
+
+def computeIterationStats(runs, fnItrStats, arr_fnAgg, work_bins=50,
+                          filteritr=filteritr_all, work_spacing=None,
+                          fnFilterData=None):
+    xy = []
+    for r in runs:
+        prev = 0
+        for i in xrange(0, len(r.iters)):
+            if not filteritr(r, i):
+                continue
+            stats = fnItrStats(r, i)
+            assert(len(stats) == len(arr_fnAgg))
+            stats = [stats[i] if stats[i] is not None or len(xy)==0
+                     else xy[-1][i] for i in xrange(len(stats))]
+            xy.append(stats)
+    xy = np.array(xy)
+    if fnFilterData is not None:
+        xy = fnFilterData(xy)
+    bins = np.digitize(xy[:, 0], np.linspace(np.min(xy[:, 0]),
+                                             np.max(xy[:, 0]), work_bins))
+    bins[bins == work_bins] = work_bins-1
+    ubins = np.unique(bins)
+    xy_binned = np.zeros((len(ubins), len(arr_fnAgg)))
+    for i, b in enumerate(ubins):
+        d = xy[bins==b, :]
+        for j in range(0, len(arr_fnAgg)):
+            xy_binned[i, j] = arr_fnAgg[j](d[:, j])
+
+    xy_binned = xy_binned[xy_binned[:, 0].argsort(), :]
+    if work_spacing is not None:
+        sel = np.zeros(xy_binned.shape[0], dtype=np.bool)
+        prevWork = xy_binned[0, 0]
+        sel[0] = True
+        for i in range(0, xy_binned.shape[0]):
+            if xy_binned[i, 0] >= prevWork + work_spacing:
+                sel[i] = True
+                prevWork = xy_binned[i, 0]
+        xy_binned = xy_binned[sel, :]
+    return xy_binned
 
 def plotDirections(ax, runs, fnPlot,
                    fnNorm=None,
@@ -591,7 +596,8 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
     xy_binned = computeIterationStats(runs,work_bins=work_bins,
                                       filteritr=filteritr,
                                       fnItrStats=fnItrStats,
-                                      arr_fnAgg=[np.mean, np.mean] + [np.max]*3)
+                                      arr_fnAgg=[np.mean, np.mean] +
+                                      [np.max]*3)
     xy_binned = xy_binned[:, 1:]
     plotObj = []
     maxrefine_kwargs = kwargs.pop('maxrefine_kwargs', None)
@@ -627,12 +633,8 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
     modifier = kwargs.pop('modifier', None)
     relative = modifier is not None
     modifier = modifier if relative else 1.
-    work_bins = kwargs.pop('work_bins', 50)
+    iter_stats_args = kwargs.pop('iter_stats_args', dict())
     fnWork = kwargs.pop('fnWork', lambda itr: itr.calcTotalWork())
-    filteritr = kwargs.pop("filteritr", filteritr_all)
-    work_spacing = kwargs.pop("work_spacing", None)
-    if work_spacing is not None:
-        work_spacing = np.log(work_spacing)
     fnAggError = kwargs.pop("fnAggError", np.max)
 
     ax.set_ylabel('Max Relative Error' if relative else 'Max Error')
@@ -644,12 +646,11 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
         work = fnWork(run, i)
         return [np.log(work), work, itr.exact_error, modifier*itr.totalErrorEst()]
 
-    xy_binned = computeIterationStats(runs, work_bins=work_bins,
-                                      filteritr=filteritr,
+    xy_binned = computeIterationStats(runs,
                                       fnItrStats=fnItrStats,
-                                      work_spacing=work_spacing,
                                       arr_fnAgg=[np.mean, np.mean,
-                                                 fnAggError, np.min])
+                                                 fnAggError, np.min],
+                                      **iter_stats_args)
     xy_binned = xy_binned[:, 1:]
 
     plotObj = []
@@ -1349,7 +1350,7 @@ def genBooklet(runs, **kwargs):
     Ref_ErrEst_kwargs = {'ls': '-.', 'c':'k', 'label': label_fmt.format(label='{rate:.2g}')}
     try:
         plotWorkVsMaxError(ax, runs,
-                           filteritr=filteritr,
+                           iter_stats_args=dict(filteritr=filteritr),
                            fnWork=lambda run, i: run.iters[i].calcTotalWork(),
                            modifier=modifier, fmt='-*',
                            ErrEst_kwargs=ErrEst_kwargs,
@@ -1362,7 +1363,8 @@ def genBooklet(runs, **kwargs):
     print_msg("plotWorkVsMaxError")
     ax = add_fig()
     try:
-        plotWorkVsMaxError(ax, runs, filteritr=filteritr,
+        plotWorkVsMaxError(ax, runs,
+                           iter_stats_args=dict(filteritr=filteritr),
                            fnWork=lambda run, i: run.iters[i].calcTotalTime(),
                            modifier=modifier, fmt='-*',
                            ErrEst_kwargs=ErrEst_kwargs,
