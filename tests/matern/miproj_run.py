@@ -26,7 +26,9 @@ class MyRun:
 
     def solveFor_sf(self, alpha, arrY):
         output = np.zeros(len(arrY))
-        self.sf.BeginRuns(alpha, np.max([len(Y) for Y in arrY]))
+        max_dim = np.max([len(Y) for Y in arrY])
+        assert(max_dim <= self.params.miproj_max_vars)
+        self.sf.BeginRuns(alpha, max_dim)
         for i, Y in enumerate(arrY):
             output[i] = self.sf.SolveFor(np.array(Y))
         self.sf.EndRuns()
@@ -67,6 +69,12 @@ class MyRun:
         self.prev_val = 0
         self.params = run.params
 
+        if run.params.miproj_min_vars > run.params.miproj_max_vars:
+            warnings.warn("miproj_min_vars is greater than run.params.miproj_max_vars, setting both to the minimum")
+            run.params.miproj_min_vars = np.minimum(run.params.miproj_min_vars,
+                                                    run.params.miproj_max_vars)
+            run.params.miproj_max_vars = run.params.miproj_min_vars
+
         if run.params.miproj_pts_sampler == 'optimal':
             fnSamplePoints = miproj.sample_optimal_leg_pts
             fnWeightPoints = lambda x, b: miproj.optimal_weights(b)
@@ -86,8 +94,8 @@ class MyRun:
                           w * np.ones(len(lvls))
 
         self.proj = miproj.MIWProjSampler(d=run.params.min_dim,
-                                          min_dim=np.minimum(run.params.miproj_min_vars,
-                                                             run.params.miproj_max_var),
+                                          min_dim=run.params.miproj_min_vars,
+                                          max_dim=run.params.miproj_max_vars,
                                           fnBasis=miproj.legendre_polynomials,
                                           fnBasisFromLvl=miproj.default_basis_from_level,
                                           fnSamplePoints=fnSamplePoints,
@@ -112,7 +120,7 @@ class MyRun:
                                                         run.params.miproj_set_mul)
         elif run.params.miproj_set == 'td_ft':
             miproj_set_dexp = run.params.miproj_set_dexp if run.params.min_dim > 0 else 0
-            qoi_N = run.params.miproj_max_var
+            qoi_N = run.params.miproj_max_vars
             td_w = [miproj_set_dexp] * run.params.min_dim + [0.] * qoi_N
             ft_w = [0.] * run.params.min_dim + [run.params.miproj_set_sexp] * qoi_N
             self.profit_calc = setutil.TDFTProfCalculator(td_w, ft_w)
@@ -122,7 +130,7 @@ class MyRun:
     def extendLvls(self, run, lvls):
         max_added = None
         max_dim = 5 + (0 if len(lvls) == 0 else np.max(lvls.get_dim()))
-        max_dim = np.minimum(run.params.miproj_max_var + run.params.min_dim,
+        max_dim = np.minimum(run.params.miproj_max_vars + run.params.min_dim,
                              np.maximum(run.params.miproj_min_vars + run.params.min_dim,
                                         max_dim))
         tStart = time.clock()
@@ -186,7 +194,7 @@ class MyRun:
                             default=True, action="store")
         migrp.add_argument(pre + "fix_lvl", type=int, default=3, action="store")
         migrp.add_argument(pre + "min_vars", type=int, default=10, action="store")
-        migrp.add_argument(pre + "max_var", type=int, default=10**6, action="store")
+        migrp.add_argument(pre + "max_vars", type=int, default=10**6, action="store")
 
     def ItrDone(self, db, run_id, run):
         if db is not None:

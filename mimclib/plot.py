@@ -421,10 +421,10 @@ def plotDirections(ax, runs, fnPlot,
     for j, direction in enumerate(directions):
         mrk = next(markers)
         prop = next(cycler)
-        labal = '$\Delta$' if len(directions)==1 \
+        labal = r'$\Delta$' if len(directions)==1 \
                 else "$[{}]$".format(",".join(["0" if d==0
                                                else ("" if d==1 else str(d))
-                                               +"\ell" for d in direction]))
+                                               +r"\ell" for d in direction]))
         cur_kwargs = {'ax' : ax, 'runs': runs,
                       'linestyle' : '-',
                       'marker' : mrk,

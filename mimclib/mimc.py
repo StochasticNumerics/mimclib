@@ -768,8 +768,10 @@ Bias={:.12e}\nStatErr={:.12e}\
                                 (self.params.bayes_k0+M) )
         Vl = np.empty(L+1)
         act = self.all_itr.active_lvls
+        fine_Vl = self.fn.Norm(self.all_itr.calcFineCentralMoment(moment=2))
+        Vl[0] = fine_Vl[0]
         Vl[1:] = (G_4 / G_3)
-        Vl[np.nonzero(act==0)[0]] = self.fn.Norm(self.all_itr.calcFineCentralMoment(moment=2)[act==0])
+        Vl[np.nonzero(act==0)[0]] = fine_Vl[np.nonzero(act==0)[0]]
         Vl[act < 0] = np.nan
         return Vl
 
@@ -916,12 +918,11 @@ estimate optimal number of levels"
         self._estimateAll()
 
     def _update_active_lvls(self):
-        if not hasattr(self, "cur_start_level"):
-            self.cur_start_level = 0
-        lvls = self.last_itr.get_lvls().to_dense_matrix()
-        self.last_itr.active_lvls = -1*np.ones(len(lvls))
-        self.last_itr.active_lvls[lvls[:, 0] > self.cur_start_level] = 1
-        self.last_itr.active_lvls[lvls[:, 0] == self.cur_start_level] = 0
+        if hasattr(self, "cur_start_level"):
+           lvls = self.last_itr.get_lvls().to_dense_matrix()
+           self.last_itr.active_lvls = -1*np.ones(len(lvls))
+           self.last_itr.active_lvls[lvls[:, 0] > self.cur_start_level] = 1
+           self.last_itr.active_lvls[lvls[:, 0] == self.cur_start_level] = 0
 
     def print_info(self, *args, **kwargs):
         if self.params.verbose >= VERBOSE_INFO:

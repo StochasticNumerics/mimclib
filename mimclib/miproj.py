@@ -150,7 +150,7 @@ Supposed to take function and maintain polynomial coefficients
 class MIWProjSampler(object):
     class SamplesCollection(object):
         def __init__(self, min_dim=1):
-            self.min_dim = 1
+            self.min_dim = min_dim
             self.beta_count = 0
             self.pols_to_beta = np.empty(0)
             self.basis = setutil.VarSizeList()
@@ -182,6 +182,7 @@ class MIWProjSampler(object):
 
     def __init__(self, d=0,  # d is the spatial dimension
                  min_dim=1, # Minimum stochastic dimensions
+                 max_dim=None,
                  fnBasis=None,
                  fnSamplesCount=None,
                  fnSamplePoints=None,
@@ -198,6 +199,7 @@ class MIWProjSampler(object):
         self.fnBasisFromLvl = fnBasisFromLvl if fnBasisFromLvl is not None else default_basis_from_level
         self.d = d   # Spatial dimension
         self.min_dim = min_dim
+        self.max_dim = max_dim
         self.alpha_ind = np.zeros(0)
         self.fnWorkModel = fnWorkModel
 
@@ -273,12 +275,15 @@ class MIWProjSampler(object):
             if len(sam_col.basis) > 50000:
                 raise MemoryError("Too many basis functions {}".format(len(sam_col.basis)))
 
-            if not self.reuse_samples or sam_col.min_dim < sam_col.basis.max_dim():
+            if not self.reuse_samples:
                 sam_col.clear_samples()
 
             if sam_col.min_dim < sam_col.basis.max_dim():
                 sam_col.min_dim *= 2**int(np.ceil(np.log2(sam_col.basis.max_dim() / sam_col.min_dim)))
+                if self.max_dim is not None:
+                    sam_col.min_dim = np.minimum(sam_col.min_dim, self.max_dim)
                 assert(len(sam_col.X) == 0)
+                sam_col.clear_samples()
 
             N_per_basis = self.fnSamplesCount(sam_col.basis)
             mods, sub_alphas = mimc.expand_delta(alpha)

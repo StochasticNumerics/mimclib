@@ -190,7 +190,7 @@ PetscReal CalcCoeff_Kink(const PetscReal* x, myCSField sf){
     for (i=0;i<sf->curN;i++) {
         y2 += sf->Y[i]*sf->Y[i];
     }
-    return 1 + std::sqrt(x2) + std::pow(y2, 3);
+    return 1 + std::sqrt(x2) + std::pow(y2, 3./2.);
 }
 
 PetscReal QoIAtPoint(const PetscReal *x, PetscReal u, myCSField sf) {
