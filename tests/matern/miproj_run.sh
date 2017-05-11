@@ -50,7 +50,7 @@ function all_cmds {
     if [ "$SEL_CMD" = "plot" ]; then
         plot_cmd "${@:1}"
     elif [ "$SEL_CMD" = "est" ]; then
-        errest_cmd ${@:1}
+        errest_cmd "${@:1}"
     elif [ "$SEL_CMD" = "plot_est" ]; then
         plotest_cmd "${@:1}"
     elif [ "$SEL_CMD" = "run" ]; then
@@ -100,7 +100,7 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
 
         for (( i=0; i<=$max_lvl; i++ ))
         do
-            all_cmds -fix-$i 2 $(($i)) $N -mimc_min_dim 0 -miproj_max_vars $N \
+            all_cmds -fix-$i 2 $(($i+2)) $N -mimc_min_dim 0 -miproj_max_vars $N \
                      -miproj_fix_lvl $i -miproj_set adaptive \
                      $CMN
         done

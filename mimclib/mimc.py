@@ -391,6 +391,9 @@ class MIMCItrData(object):
 
         header_fmt = "".join(sum([["{:", c[1], "}"] for c in columns], [])) + "\n"
         value_fmt = "".join(sum([["{:", c[2], "}"] for c in columns], [])) + "\n"
+
+        real_stat_error = self.parent._Ca * np.sum(np.sqrt(self.Vl_estimate / self.M))
+
         output = header_fmt.format(*[c[0] for c in columns])
 
         for i in range(0, self.lvls_count):
@@ -909,13 +912,18 @@ estimate optimal number of levels"
             raise NotImplementedError("Dynamic first level is not implemented for more than one dimension")
         deltaVl = self.fn.Norm(self.last_itr.calcDeltaVl())
         fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
-        if np.minimum(fineVl[self.cur_start_level],
-                      fineVl[self.cur_start_level+1]) < deltaVl[self.cur_start_level+1]:
-            self.cur_start_level += 1   # Increase minimum level one at a time.
+        if not hasattr(self, "cur_start_level"):
+            self.cur_start_level = 0
+        if fineVl[self.cur_start_level] < deltaVl[self.cur_start_level+1] or \
+           (self.cur_start_level < len(fineVl)-1 and \
+           fineVl[self.cur_start_level+1] < deltaVl[self.cur_start_level+1]):
+            # Increase minimum level one at a time.
+            self.cur_start_level = np.maximum(self.cur_start_level+1,
+                                              len(fineVl)-1)
             self.print_info("New start level", self.cur_start_level)
-        lvls = self.last_itr.get_lvls().to_dense_matrix()
-        self._update_active_lvls()
-        self._estimateAll()
+            lvls = self.last_itr.get_lvls().to_dense_matrix()
+            self._update_active_lvls()
+            self._estimateAll()
 
     def _update_active_lvls(self):
         if hasattr(self, "cur_start_level"):
