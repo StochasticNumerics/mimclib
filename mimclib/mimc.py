@@ -914,9 +914,9 @@ estimate optimal number of levels"
         fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
         if not hasattr(self, "cur_start_level"):
             self.cur_start_level = 0
-        if fineVl[self.cur_start_level] < deltaVl[self.cur_start_level+1] or \
-           (self.cur_start_level < len(fineVl)-1 and \
-           fineVl[self.cur_start_level+1] < deltaVl[self.cur_start_level+1]):
+        if self.cur_start_level < len(fineVl)-1 and \
+           np.minimum(fineVl[self.cur_start_level],
+                      fineVl[self.cur_start_level+1]) < deltaVl[self.cur_start_level+1]:
             # Increase minimum level one at a time.
             self.cur_start_level = np.maximum(self.cur_start_level+1,
                                               len(fineVl)-1)
