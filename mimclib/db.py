@@ -261,7 +261,7 @@ class MIMCDatabase(object):
         fn = fn or dict(filter(lambda i:i[0] in "Norm",
                                mimc_run.fn.getDict().iteritems())) # Only save the Norm function
         import dill
-        with self.DBConn(**self.connArgs) as cur:
+        with self.connect() as cur:
             cur.execute('''
             INSERT INTO tbl_runs(creation_date, TOL, tag, params, fn, done_flag, comment)
             VALUES(datetime(), ?, ?, ?, ?, -1, ?)''',
@@ -269,7 +269,7 @@ class MIMCDatabase(object):
             return cur.getLastRowID()
 
     def markRunDone(self, run_id, flag, totalTime=None, comment=''):
-        with self.DBConn(**self.connArgs) as cur:
+        with self.connect() as cur:
             cur.execute('''UPDATE tbl_runs SET done_flag=?, totalTime=?,
             comment = {}
             WHERE run_id=?'''.format('CONCAT(comment,  ?)' if self.engine=='mysql' else
@@ -302,7 +302,7 @@ class MIMCDatabase(object):
             prev_tW = iteration.tW
             prev_Ml = iteration.M
 
-        with self.DBConn(**self.connArgs) as cur:
+        with self.connect() as cur:
             cur.execute('''
 INSERT INTO tbl_iters(creation_date, totalTime, TOL, bias, stat_error,
 exact_error, Qparams, userdata, iteration_idx, run_id)
@@ -347,7 +347,7 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
         if len(run_ids) == 0:
             return lstruns
 
-        with self.DBConn(**self.connArgs) as cur:
+        with self.connect() as cur:
             runAll = cur.execute(
                         '''SELECT r.run_id, r.params, r.TOL, r.comment, r.fn, r.tag, r.totalTime
                         FROM tbl_runs r WHERE r.run_id in ?''', [run_ids]).fetchall()
@@ -432,8 +432,11 @@ ORDER BY dr.run_id, dr.iteration_idx
 
         return lstruns
 
+    def connect(self):
+        return self.DBConn(**self.connArgs)
+
     def _fetchArray(self, query, params=None):
-        with self.DBConn(**self.connArgs) as cur:
+        with self.connect() as cur:
             return np.array(cur.execute(query, params if params else []).fetchall())
 
     def getRunsIDs(self, minTOL=None, maxTOL=None, tag=None,
@@ -491,7 +494,7 @@ ORDER BY dr.run_id, dr.iteration_idx
             errs = fnItrError(itrs)
             for i, itr in enumerate(itrs):
                 itr.exact_error = errs[i]
-        with self.DBConn(**self.connArgs) as cur:
+        with self.connect() as cur:
             for run in runs:
                 for itr in run.iters:
                     cur.execute('''
@@ -502,14 +505,14 @@ UPDATE tbl_iters SET exact_error = ? WHERE iter_id = ?''',
     def deleteRuns(self, run_ids):
         if len(run_ids) == 0:
             return 0
-        with self.DBConn(**self.connArgs) as cur:
+        with self.connect() as cur:
             cur.execute("DELETE from tbl_runs where run_id in ?",
                         [np.array(run_ids).astype(np.int).reshape(-1).tolist()])
             return cur.getRowCount()
 
 def export_db(tag, from_db, to_db, verbose=False):
-    with from_db.DBConn(**from_db.connArgs) as from_cur:
-        with to_db.DBConn(**to_db.connArgs) as to_cur:
+    with from_db.connect() as from_cur:
+        with to_db.connect() as to_cur:
             if verbose:
                 print("Getting runs")
             runs = np.array(from_cur.execute(

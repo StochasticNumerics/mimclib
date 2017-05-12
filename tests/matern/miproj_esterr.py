@@ -30,7 +30,7 @@ def l2_error_mc(itrs, fnSample, rel_tol=0.01, maxM=1000, max_L=None):
         N = np.max([itr.parent.last_itr.lvls_max_dim()-itr.parent.params.min_dim for itr in itrs])
         N += 10
     try:
-        N = np.minimum(N, np.max([itr.parent.params.miproj_max_var for itr in itrs]))
+        N = np.minimum(N, np.max([itr.parent.params.miproj_max_vars for itr in itrs]))
     except:
         N = np.minimum(N, np.max([itr.parent.params.miproj_max_dim-itr.parent.params.min_dim for itr in itrs]))
 

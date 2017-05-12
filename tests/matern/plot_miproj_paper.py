@@ -128,7 +128,6 @@ def plot_all(runs, **kwargs):
         return figures[-1].gca()
 
     label_fmt = '{label}'
-    Ref_kwargs = {'ls': '--', 'c':'k', 'label': label_fmt.format(label='{rate:.2g}')}
     print_msg("plotWorkVsMaxError")
     ax = add_fig()
     Ref_kwargs = {'ls': '--', 'c':'k', 'label': label_fmt.format(label='{rate:.2g}')}
@@ -209,7 +208,7 @@ def plot_all(runs, **kwargs):
                                                    run.params.miproj_set_sexp,
                                                    run.params.miproj_set_mul)
         else:
-            qoi_N = run.params.miproj_max_var
+            qoi_N = run.params.miproj_max_vars
             td_w = [0.] * (run.params.min_dim + qoi_N)
             ft_w = [0.] * run.params.min_dim + [1.] * qoi_N
             profit_calc = setutil.TDFTProfCalculator(td_w, ft_w)
@@ -341,14 +340,12 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                                       iter_stats_args=iter_stats_args,
                                       modifier=modifier, fnWork=fnWork,
                                       fnAggError=np.min, fmt='--x',
-                                      Ref_kwargs=None,
                                       label='\\ell={}'.format(i), alpha=0.7)
             miplot.plotWorkVsMaxError(fig_T.gca(), [rr],
                                       iter_stats_args=iter_stats_args,
                                       fnWork=fnTime,
                                       modifier=modifier, fmt='--x',
                                       fnAggError=np.min,
-                                      Ref_kwargs=None,
                                       label='\\ell={}'.format(i),
                                       alpha=0.7)
             miplot.plotWorkVsMaxError(fig_Tc.gca(), [rr],
@@ -356,12 +353,25 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                                       fnWork=fnTime_calc,
                                       modifier=modifier, fmt='--x',
                                       fnAggError=np.min,
-                                      Ref_kwargs=None,
                                       label='\\ell={}'.format(i),
                                       alpha=0.7)
 
-    for rr, label in [[fix_runs, 'SL'],
-                       [runs_adaptive, 'ML Adaptive'], [runs_priori, 'ML']]:
+    rates_ML, rates_SL = None, None
+    if runs[0].params.qoi_example == 'sf-kink':
+        N = runs[0].params.miproj_max_var
+        if N < 3:
+            rates_ML = [-1., 1, 1.]
+        elif N == 3:
+            rates_ML = [-1., 1, 4.]
+        else:
+            rates_ML = [-3., N, 3.]
+        rates_SL = [-3., 3. + N, 1.]
+
+    for rr, label, rates in [[fix_runs, 'SL', rates_SL],
+                             [runs_adaptive, 'ML Adaptive', rates_ML if
+                              runs == runs_adaptive else None],
+                             [runs_priori, 'ML', rates_ML if runs ==
+                              runs_priori else None]]:
         if rr is None or len(rr) == 0:
             continue
         if rr == fix_runs:
@@ -373,24 +383,41 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                                    work_spacing=work_spacing,
                                    fnFilterData=filter_dec)
 
-        miplot.plotWorkVsMaxError(fig_W.gca(), rr,
-                                  modifier=modifier, fnWork=fnWork,
-                                  fnAggError=np.min, fmt='-*',
-                                  iter_stats_args=iter_stats_args,
-                                  Ref_kwargs=Ref_kwargs if rr==runs else None,
-                                  label=label)
-        miplot.plotWorkVsMaxError(fig_T.gca(), rr, fnWork=fnTime,
-                                  modifier=modifier, fmt='-*',
-                                  iter_stats_args=iter_stats_args,
-                                  fnAggError=np.min,
-                                  Ref_kwargs=Ref_kwargs if rr==runs else None,
-                                  label=label)
-        miplot.plotWorkVsMaxError(fig_Tc.gca(), rr, fnWork=fnTime_calc,
-                                  modifier=modifier, fmt='-*',
-                                  iter_stats_args=iter_stats_args,
-                                  fnAggError=np.min,
-                                  Ref_kwargs=Ref_kwargs if rr==runs else None,
-                                  label=label)
+        if rates is not None:
+            if rates[1] == 1:
+                if rates[0] == 1:
+                    base = r'W'
+                else:
+                    base = r'W^{{{:.2g}}}'.format(rates[0])
+            else:
+                base = r'W^{{\frac{{ {:.2g} }}{{ {:.2g} }}}}'.format(rates[0], rates[1])
+
+            if rates[2] == 1:
+                log_factor = r'|\log(W)|'
+            else:
+                log_factor = r'|\log(W)|^{{{:.2g}}}'.format(rates[2])
+
+            Ref_kwargs['label'] = '${}{}$'.format(base, log_factor)
+
+        for fig, curFnWork in [[fig_W, fnWork], [fig_T, fnTime],
+                               [fig_Tc, fnTime_calc]]:
+            data, _ = miplot.plotWorkVsMaxError(fig.gca(), rr,
+                                                modifier=modifier,
+                                                fnWork=curFnWork,
+                                                fnAggError=np.min,
+                                                fmt='-*',
+                                                iter_stats_args=iter_stats_args,
+                                                Ref_kwargs=Ref_kwargs
+                                                if rates is None and
+                                                rr == runs else None,
+                                                label=label)
+            if rates is not None:
+                def fnRate(x, rr=rates):
+                    base = np.min(x)
+                    return (1+x/base)**(rr[0]/rr[1])*np.abs(np.log(1+x/base)**rr[2])
+                fig.gca().add_line(miplot.FunctionLine2D(fn=fnRate,
+                                                         data=data,
+                                                         **Ref_kwargs))
 
     fig_W.gca().set_xlabel('Avg. Iteration Work')
     fig_T.gca().set_xlabel('Avg. Iteration Time (tic/toc)')
