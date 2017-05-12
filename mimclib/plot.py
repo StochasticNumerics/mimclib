@@ -78,11 +78,11 @@ class FunctionLine2D(plt.Line2D):
         y = np.array([d[1] for d in data])
         if len(x) > 0 and len(y) > 0:
             if log_data:
-                const = [np.mean(y/self.orig_fn(x)), 0]
-                self.fn = lambda x, cc=const, ff=self.orig_fn: cc[0] * ff(x) + cc[1]
+                #const = [np.mean(y/self.orig_fn(x)), 0]
+                consts = ratefit(self.orig_fn(x), y)
             else:
-                const = [np.mean(y-self.orig_fn(x)), 0]
-                self.fn = lambda x, cc=const, ff=self.orig_fn: ff(x) + cc[0]
+                consts = [1., np.mean(y-self.orig_fn(x))]
+            self.fn = lambda x, cc=consts, ff=self.orig_fn: c[0] * ff(x) + cc[1]
 
 
     def draw(self, renderer):

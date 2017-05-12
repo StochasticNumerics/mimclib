@@ -358,7 +358,7 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
 
     rates_ML, rates_SL = None, None
     if runs[0].params.qoi_example == 'sf-kink':
-        N = runs[0].params.miproj_max_var
+        N = runs[0].params.miproj_max_vars
         if N < 3:
             rates_ML = [-1., 1, 1.]
         elif N == 3:
@@ -367,11 +367,11 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
             rates_ML = [-3., N, 3.]
         rates_SL = [-3., 3. + N, 1.]
 
-    for rr, label, rates in [[fix_runs, 'SL', rates_SL],
-                             [runs_adaptive, 'ML Adaptive', rates_ML if
-                              runs == runs_adaptive else None],
-                             [runs_priori, 'ML', rates_ML if runs ==
-                              runs_priori else None]]:
+    for rr, label, rates, ref_ls in [[fix_runs, 'SL', rates_SL, '-.'],
+                                     [runs_adaptive, 'ML Adaptive', rates_ML if
+                                      runs == runs_adaptive else None, '--'],
+                                     [runs_priori, 'ML', rates_ML if runs ==
+                                      runs_priori else None, '--']]:
         if rr is None or len(rr) == 0:
             continue
         if rr == fix_runs:
@@ -398,6 +398,7 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                 log_factor = r'|\log(W)|^{{{:.2g}}}'.format(rates[2])
 
             Ref_kwargs['label'] = '${}{}$'.format(base, log_factor)
+            Ref_kwargs['ls'] = ref_ls
 
         for fig, curFnWork in [[fig_W, fnWork], [fig_T, fnTime],
                                [fig_Tc, fnTime_calc]]:
@@ -411,12 +412,13 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                                                 if rates is None and
                                                 rr == runs else None,
                                                 label=label)
+            data = data[np.argsort(data[:, 0]), :]
             if rates is not None:
                 def fnRate(x, rr=rates):
                     base = np.min(x)
                     return (1+x/base)**(rr[0]/rr[1])*np.abs(np.log(1+x/base)**rr[2])
                 fig.gca().add_line(miplot.FunctionLine2D(fn=fnRate,
-                                                         data=data,
+                                                         data=data[-len(data)//3:, :],
                                                          **Ref_kwargs))
 
     fig_W.gca().set_xlabel('Avg. Iteration Work')
