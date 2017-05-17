@@ -918,7 +918,7 @@ estimate optimal number of levels"
            np.minimum(fineVl[self.cur_start_level],
                       fineVl[self.cur_start_level+1]) < deltaVl[self.cur_start_level+1]:
             # Increase minimum level one at a time.
-            self.cur_start_level = np.maximum(self.cur_start_level+1,
+            self.cur_start_level = np.minimum(self.cur_start_level+1,
                                               len(fineVl)-1)
             self.print_info("New start level", self.cur_start_level)
             lvls = self.last_itr.get_lvls().to_dense_matrix()
