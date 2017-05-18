@@ -636,15 +636,26 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
     iter_stats_args = kwargs.pop('iter_stats_args', dict())
     fnWork = kwargs.pop('fnWork', lambda itr: itr.calcTotalWork())
     fnAggError = kwargs.pop("fnAggError", np.max)
+    flip = kwargs.pop('flip', False)
 
-    ax.set_ylabel('Max Relative Error' if relative else 'Max Error')
+    if flip:
+        ax.set_ylabel('Work')
+        ax.set_xlabel('Max Relative Error' if relative else 'Max Error')
+    else:
+        ax.set_xlabel('Work')
+        ax.set_ylabel('Max Relative Error' if relative else 'Max Error')
     ax.set_yscale('log')
     ax.set_xscale('log')
 
     def fnItrStats(run, i):
         itr = run.iters[i]
         work = fnWork(run, i)
-        return [np.log(work), work, itr.exact_error, modifier*itr.totalErrorEst()]
+        if flip:
+            return [np.log(itr.exact_error), itr.exact_error, work,
+                    modifier*itr.totalErrorEst()]
+        else:
+            return [np.log(work), work, itr.exact_error,
+                    modifier*itr.totalErrorEst()]
 
     xy_binned = computeIterationStats(runs,
                                       fnItrStats=fnItrStats,
