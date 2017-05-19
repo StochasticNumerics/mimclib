@@ -1238,6 +1238,22 @@ def add_legend(ax, handles=None, labels=None, alpha=0.5,
         handles, labels = ax.get_legend_handles_labels()
         if not handles:
             return None
+
+    lines = np.array([type(h) is FunctionLine2D for h in handles], dtype=np.bool)
+    # Order handles so that FunctionLine2D is always at the end
+    if np.any(lines):
+        nlines = np.logical_not(lines)
+        handles = np.array(handles)
+        labels = np.array(labels)
+        handles_lines, labels_lines = zip(*sorted(zip(handles[lines], labels[lines]),
+                                                  key=lambda t: t[1]))
+        handles_nlines, labels_nlines = zip(*sorted(zip(handles[nlines], labels[nlines]),
+                                                    key=lambda t: t[1]))
+        handles = handles_nlines + handles_lines
+        labels = labels_nlines + labels_lines
+    else:
+        handles, labels = zip(*sorted(zip(handles, labels), key=lambda t: t[1]))
+
     if outside is not None and len(handles) >= outside:
         # Shrink current axis by 20%
         box = ax.get_position()
