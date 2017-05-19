@@ -440,7 +440,6 @@ def plotDirections(ax, runs, fnPlot,
             cur_kwargs['estimate_kwargs'] = {'linestyle': ':',
                                              'marker' : mrk,
                                              'label' : label_fmt.format(label='Corrected estimate')}
-
         line_data, _ = fnPlot(fnNorm=fnNorm, **cur_kwargs)
         if rate is None and len(line_data[1:, :]) > 0:
             # Fit rate
@@ -454,11 +453,11 @@ def plotDirections(ax, runs, fnPlot,
                 else:
                     cur_rate = ratefit(np.log(line_data[1:, 0]),
                                        np.log(line_data[1:, 1]))[0]
-            add_rates[cur_rate] = line_data
+            add_rates[np.round(cur_rate, 2)] = line_data
         elif rate is not None:
             ind = np.nonzero(np.array(direction) != 0)[0]
             if np.all(ind < len(rate)):
-                add_rates[np.sum(rate[ind])] = line_data
+                add_rates[np.round(np.sum(rate[ind]), 2)] = line_data
 
     def _getLevelRate(rate, beta=None):
         if beta is not None:
@@ -1241,20 +1240,16 @@ def add_legend(ax, handles=None, labels=None, alpha=0.5,
 
     lines = np.array([type(h) is FunctionLine2D for h in handles], dtype=np.bool)
     # Order handles so that FunctionLine2D is always at the end
-    if np.any(lines):
+    if np.any(lines) and not np.all(lines):
         nlines = np.logical_not(lines)
         handles = np.array(handles)
         labels = np.array(labels)
         handles_lines, labels_lines = zip(*sorted(zip(handles[lines].tolist(), labels[lines].tolist()),
                                                   key=lambda t: t[1]))
-        if np.any(nlines):
-            handles_nlines, labels_nlines = zip(*sorted(zip(handles[nlines].tolist(), labels[nlines].tolist()),
-                                                        key=lambda t: t[1]))
-            handles = handles_nlines + handles_lines
-            labels = labels_nlines + labels_lines
-        else:
-            handles = handles_lines
-            labels = labels_lines
+        handles_nlines, labels_nlines = zip(*sorted(zip(handles[nlines].tolist(), labels[nlines].tolist()),
+                                                    key=lambda t: t[1]))
+        handles = handles_nlines + handles_lines
+        labels = labels_nlines + labels_lines
     else:
         handles, labels = zip(*sorted(zip(handles, labels), key=lambda t: t[1]))
 
@@ -1681,12 +1676,12 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
     with PdfPages(args.o) as pdf:
         for fig in figures:
             pdf.savefig(fig)
-            
+
     from matplotlib2tikz import save as tikz_save
     import os
     dir_name, _ = os.path.splitext(args.o)
     if not os.path.exists(dir_name):
-        os.makedirs(dir_name)        
+        os.makedirs(dir_name)
     for i, fig in enumerate(figures):
         tikz_save("{}/{:03}.tex".format(dir_name, i))
 

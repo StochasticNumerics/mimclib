@@ -112,7 +112,7 @@ def plot_all(runs, **kwargs):
                             in miplot.enum_iter(runs, miplot.filteritr_convergent)])
     iters_count = np.sum([len(r.iters) for r in runs])
     verbose = kwargs.pop('verbose', False)
-    legend_outside = kwargs.pop("legend_outside", 5)
+    legend_outside = kwargs.pop("legend_outside", 8)
     if verbose:
         def print_msg(*args):
             print(*args)
@@ -399,9 +399,9 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                 base = r'\epsilon^{{\frac{{ {:.2g} }}{{ {:.2g} }}}}'.format(rates[1], rates[0])
 
             if rates[2] == 1:
-                log_factor = r'|\log(\epsilon^{-1})|'
+                log_factor = r'\log(\epsilon^{-1})'
             else:
-                log_factor = r'|\log(\epsilon^{{-1}})|^{{{:.2g}}}'.format(rates[2])
+                log_factor = r'\log(\epsilon^{{-1}})^{{{:.2g}}}'.format(rates[2])
 
             Ref_kwargs['label'] = '${}{}$'.format(base, log_factor)
             Ref_kwargs['ls'] = ref_ls
