@@ -287,6 +287,7 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
         fix_tag = db_tag + "-fix-" + str(len(fix_runs))
         run_data = db.readRuns(tag=fix_tag, done_flag=input_args.done_flag)
         if len(run_data) == 0:
+            print("Couldn't get", fix_tag, input_args.done_flag)
             break
         print("Got", fix_tag)
         assert(len(run_data) == 1)
@@ -341,35 +342,36 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                                       flip=flip,
                                       iter_stats_args=iter_stats_args,
                                       modifier=modifier, fnWork=fnWork,
-                                      fnAggError=np.min, fmt='--x',
-                                      label='\\ell={}'.format(i), alpha=0.7)
+                                      fnAggError=np.min, fmt=':xk',
+                                      #label='\\ell={}'.format(i),
+                                      alpha=0.7)
             miplot.plotWorkVsMaxError(fig_T.gca(), [rr],
                                       flip=flip,
                                       iter_stats_args=iter_stats_args,
                                       fnWork=fnTime,
-                                      modifier=modifier, fmt='--x',
+                                      modifier=modifier, fmt=':xk',
                                       fnAggError=np.min,
-                                      label='\\ell={}'.format(i),
+                                      #label='\\ell={}'.format(i),
                                       alpha=0.7)
             miplot.plotWorkVsMaxError(fig_Tc.gca(), [rr],
                                       flip=flip,
                                       iter_stats_args=iter_stats_args,
                                       fnWork=fnTime_calc,
-                                      modifier=modifier, fmt='--x',
+                                      modifier=modifier, fmt=':xk',
                                       fnAggError=np.min,
-                                      label='\\ell={}'.format(i),
+                                      #label='\\ell={}'.format(i),
                                       alpha=0.7)
 
     rates_ML, rates_SL = None, None
     if runs[0].params.qoi_example == 'sf-kink':
         N = runs[0].params.miproj_max_vars
         if N < 3:
-            rates_ML = [-1., 1, 1.]
+            rates_ML = [1., -1, 1.]
         elif N == 3:
-            rates_ML = [-1., 1, 4.]
+            rates_ML = [1., -1, 4.]
         else:
-            rates_ML = [-3., N, 3.]
-        rates_SL = [-3., 3. + N, 1.]
+            rates_ML = [3., -N, 3.]
+        rates_SL = [3., -3. - N, 1.]
 
     for rr, label, rates, ref_ls in [[fix_runs, 'SL', rates_SL, '-.'],
                                      [runs_adaptive, 'ML Adaptive', rates_ML if
@@ -383,23 +385,23 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                                    work_spacing=None,
                                    fnFilterData=filter_dec)
         else:
-            iter_stats_args = dict(work_bins=work_bins,
-                                   work_spacing=work_spacing,
+            iter_stats_args = dict(work_bins=1000,
+                                   work_spacing=None,
                                    fnFilterData=filter_dec)
 
         if rates is not None:
-            if rates[1] == 1:
+            if rates[0] == 1:
                 if rates[0] == 1:
-                    base = r'W'
+                    base = r'\epsilon'
                 else:
-                    base = r'W^{{{:.2g}}}'.format(rates[0])
+                    base = r'\epsilon^{{{:.2g}}}'.format(rates[0])
             else:
-                base = r'W^{{\frac{{ {:.2g} }}{{ {:.2g} }}}}'.format(rates[0], rates[1])
+                base = r'\epsilon^{{\frac{{ {:.2g} }}{{ {:.2g} }}}}'.format(rates[1], rates[0])
 
             if rates[2] == 1:
-                log_factor = r'|\log(W)|'
+                log_factor = r'|\log(\epsilon^{-1})|'
             else:
-                log_factor = r'|\log(W)|^{{{:.2g}}}'.format(rates[2])
+                log_factor = r'|\log(\epsilon^{{-1}})|^{{{:.2g}}}'.format(rates[2])
 
             Ref_kwargs['label'] = '${}{}$'.format(base, log_factor)
             Ref_kwargs['ls'] = ref_ls
@@ -420,10 +422,9 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
             data = data[np.argsort(data[:, 0]), :]
             if rates is not None:
                 def fnRate(x, rr=rates):
-                    base = np.min(x)
-                    return (1+x/base)**(rr[0]/rr[1])*np.abs(np.log(1+x/base)**rr[2])
+                    return (x)**(rr[1]/rr[0])*np.abs(np.log(np.exp(1.)+x)**rr[2])
                 fig.gca().add_line(miplot.FunctionLine2D(fn=fnRate,
-                                                         data=data[-len(data)//3:, :],
+                                                         data=data[:len(data)//3, :],
                                                          **Ref_kwargs))
 
     if flip:

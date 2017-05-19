@@ -1245,12 +1245,16 @@ def add_legend(ax, handles=None, labels=None, alpha=0.5,
         nlines = np.logical_not(lines)
         handles = np.array(handles)
         labels = np.array(labels)
-        handles_lines, labels_lines = zip(*sorted(zip(handles[lines], labels[lines]),
+        handles_lines, labels_lines = zip(*sorted(zip(handles[lines].tolist(), labels[lines].tolist()),
                                                   key=lambda t: t[1]))
-        handles_nlines, labels_nlines = zip(*sorted(zip(handles[nlines], labels[nlines]),
-                                                    key=lambda t: t[1]))
-        handles = handles_nlines + handles_lines
-        labels = labels_nlines + labels_lines
+        if np.any(nlines):
+            handles_nlines, labels_nlines = zip(*sorted(zip(handles[nlines].tolist(), labels[nlines].tolist()),
+                                                        key=lambda t: t[1]))
+            handles = handles_nlines + handles_lines
+            labels = labels_nlines + labels_lines
+        else:
+            handles = handles_lines
+            labels = labels_lines
     else:
         handles, labels = zip(*sorted(zip(handles, labels), key=lambda t: t[1]))
 
@@ -1677,6 +1681,14 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
     with PdfPages(args.o) as pdf:
         for fig in figures:
             pdf.savefig(fig)
+            
+    from matplotlib2tikz import save as tikz_save
+    import os
+    dir_name, _ = os.path.splitext(args.o)
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)        
+    for i, fig in enumerate(figures):
+        tikz_save("{}/{:03}.tex".format(dir_name, i))
 
     if args.cmd is not None:
         os.system(args.cmd.format(args.o))
