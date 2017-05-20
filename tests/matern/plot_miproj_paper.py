@@ -4,7 +4,13 @@ from __future__ import division
 from __future__ import print_function
 
 import matplotlib as mpl
+mpl.rc('text', usetex=True)
+mpl.rc('font', **{'family': 'normal', 'weight': 'demibold',
+                  'size': 15})
+mpl.rc('lines', linewidth=2,)
+mpl.rc('axes', labelsize=20,)
 mpl.use('Agg')
+
 import numpy as np
 import mimclib.plot as miplot
 import matplotlib.pyplot as plt
@@ -422,19 +428,19 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
             data = data[np.argsort(data[:, 0]), :]
             if rates is not None:
                 def fnRate(x, rr=rates):
-                    return (x)**(rr[1]/rr[0])*np.abs(np.log(np.exp(1.)+x)**rr[2])
+                    return (x)**(rr[1]/rr[0])*np.abs(np.log(x)**rr[2])
                 fig.gca().add_line(miplot.FunctionLine2D(fn=fnRate,
                                                          data=data[:len(data)//3, :],
                                                          **Ref_kwargs))
 
     if flip:
-        fig_W.gca().set_ylabel('Avg. Iteration Work')
-        fig_T.gca().set_ylabel('Avg. Iteration Time (tic/toc)')
-        fig_Tc.gca().set_ylabel('Avg. Iteration Time (calculated)')
+        fig_W.gca().set_ylabel('Work Estimate')
+        fig_T.gca().set_ylabel('Time, total [s.]')
+        fig_Tc.gca().set_ylabel('Time [s.]')
     else:
-        fig_W.gca().set_xlabel('Avg. Iteration Work')
-        fig_T.gca().set_xlabel('Avg. Iteration Time (tic/toc)')
-        fig_Tc.gca().set_xlabel('Avg. Iteration Time (calculated)')
+        fig_W.gca().set_xlabel('Work Estimate')
+        fig_T.gca().set_xlabel('Time, total [s.]')
+        fig_Tc.gca().set_xlabel('Time [s.]')
 
     return [fig_W, fig_T, fig_Tc]
 
