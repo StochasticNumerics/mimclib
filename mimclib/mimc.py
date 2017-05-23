@@ -152,6 +152,7 @@ class MIMCItrData(object):
     """
     def __init__(self, parent=None, min_dim=0, moments=None, lvls=None):
         self.parent = parent
+        self.userdata = None
         self.moments = moments
         self._lvls = lvls if lvls is not None else setutil.VarSizeList(min_dim=min_dim)
         self.psums_delta = None
@@ -538,12 +539,10 @@ supported with a given work model")
         # fnHierarchy(lvls): Returns associated hierarchy of lvls
         for k in kwargs.keys():
             kk = k[2:] if k.startswith('fn') else k
-            if kk not in ["SampleLvl",
-                          "SampleAll",
-                          "ExtendLvls",
-                          "ItrDone", "WorkModel",
+            if kk not in ["SampleLvl", "SampleAll", "ExtendLvls",
+                          "ItrStart", "ItrDone", "WorkModel",
                           "Hierarchy", "SampleQoI", "Norm"]:
-                raise KeyError("Invalid function name")
+                raise KeyError("Invalid function name `{}`".format(kk))
             if kk == "SampleLvl":
                 if kwargs[k] is not None:
                     self.fn.SampleAll = lambda lvls, M, moments: \
@@ -981,6 +980,10 @@ estimate optimal number of levels"
 
                 add_new_iteration = False
                 self.last_itr.TOL = TOL
+
+                if hasattr(self.fn, "ItrStart"):
+                    self.fn.ItrStart()
+
                 gc.collect()
                 # Added levels if bayesian
                 if self.params.dynamic_lvls and self.last_itr.lvls_count > 0:

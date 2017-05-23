@@ -4,12 +4,13 @@ from __future__ import division
 from __future__ import print_function
 
 import matplotlib as mpl
+mpl.use('Agg')
 mpl.rc('text', usetex=True)
 mpl.rc('font', **{'family': 'normal', 'weight': 'demibold',
                   'size': 15})
-mpl.rc('lines', linewidth=2,)
+mpl.rc('lines', linewidth=2, markersize=10, markeredgewidth=1.)
+mpl.rc('markers', fillstyle='none')
 mpl.rc('axes', labelsize=20,)
-mpl.use('Agg')
 
 import numpy as np
 import mimclib.plot as miplot
@@ -376,7 +377,7 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
         elif N == 3:
             rates_ML = [1., -1, 4.]
         else:
-            rates_ML = [3., -N, 3.]
+            rates_ML = [3., -N, 2.]
         rates_SL = [3., -3. - N, 1.]
 
     for rr, label, rates, ref_ls in [[fix_runs, 'SL', rates_SL, '-.'],
@@ -386,14 +387,9 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                                       runs_priori else None, '--']]:
         if rr is None or len(rr) == 0:
             continue
-        if rr == fix_runs:
-            iter_stats_args = dict(work_bins=1000,
-                                   work_spacing=None,
-                                   fnFilterData=filter_dec)
-        else:
-            iter_stats_args = dict(work_bins=1000,
-                                   work_spacing=None,
-                                   fnFilterData=filter_dec)
+        iter_stats_args = dict(work_bins=work_bins,
+                               work_spacing=work_spacing,
+                               fnFilterData=filter_dec)
 
         if rates is not None:
             if rates[0] == 1:
@@ -404,7 +400,9 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
             else:
                 base = r'\epsilon^{{\frac{{ {:.2g} }}{{ {:.2g} }}}}'.format(rates[1], rates[0])
 
-            if rates[2] == 1:
+            if rates[2] == 0:
+                log_factor = r''
+            elif rates[2] == 1:
                 log_factor = r'\log(\epsilon^{-1})'
             else:
                 log_factor = r'\log(\epsilon^{{-1}})^{{{:.2g}}}'.format(rates[2])

@@ -121,8 +121,8 @@ class MyRun:
         elif run.params.miproj_set == 'td_ft':
             miproj_set_dexp = run.params.miproj_set_dexp if run.params.min_dim > 0 else 0
             qoi_N = run.params.miproj_max_vars
-            td_w = [miproj_set_dexp] * run.params.min_dim + [0.] * qoi_N
-            ft_w = [0.] * run.params.min_dim + [run.params.miproj_set_sexp] * qoi_N
+            td_w = [miproj_set_dexp] * run.params.min_dim + [run.params.miproj_set_sexp] * qoi_N
+            ft_w = [0.] * (run.params.min_dim +  qoi_N)
             self.profit_calc = setutil.TDFTProfCalculator(td_w, ft_w)
         else:
             assert run.params.miproj_set == 'adaptive'

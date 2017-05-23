@@ -286,7 +286,7 @@ class MIMCDatabase(object):
                 comment += "{}: {}".format(exc_type.__name__, exc_obj)
         self.markRunDone(run_id, flag=0, comment=comment, totalTime=totalTime)
 
-    def writeRunData(self, run_id, mimc_run, iteration_idx, userdata=None):
+    def writeRunData(self, run_id, mimc_run, iteration_idx):
         base = 0
         iteration = mimc_run.iters[iteration_idx]
         El = mimc_run.fn.Norm(iteration.calcDeltaEl())
@@ -310,7 +310,7 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                         _nan2none([iteration.totalTime, iteration.TOL,
                                    iteration.bias, iteration.stat_error,
                                    iteration.exact_error])
-                        +[_pickle(iteration.Q), _pickle(userdata),
+                        +[_pickle(iteration.Q), _pickle(iteration.userdata),
                           iteration_idx, run_id])
             iter_id = cur.getLastRowID()
 

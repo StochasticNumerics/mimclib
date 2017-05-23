@@ -10,9 +10,9 @@ DB_CONN='-db_engine mysql -db_name mimc -db_host 129.67.187.118 '
 #          -verbose True -all_itr True
 # done
 
-for N in 2 4 6
+for N in 2 3 4 6
 do
     echo ./plot_miproj_paper.py $DB_CONN \
-         -db_tag sf-kink-2-$N-adapt -o output/poisson-kink-$N.pdf \
-         -verbose True -all_itr True -qoi_exact_tag sf-kink-2-$N-adapt
+         -db_tag sf-kink-2-$N-adapt -o output/poisson-kink-$N \
+         -verbose True -all_itr True # -qoi_exact_tag sf-kink-2-$N-adapt
 done

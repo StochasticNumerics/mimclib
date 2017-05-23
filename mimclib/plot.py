@@ -1605,7 +1605,8 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
         parser.add_argument("-done_flag", type=int, nargs='+',
                             action="store", default=None)
         parser.add_argument("-qoi_exact_tag", type=str, action="store")
-
+        parser.add_argument("-formats", type=str, action="store",
+                            nargs="+", default=["pdf", "tikz"])
 
     parser = argparse.ArgumentParser(add_help=True)
     addExtraArguments(parser)
@@ -1672,18 +1673,21 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
 
     if args.verbose:
         print("Saving file")
-    from matplotlib.backends.backend_pdf import PdfPages
-    with PdfPages(args.o) as pdf:
-        for fig in figures:
-            pdf.savefig(fig)
 
-    from matplotlib2tikz import save as tikz_save
-    import os
-    dir_name, _ = os.path.splitext(args.o)
-    if not os.path.exists(dir_name):
-        os.makedirs(dir_name)
-    for i, fig in enumerate(figures):
-        tikz_save("{}/{:03}.tex".format(dir_name, i))
+    if 'pdf' in args.formats:
+        from matplotlib.backends.backend_pdf import PdfPages
+        with PdfPages(args.o + '.pdf') as pdf:
+            for fig in figures:
+                pdf.savefig(fig)
+
+    if 'tikz' in args.formats:
+        import os
+        from matplotlib2tikz import save as tikz_save
+        dir_name = args.o
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+        for i, fig in enumerate(figures):
+            tikz_save("{}/{:03}.tex".format(dir_name, i), fig)
 
     if args.cmd is not None:
         os.system(args.cmd.format(args.o))
