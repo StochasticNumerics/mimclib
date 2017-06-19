@@ -89,6 +89,33 @@ private:
     std::vector<double> ft_weights;
 };
 
+// Total Degree, hyperbolic cross profit calculator
+class TDHCProfCalculator : public ProfitCalculator {
+public:
+    TDHCProfCalculator(ind_t d,
+                       const double *_td_weights,
+                       const double *_hc_weights) :
+        td_weights(_td_weights, _td_weights+d),
+        hc_weights(_hc_weights, _hc_weights+d){ }
+
+    double calc_log_prof(const mul_ind_t &cur){
+        if (cur.size() > td_weights.size())
+            throw std::runtime_error("Index too large for profit calculator");
+        double td_prof=0;
+        uint i=0;
+        for (auto itr=cur.begin();itr!=cur.end();itr++, i++)
+            td_prof += (itr->value-SparseMIndex::SET_BASE)*td_weights[itr->ind];
+
+        double hc_prof=0;
+        for (auto itr=cur.begin();itr!=cur.end();itr++, i++)
+            hc_prof += (itr->value-SparseMIndex::SET_BASE)*hc_weights[itr->ind];
+        return td_prof + std::log(1+hc_prof);
+    }
+private:
+    std::vector<double> td_weights;
+    std::vector<double> hc_weights;
+};
+
 // For an index alpha
 // Computes 2*(d_rates * alpha[:d]) * prod(exp(-log(xi * alpha[] ** exponent) * 2**(v-1) ))
 //
@@ -326,6 +353,10 @@ PProfitCalculator CreateMIProfCalc(ind_t d, const double *dexp,
 PProfitCalculator CreateTDFTProfCalc(ind_t d, const double *td_w,
                                      const double *ft_w){
     return new TDFTProfCalculator(d, td_w, ft_w);
+}
+PProfitCalculator CreateTDHCProfCalc(ind_t d, const double *td_w,
+                                     const double *ft_w){
+    return new TDHCProfCalculator(d, td_w, ft_w);
 }
 
 void FreeProfitCalculator(PProfitCalculator profCalc){

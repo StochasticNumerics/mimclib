@@ -9,7 +9,7 @@ if [ -z "$EXAMPLE" ]; then
     EXAMPLE='sf-kink'
 fi
 DB_CONN='-db_engine mysql -db_name mimc -db_host 129.67.187.118 '
-BASETAG="$EXAMPLE-"
+BASETAG="tdhc-$EXAMPLE-"
 COMMON="-qoi_seed 0 -ksp_rtol 1e-15 -ksp_type gmres  $DB_CONN "
 EST_CMD="python miproj_esterr.py $COMMON "
 RUN_CMD="OPENBLAS_NUM_THREADS=1 python miproj_run.py -qoi_example $EXAMPLE \
@@ -17,7 +17,7 @@ RUN_CMD="OPENBLAS_NUM_THREADS=1 python miproj_run.py -qoi_example $EXAMPLE \
        -miproj_reuse_samples True $VERBOSE $COMMON "
 
 function run_cmd {
-    echo  $RUN_CMD -mimc_max_lvl $3 \
+    echo  $RUN_CMD -miproj_max_lvl $3 \
           -qoi_dim $2 -qoi_df_nu $4 \
           ${@:5} -db_tag $BASETAG$2-$4$1
 }
@@ -38,7 +38,7 @@ function plotest_cmd {
 
 
 function errest_cmd {
-    echo $EST_CMD -mimc_max_lvl "$3" \
+    echo $EST_CMD -miproj_max_lvl "$3" \
          -qoi_dim "$2" -qoi_df_nu "$4" \
          "${@:5}" -db_tag "$BASETAG$2-$4$1" \
          "; " ../plot_prog.py "$DB_CONN" \
@@ -79,33 +79,33 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
     for N in 2 3 4 6
     do
         max_lvl=12
-        # if [ "$N" = "1" ]; then
-        #     DEXP=0.770949720670391  # (gamma_space + beta_space) / (N + kappa)
-        # else
-        #     DEXP=0.5714285714285714
-        # fi;
-
         # (gamma_space + w_space) / (N + kappa)
         if [ "$N" = "2" ]; then
-            DEXP=0.8
+            DEXP=0.3960841
         elif [ "$N" = "3" ]; then
-            DEXP=1.0
+            DEXP=0.34657359
         elif [ "$N" = "4" ]; then
-            DEXP=1.142857
+            DEXP=0.29185144
         elif [ "$N" = "6" ]; then
-            DEXP=1.333333
+            DEXP=0.21327606
         fi;
 
-        # all_cmds -adapt 2 $max_lvl $N -miproj_max_vars $N -mimc_min_dim 1 \
-        #          -miproj_set_maxadd 1 $CMN
-        all_cmds "" 2 $max_lvl $N -miproj_max_vars $N \
-                 -miproj_set_dexp $DEXP -miproj_set td_ft -mimc_min_dim 1 $CMN
+        all_cmds "" 2 $max_lvl $N -miproj_max_vars $N -miproj_lvl_basis linear \
+                 -miproj_set_dexp $DEXP -miproj_set td_hc -mimc_min_dim 1 $CMN
 
-        # for (( i=0; i<=$max_lvl; i++ ))
-        # do
-        #     all_cmds -fix-$i 2 $(($i+2)) $N -mimc_min_dim 0 -miproj_max_vars $N \
-        #              -miproj_fix_lvl $i -miproj_set adaptive \
-        #              $CMN
-        # done
+        # all_cmds -adapt 2 $max_lvl $N -miproj_max_vars $N -mimc_min_dim 1 \
+        #          -miproj_lvl_basis exp -miproj_set_maxadd 1 $CMN
+
+        max_lvl=9
+        for (( i=0; i<=$max_lvl; i++ ))
+        do
+            # all_cmds -fix-adapt-$i 2 $(($i+2)) $N -mimc_min_dim 0 -miproj_max_vars $N \
+            #          -miproj_lvl_basis exp -miproj_fix_lvl $i -miproj_set adaptive \
+            #          $CMN
+
+            all_cmds -fix-$i 2 $((($i+3)*3)) $N -mimc_min_dim 0 -miproj_max_vars $N \
+                     -miproj_fix_lvl $i -miproj_set td_hc \
+                     -miproj_lvl_basis linear $CMN
+        done
     done
 fi;

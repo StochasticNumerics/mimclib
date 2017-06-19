@@ -271,7 +271,6 @@ class MIWProjSampler(object):
                 sam_col.pols_to_beta = np.concatenate((sam_col.pols_to_beta,
                                                       [sam_col.beta_count]*len(new_b)))
                 sam_col.beta_count += 1
-
             if len(sam_col.basis) > 14000:
                 raise MemoryError("Too many basis functions {}".format(len(sam_col.basis)))
 
@@ -461,7 +460,7 @@ def optimal_weights(basis_values):
     return basis_values.shape[1] / np.sum(basis_values**2, axis=1)
 
 @public
-def default_basis_from_level(beta, C=2):
+def exp_basis_from_level(beta):
     # beta is zero indexed
     max_deg = 2 ** (beta + 1) - 1
     prev_deg = np.maximum(0, 2 ** beta - 1)
@@ -472,7 +471,18 @@ def default_basis_from_level(beta, C=2):
                                      for i in xrange(0, l)]))
 
 @public
-def linear_basis_from_level(beta, C=2):
+def linear_basis_from_level(beta):
+    # beta is zero indexed
+    # max_deg = 1 + 2*np.array(beta, dtype=np.int)
+    # prev_deg = np.maximum(0, max_deg - 2)
+    # l = len(beta)
+    # return list(itertools.product(*[np.arange(prev_deg[i], max_deg[i])
+    #                                  for i in xrange(0, l)]))
+    return [tuple(beta)]
+
+
+@public
+def pair_basis_from_level(beta):
     # beta is zero indexed
     max_deg = 1 + 2*np.array(beta, dtype=np.int)
     prev_deg = np.maximum(0, max_deg - 2)

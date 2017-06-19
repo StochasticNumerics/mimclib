@@ -75,6 +75,15 @@ class MyRun:
                                                     run.params.miproj_max_vars)
             run.params.miproj_max_vars = run.params.miproj_min_vars
 
+        if run.params.miproj_lvl_basis == 'exp':
+            fnBasisFromLvl = miproj.exp_basis_from_level
+        elif run.params.miproj_lvl_basis == 'linear':
+            fnBasisFromLvl = miproj.linear_basis_from_level
+        elif run.params.miproj_lvl_basis == 'pair':
+            fnBasisFromLvl = miproj.pair_basis_from_level
+        else:
+            raise NotImplementedError("Unknown lvls to basis")
+
         if run.params.miproj_pts_sampler == 'optimal':
             fnSamplePoints = miproj.sample_optimal_leg_pts
             fnWeightPoints = lambda x, b: miproj.optimal_weights(b)
@@ -97,7 +106,7 @@ class MyRun:
                                           min_dim=run.params.miproj_min_vars,
                                           max_dim=run.params.miproj_max_vars,
                                           fnBasis=miproj.legendre_polynomials,
-                                          fnBasisFromLvl=miproj.default_basis_from_level,
+                                          fnBasisFromLvl=fnBasisFromLvl,
                                           fnSamplePoints=fnSamplePoints,
                                           fnWeightPoints=fnWeightPoints,
                                           fnWorkModel=fnWorkModel,
@@ -118,16 +127,21 @@ class MyRun:
                                                         run.params.miproj_set_xi,
                                                         run.params.miproj_set_sexp,
                                                         run.params.miproj_set_mul)
-        elif run.params.miproj_set == 'td_ft':
+        elif run.params.miproj_set == 'td_hc':
             miproj_set_dexp = run.params.miproj_set_dexp if run.params.min_dim > 0 else 0
             qoi_N = run.params.miproj_max_vars
-            td_w = [miproj_set_dexp] * run.params.min_dim + [run.params.miproj_set_sexp] * qoi_N
-            ft_w = [0.] * (run.params.min_dim +  qoi_N)
-            self.profit_calc = setutil.TDFTProfCalculator(td_w, ft_w)
+            td_w = [miproj_set_dexp] * run.params.min_dim + [0.] * qoi_N
+            hc_w = [0.] * run.params.min_dim +  [run.params.miproj_set_sexp] * qoi_N
+            self.profit_calc = setutil.TDHCProfCalculator(td_w, hc_w)
         else:
             assert run.params.miproj_set == 'adaptive'
 
     def extendLvls(self, run, lvls):
+        if len(lvls) >= 1:
+            max_lvls = lvls.to_sparse_matrix().max(axis=0).todense()
+            if max_lvls[0, 0] > run.params.miproj_max_lvl:
+                return  # No more levels
+
         max_added = None
         max_dim = 5 + (0 if len(lvls) == 0 else np.max(lvls.get_dim()))
         max_dim = np.minimum(run.params.miproj_max_vars + run.params.min_dim,
@@ -195,12 +209,15 @@ class MyRun:
         migrp.add_argument(pre + "fix_lvl", type=int, default=3, action="store")
         migrp.add_argument(pre + "min_vars", type=int, default=10, action="store")
         migrp.add_argument(pre + "max_vars", type=int, default=10**6, action="store")
+        migrp.add_argument(pre + "lvl_basis", type=str, default="exp", action="store")
+        migrp.add_argument(pre + "max_lvl", type=int, default=1000, action="store")
+
 
     def ItrDone(self, db, run_id, run):
         if db is not None:
+            run.last_itr.userdata = self.proj.user_data
             db.writeRunData(run_id, run,
-                            iteration_idx=len(run.iters)-1,
-                            userdata=self.proj.user_data)
+                            iteration_idx=len(run.iters)-1)
         self.proj.user_data = []
 
 

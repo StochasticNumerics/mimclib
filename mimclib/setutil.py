@@ -76,6 +76,9 @@ __lib__.CreateMIProfCalc.argtypes = [__ct_ind_t__, __arr_double__,
 __lib__.CreateTDFTProfCalc.restype = ct.c_voidp
 __lib__.CreateTDFTProfCalc.argtypes = [__ct_ind_t__, __arr_double__, __arr_double__]
 
+__lib__.CreateTDHCProfCalc.restype = ct.c_voidp
+__lib__.CreateTDHCProfCalc.argtypes = [__ct_ind_t__, __arr_double__, __arr_double__]
+
 __lib__.FreeProfitCalculator.restype = None
 __lib__.FreeProfitCalculator.argtypes = [ct.c_voidp]
 
@@ -480,7 +483,6 @@ class VarSizeList(object):
         self.set_union(VarSizeList(_handle=new_handle))
         return self
 
-
     def get_min_outer_prof(self, profCalc, max_dim):
         return __lib__.GetMinOuterProfit(self._handle,
                                          profCalc._handle, max_dim)
@@ -543,6 +545,16 @@ class TDFTProfCalculator(ProfCalculator):
         self._handle = __lib__.CreateTDFTProfCalc(len(td_w),
                                                   np.array(td_w, dtype=np.float),
                                                   np.array(ft_w, dtype=np.float))
+
+class TDHCProfCalculator(ProfCalculator):
+    def __init__(self, td_w=None, hc_w=None):
+        hc_w = hc_w if hc_w is not None else np.zeros(len(td_w))
+        td_w = td_w if td_w is not None else np.zeros(len(hc_w))
+        assert len(td_w) == len(hc_w), "Argument mismatch"
+        self.max_dim = len(td_w)
+        self._handle = __lib__.CreateTDHCProfCalc(len(td_w),
+                                                  np.array(td_w, dtype=np.float),
+                                                  np.array(hc_w, dtype=np.float))
 
 @public
 def TensorGrid(m, base=1, count=None):

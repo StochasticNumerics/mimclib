@@ -648,9 +648,6 @@ previous estimates.")
             add_store('min_lvl', type=int, default=3,
                       help="The initial number of levels to run \
 the first iteration. Not needed if a profit calculator is provided.")
-            add_store('max_lvl', type=int, default=1000,
-                      help="Maximum number of levels to run. \
-The algorithm will terminate even if TOL is not reached")
             add_store('max_add_itr', type=int, default=2,
                       help="Maximum number of additonal iterations\
 to run when the MIMC is expected to but is not converging.\
@@ -676,6 +673,9 @@ Bias={:.12e}\nStatErr={:.12e}\
                                           self.bias, self.stat_error,
                                           self.totalErrorEst(),
                                           self.last_itr.TOL)
+
+            output += "max_lvl = {}\n".format(self.last_itr._lvls.
+                                              to_sparse_matrix().max(axis=0).todense())
         if verbose < VERBOSE_DEBUG:
             print(output, end="")
             return
@@ -856,11 +856,11 @@ estimate optimal number of levels"
             self.last_itr.lvls_add_from_list(new_lvls)
         else:
             self.fn.ExtendLvls(lvls=self.last_itr.get_lvls())
-            self.last_itr._levels_added()
-
+        self.last_itr._levels_added()
         self.all_itr._levels_added()
-        # TODO: We should allow the user to not add any new levels!
-        assert(prev != self.last_itr.lvls_count)
+        if prev == self.last_itr.lvls_count:
+            return None
+
         newTodoM = self.params.M0
         if self.params.M0_coeff > 0:
             newTodoM = np.maximum(newTodoM, (int)(self.params.M0_coeff *
@@ -988,9 +988,6 @@ estimate optimal number of levels"
                 # Added levels if bayesian
                 if self.params.dynamic_lvls and self.last_itr.lvls_count > 0:
                     L = self._estimateOptimalL(TOL)
-                    if L > self.params.max_lvl:
-                        self.print_info("WARNING: MIMC did not converge with the maximum number of levels")
-                        break
                     if L > self.last_itr.lvls_count:
                         self._extendLevels(new_lvls=np.arange(
                             self.last_itr.lvls_count, L+1).reshape((-1, 1)))
@@ -1006,11 +1003,10 @@ estimate optimal number of levels"
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
                     newTodoM = self._extendLevels()
-                    self._update_active_lvls()
-                    data = np.hstack(self.last_itr._lvls.to_list()[0])
-                    if data.size > 0 and np.max(data) > self.params.max_lvl:
+                    if newTodoM is None:
                         self.print_info("WARNING: MIMC did not converge with the maximum number of levels")
                         break
+                    self._update_active_lvls()
                     # TODO: We might not need newTodoM is some of the
                     # levels are inactive. This is needed for MIMC, not MLMC
                     samples_added = self._genSamples(newTodoM) or samples_added

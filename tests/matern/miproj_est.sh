@@ -1,6 +1,6 @@
 #!/bin/bash
 
-EST_CMD="python miproj_esterr.py -db_engine mysql -db_name mimc -db_host 129.67.187.118"
+EST_CMD="OPENBLAS_NUM_THREADS=20 python miproj_esterr.py -db_engine mysql -db_name mimc -db_host 129.67.187.118"
 
 # echo $EST_CMD -db_tag "matern_reuse-%10.5%" -qoi_exact_tag matern-reuse-1-10.5
 # echo $EST_CMD -db_tag "matern_reuse-%8.5%" -qoi_exact_tag matern-reuse-1-8.5
@@ -9,8 +9,8 @@ EST_CMD="python miproj_esterr.py -db_engine mysql -db_name mimc -db_host 129.67.
 # echo $EST_CMD -db_tag "matern_reuse-%3.5%" -qoi_exact_tag matern-reuse-1-3.5
 # echo $EST_CMD -db_tag "matern_reuse-%2.5%" -qoi_exact_tag matern-reuse-1-2.5
 
-# echo $EST_CMD -db_tag "sf-kink-2-1%" -qoi_exact_tag sf-kink-2-1
-echo $EST_CMD -db_tag "sf-kink-2-2%" # -qoi_exact_tag sf-kink-2-2
-echo $EST_CMD -db_tag "sf-kink-2-3%" #  -qoi_exact_tag sf-kink-2-2
-echo $EST_CMD -db_tag "sf-kink-2-4%" #  -qoi_exact_tag sf-kink-2-2
-echo $EST_CMD -db_tag "sf-kink-2-6%" #  -qoi_exact_tag sf-kink-2-2
+# echo $EST_CMD -db_tag "flin-sf-kink-2-1%" -qoi_exact_tag sf-kink-2-1
+echo $EST_CMD -db_tag "nlin-sf-kink-2-2%" # -qoi_exact_tag sf-kink-2-2
+echo $EST_CMD -db_tag "nlin-sf-kink-2-3%" #  -qoi_exact_tag sf-kink-2-2
+echo $EST_CMD -db_tag "nlin-sf-kink-2-4%" #  -qoi_exact_tag sf-kink-2-2
+echo $EST_CMD -db_tag "nlin-sf-kink-2-6%" #  -qoi_exact_tag sf-kink-2-2

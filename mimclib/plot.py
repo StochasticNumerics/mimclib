@@ -7,6 +7,7 @@ import matplotlib
 # matplotlib.use('Agg')
 
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pylab as plt
 from . import mimc
 from matplotlib.ticker import MaxNLocator
@@ -368,10 +369,14 @@ def computeIterationStats(runs, fnItrStats, arr_fnAgg, work_bins=50,
             assert(len(stats) == len(arr_fnAgg))
             stats = [stats[i] if stats[i] is not None or len(xy)==0
                      else xy[-1][i] for i in xrange(len(stats))]
+            if not np.isfinite(stats[0]):
+                continue
             xy.append(stats)
     xy = np.array(xy)
     if fnFilterData is not None:
         xy = fnFilterData(xy)
+    if len(xy) == 0:
+        return xy
     bins = np.digitize(xy[:, 0], np.linspace(np.min(xy[:, 0]),
                                              np.max(xy[:, 0]), work_bins))
     bins[bins == work_bins] = work_bins-1
@@ -499,8 +504,9 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     """
 
     num_kwargs = kwargs.pop('num_kwargs', None)
-    modifier = kwargs.pop('modifier', 1.)
-    relative = modifier != 1.
+    modifier = kwargs.pop('modifier', None)
+    relative = modifier is None
+    modifier = modifier if relative else 1.
     filteritr = kwargs.pop("filteritr", filteritr_convergent)
 
     ax.set_xlabel('TOL')
@@ -646,15 +652,15 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
     ax.set_yscale('log')
     ax.set_xscale('log')
 
-    def fnItrStats(run, i):
+    def fnItrStats(run, i, in_fn=fnWork, in_flip=flip, in_mod=modifier):
         itr = run.iters[i]
-        work = fnWork(run, i)
-        if flip:
+        work = in_fn(run, i)
+        if in_flip:
             return [np.log(itr.exact_error), itr.exact_error, work,
-                    modifier*itr.totalErrorEst()]
+                    in_mod*itr.totalErrorEst()]
         else:
             return [np.log(work), work, itr.exact_error,
-                    modifier*itr.totalErrorEst()]
+                    in_mod*itr.totalErrorEst()]
 
     xy_binned = computeIterationStats(runs,
                                       fnItrStats=fnItrStats,
@@ -662,7 +668,6 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
                                                  fnAggError, np.min],
                                       **iter_stats_args)
     xy_binned = xy_binned[:, 1:]
-
     plotObj = []
     ErrEst_kwargs = kwargs.pop('ErrEst_kwargs', None)
     Ref_kwargs = kwargs.pop('Ref_kwargs', None)
@@ -680,7 +685,7 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
         plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 2], *ErrEst_args, **ErrEst_kwargs))
     #sel = sel[np.log(xy_binned[sel, 0]) > np.median(np.log(xy_binned[:, 0]))]
     if len(sel) > 0 and Ref_kwargs is not None:
-        plotObj.append(ax.add_line(FunctionLine2D.ExpLine(data=xy_binned[sel, :2],
+        plotObj.append(ax.add_line(FunctionLine2D.ExpLine(data=xy_binned[sel[-4:], :2],
                                                           **Ref_kwargs)))
         if ErrEst_kwargs is not None:
             plotObj.append(ax.add_line(FunctionLine2D.ExpLine(data=xy_binned[sel, :][:, [0,2]],
@@ -1257,12 +1262,18 @@ def add_legend(ax, handles=None, labels=None, alpha=0.5,
         # Shrink current axis by 20%
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        return ax.legend(handles, labels, loc='center left', fancybox=False,
-                         frameon=False, shadow=False,
-                         bbox_to_anchor=(1, 0.5), *args, **kwargs)
+        kwargs['loc'] = 'center left'
+        kwargs['fancybox'] = False
+        kwargs['frameon'] = False
+        kwargs['shadow'] = False
+        kwargs['bbox_to_anchor'] = (1, 0.5)
+        return ax.legend(handles, labels, *args, **kwargs)
     else:
-        return ax.legend(handles, labels, loc=loc, fancybox=True,
-                         shadow=False, *args, **kwargs)
+        kwargs['loc'] = 'center left'
+        kwargs['fancybox'] = False
+        kwargs['frameon'] = False
+        kwargs['shadow'] = False
+        return ax.legend(handles, labels, *args, **kwargs)
 
 
 def __formatMIMCRate(rate, log_rate, lbl_base=r"\textrm{TOL}", lbl_log_base=None):
@@ -1307,7 +1318,7 @@ def genBooklet(runs, **kwargs):
     label_fmt = kwargs.pop("label_fmt", None)
     call_add_legend = kwargs.pop("add_legend", True)
     filteritr = kwargs.pop("filteritr", filteritr_all)
-    modifier = kwargs.pop("modifier", 1.)
+    modifier = kwargs.pop("modifier", 1)
     TOLs_count = len(np.unique([itr.TOL for _, itr in enum_iter(runs, filteritr)]))
     convergent_count = len([itr.TOL for _, itr in enum_iter(runs, filteritr_convergent)])
     iters_count = np.sum([len(r.iters) for r in runs])
@@ -1606,7 +1617,7 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
                             action="store", default=None)
         parser.add_argument("-qoi_exact_tag", type=str, action="store")
         parser.add_argument("-formats", type=str, action="store",
-                            nargs="+", default=["pdf", "tikz"])
+                            nargs="+", default=["pdf"])
 
     parser = argparse.ArgumentParser(add_help=True)
     addExtraArguments(parser)
@@ -1654,10 +1665,10 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
         assert fnExactErr is None, "An exact value and an exact function are given"
         fnExactErr = lambda itrs, e=args.qoi_exact: \
                      fnNorm([v.calcEg() + e*-1 for v in itrs])
-        modifer = 1./fnNorm([args.qoi_exact])
+        modifier = 1./fnNorm([args.qoi_exact])
     else:
         # TODO: Need to somehow set it as relative
-        modifer = 1.
+        modifier = 1.
 
     filteritr = filteritr_all if args.all_itr else filteritr_convergent
     if fnExactErr is not None:
@@ -1665,8 +1676,8 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
             print("Setting errors")
         set_exact_errors(run_data, fnExactErr, filteritr=filteritr)
 
-    figures = fnPlot(run_data, modifier=modifer if args.relative else
-                     1., verbose=args.verbose,
+    figures = fnPlot(run_data, modifier=modifier if args.relative else
+                     None, verbose=args.verbose,
                      fnNorm=fnNorm, filteritr=filteritr,
                      label_fmt=args.label_fmt,
                      input_args=args)
@@ -1687,7 +1698,11 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
         for i, fig in enumerate(figures):
-            tikz_save("{}/{:03}.tex".format(dir_name, i), fig)
+            tikz_save("{}/{:03}.tex".format(dir_name, i), fig,
+                      show_info=False,
+                      figurewidth=r'\figurewidth',
+                      figureheight=r'\figureheight',
+                      figlabel=fig.label if hasattr(fig, "label") else '')
 
     if args.cmd is not None:
         os.system(args.cmd.format(args.o))

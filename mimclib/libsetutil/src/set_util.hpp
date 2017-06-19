@@ -22,6 +22,7 @@ extern "C"{
     PProfitCalculator CreateMIProfCalc(ind_t d, const double *dexp,
                                        double xi, double sexp, double mul);
     PProfitCalculator CreateTDFTProfCalc(ind_t d, const double *td_w, const double *ft_w);
+    PProfitCalculator CreateTDHCProfCalc(ind_t d, const double *td_w, const double *hc_w);
 
     double GetMinOuterProfit(const PVarSizeList,
                              const PProfitCalculator profCalc,
