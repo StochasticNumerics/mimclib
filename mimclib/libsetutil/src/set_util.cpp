@@ -116,6 +116,44 @@ private:
     std::vector<double> hc_weights;
 };
 
+class MIProjProfCalculator : public ProfitCalculator {
+public:
+    MIProjProfCalculator(ind_t _D, ind_t _d,
+                         double _beta, double _gamma,
+                         double _alpha, double _proj_sample_ratio) :
+        D(_D), d(_d), beta(_beta), gamma(_gamma), alpha(_alpha),
+        proj_sample_ratio(_proj_sample_ratio){ }
+
+    double calc_log_prof(const mul_ind_t &cur){
+        if (cur.size() > D + 1)
+            throw std::runtime_error("Index too large for profit calculator");
+
+        double work_space=0, error=0;
+        uint i=0;
+        auto itr = cur.begin();
+        for (;itr!=cur.end() && i < D;itr++, i++){
+            work_space += (itr->value-SparseMIndex::SET_BASE)*gamma;
+            error += (itr->value-SparseMIndex::SET_BASE)*beta;
+        }
+
+        double work = work_space;
+        if (itr!=cur.end()){
+            double ell = itr->value-SparseMIndex::SET_BASE;
+            work = std::log(1+ell) + ell +
+                std::max(work_space, std::log(proj_sample_ratio) + ell);
+            error += alpha * ell;
+        }
+        // std::cout << cur << " -> " << work << "(" << work_space << ", " <<
+        //     work_sampling << ", " << proj_sample_ratio << ", " << work_proj
+        //           << ")" << ", " << error << std::endl;
+        return work + error;
+    }
+private:
+    ind_t D;
+    ind_t d;
+    double beta, gamma, alpha, proj_sample_ratio;
+};
+
 // For an index alpha
 // Computes 2*(d_rates * alpha[:d]) * prod(exp(-log(xi * alpha[] ** exponent) * 2**(v-1) ))
 //
@@ -343,6 +381,12 @@ void VarSizeList_to_matrix(const PVarSizeList pset, ind_t *ij, uint32 ij_size,
 PProfitCalculator CreateMISCProfCalc(ind_t d, ind_t s, const double *d_w,
                                      const double *s_err_w){
     return new MISCProfCalculator(d, s, d_w, s_err_w);
+}
+PProfitCalculator CreateMIProjProfCalc(ind_t D, ind_t d,
+                                       double beta, double gamma,
+                                       double alpha,
+                                       double proj_sample_ratio){
+    return new MIProjProfCalculator(D, d, beta, gamma, alpha, proj_sample_ratio);
 }
 
 PProfitCalculator CreateMIProfCalc(ind_t d, const double *dexp,

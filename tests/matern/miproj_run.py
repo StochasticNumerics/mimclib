@@ -75,12 +75,10 @@ class MyRun:
                                                     run.params.miproj_max_vars)
             run.params.miproj_max_vars = run.params.miproj_min_vars
 
-        if run.params.miproj_lvl_basis == 'exp':
+        if run.params.miproj_set == 'adaptive':
             fnBasisFromLvl = miproj.exp_basis_from_level
-        elif run.params.miproj_lvl_basis == 'linear':
-            fnBasisFromLvl = miproj.linear_basis_from_level
-        elif run.params.miproj_lvl_basis == 'pair':
-            fnBasisFromLvl = miproj.pair_basis_from_level
+        elif run.params.miproj_set == 'apriori':
+            fnBasisFromLvl = lambda beta, d=self.params.miproj_max_vars: miproj.td_basis_from_level(d, beta)
         else:
             raise NotImplementedError("Unknown lvls to basis")
 
@@ -106,6 +104,7 @@ class MyRun:
                                           min_dim=run.params.miproj_min_vars,
                                           max_dim=run.params.miproj_max_vars,
                                           fnBasis=miproj.legendre_polynomials,
+                                          proj_sample_ratio=run.params.miproj_s_proj_sample_ratio,
                                           fnBasisFromLvl=fnBasisFromLvl,
                                           fnSamplePoints=fnSamplePoints,
                                           fnWeightPoints=fnWeightPoints,
@@ -122,26 +121,42 @@ class MyRun:
 
         self.profit_calc = None
         if run.params.miproj_set == 'xi_exp':
-            miproj_set_dexp = run.params.miproj_set_dexp if run.params.min_dim > 0 else 0
-            self.profit_calc = setutil.MIProfCalculator([miproj_set_dexp] * run.params.min_dim,
+            dexp = 0
+            if run.params.min_dim > 0:
+                qoi_N = run.params.miproj_max_vars
+                dexp = (run.params.miproj_d_beta +
+                        run.params.miproj_d_gamma) / \
+                        (qoi_N + run.params.miproj_s_alpha)
+            self.profit_calc = setutil.MIProfCalculator([dexp] * run.params.min_dim,
                                                         run.params.miproj_set_xi,
-                                                        run.params.miproj_set_sexp,
+                                                        1.,
                                                         run.params.miproj_set_mul)
-        elif run.params.miproj_set == 'td_hc':
-            miproj_set_dexp = run.params.miproj_set_dexp if run.params.min_dim > 0 else 0
-            qoi_N = run.params.miproj_max_vars
-            td_w = [miproj_set_dexp] * run.params.min_dim + [0.] * qoi_N
-            hc_w = [0.] * run.params.min_dim +  [run.params.miproj_set_sexp] * qoi_N
-            self.profit_calc = setutil.TDHCProfCalculator(td_w, hc_w)
+        elif run.params.miproj_set == 'apriori':
+            if run.params.min_dim > 0:
+                # dexp = (run.params.miproj_d_beta +
+                #         run.params.miproj_d_gamma) / \
+                #         (run.params.miproj_max_vars + run.params.miproj_s_alpha)
+                # self.profit_calc = setutil.TDFTProfCalculator([dexp, 1.])
+                self.profit_calc = setutil.MIProjProfCalculator(run.params.min_dim,
+                                                                run.params.miproj_max_vars,
+                                                                run.params.miproj_d_beta,
+                                                                run.params.miproj_d_gamma,
+                                                                run.params.miproj_s_alpha,
+                                                                run.params.miproj_s_proj_sample_ratio)
+            else:
+                self.profit_calc = setutil.TDFTProfCalculator([1.])
         else:
             assert run.params.miproj_set == 'adaptive'
 
     def extendLvls(self, run, lvls):
         max_added = None
-        max_dim = 5 + (0 if len(lvls) == 0 else np.max(lvls.get_dim()))
-        max_dim = np.minimum(run.params.miproj_max_vars + run.params.min_dim,
-                             np.maximum(run.params.miproj_min_vars + run.params.min_dim,
-                                        max_dim))
+        if run.params.miproj_set == 'apriori':
+            max_dim = 2
+        else:
+            max_dim = 5 + (0 if len(lvls) == 0 else np.max(lvls.get_dim()))
+            max_dim = np.minimum(run.params.miproj_max_vars + run.params.min_dim,
+                                 np.maximum(run.params.miproj_min_vars + run.params.min_dim,
+                                            max_dim))
         tStart = time.clock()
         if self.profit_calc is None:
             # Adaptive
@@ -166,7 +181,7 @@ class MyRun:
             if max_lvls[0, 0] > run.params.miproj_max_lvl:
                 return  False # No more levels
         return True
-    
+
     def addExtraArguments(self, parser):
         class store_as_array(argparse._StoreAction):
             def __call__(self, parser, namespace, values, option_string=None):
@@ -191,25 +206,32 @@ class MyRun:
         migrp = parser.add_argument_group('miproj', 'Arguments to control projection')
         pre = '-miproj_'
         migrp.add_argument(pre + "double_work", type="bool",
-                            default=False, action="store")
-        migrp.add_argument(pre + "set", type=str,
-                            default="adaptive", action="store")
+                           default=False, action="store")
+        migrp.add_argument(pre + "set", type=str, default="adaptive",
+                           action="store")
         migrp.add_argument(pre + "set_xi", type=float, default=2.,
-                            action="store")
+                           action="store")
         migrp.add_argument(pre + "set_mul", type=float, default=1.,
-                            action="store")
-        migrp.add_argument(pre + "set_sexp", type=float, action="store")
-        migrp.add_argument(pre + "set_dexp", type=float, action="store")
-        migrp.add_argument(pre + "set_maxadd", type=int,
-                            default=30, action="store")
+                           action="store")
+
+        migrp.add_argument(pre + "d_beta", type=float,
+                           action="store", default=1.)
+        migrp.add_argument(pre + "d_gamma", type=float,
+                           action="store", default=1.)
+        migrp.add_argument(pre + "s_alpha", type=float,
+                           action="store", default=3./2.)
+        migrp.add_argument(pre + "s_proj_sample_ratio", type=float,
+                           action="store", default=0.)
+
+        migrp.add_argument(pre + "set_maxadd", type=int, default=30,
+                           action="store")
         migrp.add_argument(pre + "pts_sampler", type=str,
                            default="optimal", action="store")
         migrp.add_argument(pre + "reuse_samples", type="bool",
-                            default=True, action="store")
+                           default=True, action="store")
         migrp.add_argument(pre + "fix_lvl", type=int, default=3, action="store")
         migrp.add_argument(pre + "min_vars", type=int, default=10, action="store")
         migrp.add_argument(pre + "max_vars", type=int, default=10**6, action="store")
-        migrp.add_argument(pre + "lvl_basis", type=str, default="exp", action="store")
         migrp.add_argument(pre + "max_lvl", type=int, default=1000, action="store")
 
 

@@ -189,7 +189,7 @@ class MIWProjSampler(object):
                  fnBasisFromLvl=None,
                  fnWeightPoints=None,
                  fnWorkModel=None,
-                 reuse_samples=False):
+                 reuse_samples=False, proj_sample_ratio=0):
         self.fnBasis = fnBasis
         # Returns samples count of a projection index to ensure stability
         self.fnSamplesCount = fnSamplesCount if fnSamplesCount is not None else default_samples_count
@@ -210,6 +210,7 @@ class MIWProjSampler(object):
 
         self.prev_samples = defaultdict(lambda: MIWProjSampler.SamplesCollection(self.min_dim))
         self.reuse_samples = reuse_samples
+        self.proj_sample_ratio = proj_sample_ratio
         self.direct = False
         self.user_data = []
 
@@ -237,9 +238,15 @@ class MIWProjSampler(object):
             work_per_sample = self.fnWorkModel(setutil.VarSizeList([alpha]))[0]
             sel_lvls = np.nonzero(self.alpha_ind == ind)[0]
             beta_indset = self.lvls.sublist(sel_lvls, d_start=self.d, min_dim=0)
-            total_samples = np.sum(self.fnSamplesCount(sum([self.fnBasisFromLvl(beta)
-                                                            for beta in beta_indset], [])))
-            total_work += work_per_sample * total_samples
+            basis = setutil.VarSizeList()
+            for i, beta in enumerate(beta_indset):
+                new_b = self.fnBasisFromLvl(beta)
+                if isinstance(new_b, setutil.VarSizeList):
+                    basis.set_union(new_b)
+                else:
+                    basis.add_from_list(new_b)
+            total_samples = np.sum(self.fnSamplesCount(basis))
+            total_work += work_per_sample * total_samples + self.proj_sample_ratio * len(basis) * total_samples
         return total_work
 
     #@profile
@@ -260,17 +267,26 @@ class MIWProjSampler(object):
             sam_col = self.prev_samples[ind]
             sel_lvls = np.nonzero(self.alpha_ind == ind)[0]
             work_per_sample = self.fnWorkModel(setutil.VarSizeList([alpha]))[0]
+
+            # self.fnBasisFromLvls(sel_lvls,
+            #                      sam_col.basis,
+            #                      sam_col.pols_per_beta)
+
             beta_indset = lvls.sublist(sel_lvls[sam_col.beta_count:],
                                        d_start=self.d, min_dim=0)
 
+            # TODO: This assumes that beta_indset is ordered (in 1D)
             #new_basis = setutil.VarSizeList()
             for i, beta in enumerate(beta_indset):
                 new_b = self.fnBasisFromLvl(beta)
-                #new_basis.add_from_list(new_b)
-                sam_col.basis.add_from_list(new_b)
+                if isinstance(new_b, setutil.VarSizeList):
+                    sam_col.basis.set_union(new_b)
+                else:
+                    sam_col.basis.add_from_list(new_b)
                 sam_col.pols_to_beta = np.concatenate((sam_col.pols_to_beta,
                                                       [sam_col.beta_count]*len(new_b)))
                 sam_col.beta_count += 1
+
             if len(sam_col.basis) > 14000:
                 raise MemoryError("Too many basis functions {}".format(len(sam_col.basis)))
 
@@ -369,7 +385,8 @@ class MIWProjSampler(object):
             time_taken += assembly_time_1 + assembly_time_2 + projection_time
 
             total_time[sel_lvls] = time_taken * totalN_per_beta / np.sum(totalN_per_beta)
-            total_work[sel_lvls] = work_per_sample * totalN_per_beta
+            total_work[sel_lvls] = work_per_sample * totalN_per_beta + \
+                                   self.proj_sample_ratio * np.cumsum(totalN_per_beta) * np.cumsum(totalBasis_per_beta)
             self.user_data.append(Bunch(alpha=alpha,
                                         max_cond=max_cond,
                                         matrix_size=BW.shape[1],
@@ -471,14 +488,17 @@ def exp_basis_from_level(beta):
                                      for i in xrange(0, l)]))
 
 @public
-def linear_basis_from_level(beta):
-    # beta is zero indexed
-    # max_deg = 1 + 2*np.array(beta, dtype=np.int)
-    # prev_deg = np.maximum(0, max_deg - 2)
-    # l = len(beta)
-    # return list(itertools.product(*[np.arange(prev_deg[i], max_deg[i])
-    #                                  for i in xrange(0, l)]))
-    return [tuple(beta)]
+def td_basis_from_level(d, beta):
+    # Return basis functions from a TD set of d dimensions
+    td_prof = setutil.TDFTProfCalculator(np.ones(d))
+    assert(len(beta) <= 1)
+    b = 0 if len(beta) == 0 else beta[0]
+    basis = setutil.VarSizeList()
+    basis.expand_set(td_prof, d, max_prof=2**b)
+    if b == 0:
+        return basis
+    profits = basis.calc_log_prof(td_prof)
+    return basis.sublist(profits > 2**(b-1))
 
 
 @public
