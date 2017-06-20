@@ -155,6 +155,7 @@ def plot_all(runs, **kwargs):
         ax.set_xlabel('Avg. Iteration Work')
     except:
         miplot.plot_failed(ax)
+        raise
 
     print_msg("plotWorkVsMaxError")
     ax = add_fig('time-vs-max-error')
@@ -196,19 +197,22 @@ def plot_all(runs, **kwargs):
 
     print_msg("plotDirections")
     ax = add_fig('error-vs-lvl')
-    try:
-        miplot.plotDirections(ax, runs, miplot.plotExpectVsLvls,
-                              fnNorm=fnNorm)
-    except:
-        miplot.plot_failed(ax)
+    #try:
+    miplot.plotDirections(ax, runs, miplot.plotExpectVsLvls,
+                          fnNorm=fnNorm,
+                          dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'log_ell'}])
+    # except:
+    #     miplot.plot_failed(ax)
+    #     raise
 
     print_msg("plotDirections")
     ax = add_fig('work-vs-lvl')
     try:
         miplot.plotDirections(ax, runs, miplot.plotWorkVsLvls,
-                              fnNorm=fnNorm)
+                              fnNorm=fnNorm, dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'log_ell'}])
     except:
         miplot.plot_failed(ax)
+        raise
 
     if runs[0].params.min_dim > 0 and runs[0].last_itr.lvls_max_dim() > 2:
         run = runs[0]
@@ -220,9 +224,10 @@ def plot_all(runs, **kwargs):
                                                    run.params.miproj_set_mul)
         else:
             qoi_N = run.params.miproj_max_vars
-            td_w = [0.] * (run.params.min_dim + qoi_N)
-            ft_w = [0.] * run.params.min_dim + [1.] * qoi_N
-            profit_calc = setutil.TDFTProfCalculator(td_w, ft_w)
+            miproj_set_dexp = run.params.miproj_set_dexp if run.params.min_dim > 0 else 0
+            td_w = [miproj_set_dexp] * run.params.min_dim + [0.] * qoi_N
+            hc_w = [0.] * run.params.min_dim +  [run.params.miproj_set_sexp] * qoi_N
+            profit_calc = setutil.TDHCProfCalculator(td_w, hc_w)
 
         profits = run.last_itr._lvls.calc_log_prof(profit_calc)
         reduced_run = runs[0].reduceDims(np.arange(0, runs[0].params.min_dim),
@@ -232,7 +237,7 @@ def plot_all(runs, **kwargs):
         try:
             miplot.plotDirections(ax, [reduced_run],
                                   miplot.plotExpectVsLvls, fnNorm=fnNorm,
-                                  x_axis='ell')
+                                  dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'log_ell'}])
         except:
             miplot.plot_failed(ax)
         print_msg("plotDirections")
@@ -240,7 +245,7 @@ def plot_all(runs, **kwargs):
         try:
             miplot.plotDirections(ax, [reduced_run],
                                   miplot.plotWorkVsLvls, fnNorm=fnNorm,
-                                  x_axis='ell')
+                                  dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'log_ell'}])
         except:
             miplot.plot_failed(ax)
     print_msg("plotBestNTerm")
@@ -272,7 +277,7 @@ def plot_all(runs, **kwargs):
     for fig in figures:
         for ax in fig.axes:
             legend = miplot.add_legend(ax, outside=legend_outside,
-                                       frameon=False)
+                                       frameon=False, loc='best')
             if legend is not None:
                 legend.get_frame().set_facecolor('none')
     return figures

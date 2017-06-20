@@ -9,7 +9,7 @@ if [ -z "$EXAMPLE" ]; then
     EXAMPLE='sf-kink'
 fi
 DB_CONN='-db_engine mysql -db_name mimc -db_host 129.67.187.118 '
-BASETAG="tdhc-$EXAMPLE-"
+BASETAG="dbl-$EXAMPLE-"
 COMMON="-qoi_seed 0 -ksp_rtol 1e-15 -ksp_type gmres  $DB_CONN "
 EST_CMD="python miproj_esterr.py $COMMON "
 RUN_CMD="OPENBLAS_NUM_THREADS=1 python miproj_run.py -qoi_example $EXAMPLE \
@@ -91,7 +91,7 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
         fi;
 
         all_cmds "" 2 $max_lvl $N -miproj_max_vars $N -miproj_lvl_basis linear \
-                 -miproj_set_dexp $DEXP -miproj_set td_hc -mimc_min_dim 1 $CMN
+                 -miproj_set_dexp $DEXP -miproj_set td_hc -mimc_min_dim 1 $CMN  -miproj_double_work True
 
         # all_cmds -adapt 2 $max_lvl $N -miproj_max_vars $N -mimc_min_dim 1 \
         #          -miproj_lvl_basis exp -miproj_set_maxadd 1 $CMN
@@ -105,7 +105,7 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
 
             all_cmds -fix-$i 2 $((($i+3)*3)) $N -mimc_min_dim 0 -miproj_max_vars $N \
                      -miproj_fix_lvl $i -miproj_set td_hc \
-                     -miproj_lvl_basis linear $CMN
+                     -miproj_lvl_basis linear $CMN -miproj_double_work True
         done
     done
 fi;

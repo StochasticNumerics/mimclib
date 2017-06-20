@@ -137,11 +137,6 @@ class MyRun:
             assert run.params.miproj_set == 'adaptive'
 
     def extendLvls(self, run, lvls):
-        if len(lvls) >= 1:
-            max_lvls = lvls.to_sparse_matrix().max(axis=0).todense()
-            if max_lvls[0, 0] > run.params.miproj_max_lvl:
-                return  # No more levels
-
         max_added = None
         max_dim = 5 + (0 if len(lvls) == 0 else np.max(lvls.get_dim()))
         max_dim = np.minimum(run.params.miproj_max_vars + run.params.min_dim,
@@ -166,7 +161,12 @@ class MyRun:
                 new_total_work = self.proj.estimateWork()
                 if not self.params.miproj_double_work or new_total_work >= 2*prev_total_work:
                     break
-
+        if len(lvls) >= 1:
+            max_lvls = lvls.to_sparse_matrix().max(axis=0).todense()
+            if max_lvls[0, 0] > run.params.miproj_max_lvl:
+                return  False # No more levels
+        return True
+    
     def addExtraArguments(self, parser):
         class store_as_array(argparse._StoreAction):
             def __call__(self, parser, namespace, values, option_string=None):

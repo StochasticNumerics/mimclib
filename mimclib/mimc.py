@@ -852,13 +852,14 @@ estimate optimal number of levels"
 
     def _extendLevels(self, new_lvls=None):
         prev = self.last_itr.lvls_count
+        retVal = True
         if new_lvls is not None:
             self.last_itr.lvls_add_from_list(new_lvls)
         else:
-            self.fn.ExtendLvls(lvls=self.last_itr.get_lvls())
+            retVal = self.fn.ExtendLvls(lvls=self.last_itr.get_lvls())
         self.last_itr._levels_added()
         self.all_itr._levels_added()
-        if prev == self.last_itr.lvls_count:
+        if not retVal or prev == self.last_itr.lvls_count:
             return None
 
         newTodoM = self.params.M0

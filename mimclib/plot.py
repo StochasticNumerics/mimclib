@@ -402,7 +402,8 @@ def computeIterationStats(runs, fnItrStats, arr_fnAgg, work_bins=50,
 def plotDirections(ax, runs, fnPlot,
                    fnNorm=None,
                    plot_fine=False, plot_estimate=False,
-                   directions=None, rate=None, x_axis='ell',
+                   directions=None, rate=None, 
+                   dir_kwargs=[{}],
                    label_fmt='{label}', beta=None):
     if directions is None:
         default_max_dims = 5
@@ -418,8 +419,6 @@ def plotDirections(ax, runs, fnPlot,
                      '*', 'h', 'H', 'D', 'd'])
     linestyles = cycle(['--', '-.', '-', ':', '-'])
     cycler = ax._get_lines.prop_cycler
-    x_linear = x_axis == 'ell'
-    assert(x_linear or beta == None)
     if beta is not None and hasattr(beta, '__iter__'):
         beta = beta[0]
 
@@ -434,7 +433,7 @@ def plotDirections(ax, runs, fnPlot,
                       'linestyle' : '-',
                       'marker' : mrk,
                       'label': label_fmt.format(label=labal),
-                      'direction' : direction, 'x_axis': x_axis}
+                      'direction' : direction}
         cur_kwargs.update(prop)
         if plot_fine:
             cur_kwargs['fine_kwargs'] = {'linestyle': '--',
@@ -445,6 +444,7 @@ def plotDirections(ax, runs, fnPlot,
             cur_kwargs['estimate_kwargs'] = {'linestyle': ':',
                                              'marker' : mrk,
                                              'label' : label_fmt.format(label='Corrected estimate')}
+        cur_kwargs.update(dir_kwargs[np.minimum(j, len(dir_kwargs)-1)])
         line_data, _ = fnPlot(fnNorm=fnNorm, **cur_kwargs)
         if rate is None and len(line_data[1:, :]) > 0:
             # Fit rate
@@ -452,7 +452,7 @@ def plotDirections(ax, runs, fnPlot,
                 cur_rate = ratefit(np.log(beta) * line_data[1:, 0],
                                    np.log(line_data[1:, 1]))[0]
             else:
-                if x_linear:
+                if 'x_axis' not in cur_kwargs or cur_kwargs['x_axis'] == 'ell':
                     cur_rate = ratefit(line_data[1:, 0],
                                        np.log(line_data[1:, 1]))[0]
                 else:
@@ -470,7 +470,7 @@ def plotDirections(ax, runs, fnPlot,
             label = r'${:.2g}^{{ {}\ell }}$'.format(beta,
                                                     _formatPower(rate))
         else:
-            if x_linear:
+            if 'x_axis' not in cur_kwargs or cur_kwargs['x_axis'] == 'ell':
                 func = lambda x, r=rate: np.exp(r*x)
                 label = r'$\exp({}\ell)$'.format(_formatPower(rate))
             else:
@@ -798,6 +798,9 @@ def _get_x_axis(ax, ret, kwargs):
     if x_axis == 'ell':
         ax.set_xlabel(r'$\ell$')
         x = np.arange(0, len(ret.central_delta_moments[:, 0]))
+    elif x_axis == 'log_ell':
+        ax.set_xlabel(r'$\ell$')
+        x = np.log(1+np.arange(0, len(ret.central_delta_moments[:, 0])))
     elif x_axis == 'work':
         ax.set_xlabel(r'$W_\ell$')
         ax.set_xscale('log')
@@ -807,7 +810,7 @@ def _get_x_axis(ax, ret, kwargs):
         ax.set_xscale('log')
         x = np.mean(ret.Tl, axis=1)  # TODO: This should not take the average
     else:
-        raise ValueError('x_axis must be: ell, work or time')
+        raise ValueError('x_axis must be: ell, work or time not %s' % x_axis)
     return x, np.argsort(x)
 
 @public
@@ -1262,14 +1265,14 @@ def add_legend(ax, handles=None, labels=None, alpha=0.5,
         # Shrink current axis by 20%
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        kwargs['loc'] = 'center left'
+        kwargs['loc'] = 'center right'
         kwargs['fancybox'] = False
         kwargs['frameon'] = False
         kwargs['shadow'] = False
         kwargs['bbox_to_anchor'] = (1, 0.5)
         return ax.legend(handles, labels, *args, **kwargs)
     else:
-        kwargs['loc'] = 'center left'
+        kwargs['loc'] = loc
         kwargs['fancybox'] = False
         kwargs['frameon'] = False
         kwargs['shadow'] = False
