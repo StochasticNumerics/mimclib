@@ -8,7 +8,7 @@
 #include <iostream>
 #include "set_util.hpp"
 
-#define DEBUG_ASSERT(x)
+#define DEBUG_ASSERT(x) if (!(x)) throw std::runtime_error("Hello");
 // static std::ostream& operator<<(std::ostream& out, const std::vector<ind_t>& v) {
 //     out << "[";
 //     size_t i=0;
@@ -128,24 +128,27 @@ public:
         if (cur.size() > D + 1)
             throw std::runtime_error("Index too large for profit calculator");
 
+        double ell = 0;
+        double k = 0;
         double work_space=0, error=0;
         uint i=0;
         auto itr = cur.begin();
         for (;itr!=cur.end() && i < D;itr++, i++){
             work_space += (itr->value-SparseMIndex::SET_BASE)*gamma;
             error += (itr->value-SparseMIndex::SET_BASE)*beta;
+            k = itr->value-SparseMIndex::SET_BASE;
         }
 
         double work = work_space;
-        if (itr!=cur.end()){
-            double ell = itr->value-SparseMIndex::SET_BASE;
-            work = std::log(1+ell) + ell +
-                std::max(work_space, std::log(proj_sample_ratio) + ell);
-            error += alpha * ell;
-        }
-        // std::cout << cur << " -> " << work << "(" << work_space << ", " <<
-        //     work_sampling << ", " << proj_sample_ratio << ", " << work_proj
-        //           << ")" << ", " << error << std::endl;
+        ell = cur.get(D)-SparseMIndex::SET_BASE;
+        // bc = 2**(d*ell);
+        // work = log(bc * log(bc))
+        work = std::log(1+d*ell) +
+            d*ell +
+            std::max(work_space, std::log(proj_sample_ratio) + d*ell);
+        work = work_space + d*ell;
+        error += alpha * ell;
+
         return work + error;
     }
 private:

@@ -133,10 +133,10 @@ class MyRun:
                                                         run.params.miproj_set_mul)
         elif run.params.miproj_set == 'apriori':
             if run.params.min_dim > 0:
-                # dexp = (run.params.miproj_d_beta +
-                #         run.params.miproj_d_gamma) / \
-                #         (run.params.miproj_max_vars + run.params.miproj_s_alpha)
-                # self.profit_calc = setutil.TDFTProfCalculator([dexp, 1.])
+                #self.profit_calc = setutil.TDFTProfCalculator([dexp, 1.])
+                # self.profit_calc_td = setutil.TDFTProfCalculator([run.params.miproj_d_beta +
+                #                                                run.params.miproj_d_gamma,
+                #                                                run.params.miproj_max_vars + run.params.miproj_s_alpha])
                 self.profit_calc = setutil.MIProjProfCalculator(run.params.min_dim,
                                                                 run.params.miproj_max_vars,
                                                                 run.params.miproj_d_beta,
@@ -151,7 +151,7 @@ class MyRun:
     def extendLvls(self, run, lvls):
         max_added = None
         if run.params.miproj_set == 'apriori':
-            max_dim = 2
+            max_dim = run.params.min_dim+1
         else:
             max_dim = 5 + (0 if len(lvls) == 0 else np.max(lvls.get_dim()))
             max_dim = np.minimum(run.params.miproj_max_vars + run.params.min_dim,

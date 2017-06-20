@@ -81,7 +81,7 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
     do
         max_lvl=12
         # (gamma_space + w_space) / (N + kappa)
-        ALPHA=`echo "3/$N" | bc`
+        ALPHA=3
 
         all_cmds "" 2 $max_lvl $N -miproj_max_vars $N \
                  -miproj_s_alpha $ALPHA -miproj_s_proj_sample_ratio 1 \
@@ -102,7 +102,7 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
             #          $CMN
 
             all_cmds -fix-$i 2 $((($i+3)*3)) $N -mimc_min_dim 0 -miproj_max_vars $N \
-                     -miproj_fix_lvl $i -miproj_set miproj \
+                     -miproj_fix_lvl $i -miproj_set apriori \
                      $CMN -miproj_double_work True
         done
     done
