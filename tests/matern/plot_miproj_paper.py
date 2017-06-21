@@ -284,6 +284,9 @@ def plot_all(runs, **kwargs):
 
 
 def plotSingleLevel(runs, input_args, *args, **kwargs):
+    cmp_labels = ['SL', 'ML', 'Adaptive ML', 'Prof ML', 'TD ML']
+    cmp_tags = [None, '-', '-adapt', '-prof', '-td']
+
     modifier = kwargs.pop('modifier', None)
     fnNorm = kwargs.pop('fnNorm', None)
     Ref_kwargs = kwargs.pop('Ref_kwargs', None)
@@ -336,15 +339,19 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
         runs_adaptive = db.readRuns(tag=db_tag + "-adapt", done_flag=input_args.done_flag)
         runs_priori = runs
 
-    if len(runs_priori) > 0:
-        print("N", runs_priori[0].params.miproj_max_vars,
-              "DEXP", runs_priori[0].params.miproj_set_dexp)
+    cmp_runs = [fix_runs]
+    for subtag in cmp_tags[1:]:
+        if db_tag + subtag == input_args.db_tag:
+            cmp_runs.append(runs)
+        else:
+            cmp_runs.append(db.readRuns(tag=db_tag + sub_tag,
+                                        done_flag=input_args.done_flag))
 
     if input_args.qoi_exact is not None:
         print("Setting errors")
         fnExactErr = lambda itrs, e=input_args.qoi_exact: \
                      fnNorm([v.calcEg() + e*-1 for v in itrs])
-        miplot.set_exact_errors(fix_runs + runs_adaptive, fnExactErr)
+        miplot.set_exact_errors(cmp_runs, fnExactErr)
 
     def filter_dec(xy):
         xy = xy[xy[:, 1].argsort(), :]
@@ -417,21 +424,17 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
     rates_SL[0] /= g
     rates_SL[1] /= g
 
-    for zorder, rr, label, rates, ref_ls in [[10,fix_runs, 'SL', rates_SL, '-.'],
-                                             [11,runs_priori, 'ML', rates_ML if runs ==
-                                              runs_priori else None, '--'],
-                                             [12,runs_adaptive, 'ML Adaptive', rates_ML if
-                                              runs == runs_adaptive else None, '--']]:
+    for i in range(0, len(cmp_runs)):
+        rr = cmp_runs[i]
         if rr is None or len(rr) == 0:
             continue
-        if rr != fix_runs:
-            iter_stats_args = dict(work_bins=1000,
-                                   work_spacing=None,
-                                   fnFilterData=None)
-        else:
-            iter_stats_args = dict(work_bins=1000,
-                                   work_spacing=None,
-                                   fnFilterData=filter_dec)
+        label = cmp_labels[i]
+        rates = rates_SL if rr == fix_runs else (rates_ML if rr == runs else None)
+        ref_ls = '-.' if rr == fix_runs else '--'
+        zorder = 10+i
+        iter_stats_args = dict(work_bins=1000,
+                               work_spacing=None,
+                               fnFilterData=filter_dec if rr == fix_runs else None)
 
         if rates is not None:
             if rates[1] == 1:  # Denominator
@@ -471,10 +474,10 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                 def fnRate(x, rr=rates):
                     return (x)**(-rr[0]/rr[1])*np.abs(np.log(x)**rr[2])
                 fig.add_line(miplot.FunctionLine2D(fn=fnRate,
-                                                         linewidth=2,
-                                                         zorder=5,
-                                                         data=data[:len(data)//3, :],
-                                                         **Ref_kwargs))
+                                                   linewidth=2,
+                                                   zorder=5,
+                                                   data=data[:len(data)//3, :],
+                                                   **Ref_kwargs))
 
     if flip:
         fig_W.set_ylabel('Work Estimate')

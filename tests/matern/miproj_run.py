@@ -138,15 +138,15 @@ class MyRun:
             else:
                 self.profit_calc_td = setutil.TDFTProfCalculator([run.params.miproj_d_beta +
                                                                   run.params.miproj_d_gamma,
-                                                                  1. + run.params.miproj_s_alpha])
-                # self.profit_calc = setutil.MIProjProfCalculator(run.params.min_dim,
-                #                                                 run.params.miproj_max_vars,
-                #                                                 run.params.miproj_d_beta,
-                #                                                 run.params.miproj_d_gamma,
-                #                                                 run.params.miproj_s_alpha,
-                #                                                 run.params.miproj_s_theta,
-                #                                                 run.params.miproj_s_proj_sample_ratio)
-                self.profit_calc = self.profit_calc_td
+                                                                  2. * 1. + 2. * run.params.miproj_s_alpha])
+                self.profit_calc = setutil.MIProjProfCalculator(run.params.min_dim,
+                                                                run.params.miproj_max_vars,
+                                                                run.params.miproj_d_beta,
+                                                                run.params.miproj_d_gamma,
+                                                                run.params.miproj_s_alpha,
+                                                                run.params.miproj_s_theta,
+                                                                run.params.miproj_s_proj_sample_ratio)
+                #self.profit_calc = self.profit_calc_td
         else:
             assert run.params.miproj_set == 'adaptive' or run.params.miproj_set == 'apriori-adapt'
 
