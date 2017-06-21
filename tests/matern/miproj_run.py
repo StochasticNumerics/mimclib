@@ -77,9 +77,8 @@ class MyRun:
 
         if run.params.miproj_set == 'adaptive':
             fnBasisFromLvl = miproj.exp_basis_from_level
-        elif run.params.miproj_set == 'apriori-adapt':
             fnBasisFromLvl = lambda beta, d=self.params.miproj_max_vars: miproj.td_basis_from_level(d, beta)
-        elif run.params.miproj_set == 'apriori':
+        elif run.params.miproj_set == 'apriori' or run.params.miproj_set == 'apriori-adapt':
             fnBasisFromLvl = lambda beta, d=self.params.miproj_max_vars: miproj.td_basis_from_level(d, beta)
         else:
             raise NotImplementedError("Unknown lvls to basis")
@@ -134,16 +133,20 @@ class MyRun:
                                                         1.,
                                                         run.params.miproj_set_mul)
         elif run.params.miproj_set == 'apriori':
-            # self.profit_calc_td = setutil.TDFTProfCalculator([run.params.miproj_d_beta +
-            #                                                run.params.miproj_d_gamma,
-            #                                                run.params.miproj_max_vars + run.params.miproj_s_alpha])
-            self.profit_calc = setutil.MIProjProfCalculator(run.params.min_dim,
-                                                            run.params.miproj_max_vars,
-                                                            run.params.miproj_d_beta,
-                                                            run.params.miproj_d_gamma,
-                                                            run.params.miproj_s_alpha,
-                                                            run.params.miproj_s_theta,
-                                                            run.params.miproj_s_proj_sample_ratio)
+            if run.params.min_dim == 0:
+                self.profit_calc = setutil.TDFTProfCalculator([1.])
+            else:
+                self.profit_calc_td = setutil.TDFTProfCalculator([run.params.miproj_d_beta +
+                                                                  run.params.miproj_d_gamma,
+                                                                  1. + run.params.miproj_s_alpha])
+                # self.profit_calc = setutil.MIProjProfCalculator(run.params.min_dim,
+                #                                                 run.params.miproj_max_vars,
+                #                                                 run.params.miproj_d_beta,
+                #                                                 run.params.miproj_d_gamma,
+                #                                                 run.params.miproj_s_alpha,
+                #                                                 run.params.miproj_s_theta,
+                #                                                 run.params.miproj_s_proj_sample_ratio)
+                self.profit_calc = self.profit_calc_td
         else:
             assert run.params.miproj_set == 'adaptive' or run.params.miproj_set == 'apriori-adapt'
 
@@ -213,14 +216,10 @@ class MyRun:
         migrp.add_argument(pre + "set_mul", type=float, default=1.,
                            action="store")
 
-        migrp.add_argument(pre + "d_beta", type=float,
-                           action="store")
-        migrp.add_argument(pre + "d_gamma", type=float,
-                           action="store")
-        migrp.add_argument(pre + "s_alpha", type=float,
-                           action="store")
-        migrp.add_argument(pre + "s_theta", type=float,
-                           action="store")
+        migrp.add_argument(pre + "d_beta", type=float, action="store")
+        migrp.add_argument(pre + "d_gamma", type=float, action="store")
+        migrp.add_argument(pre + "s_alpha", type=float, action="store")
+        migrp.add_argument(pre + "s_theta", type=float, action="store")
         migrp.add_argument(pre + "s_proj_sample_ratio", type=float,
                            action="store", default=0.)
 

@@ -142,9 +142,11 @@ public:
         ell = theta*(cur.get(D)-SparseMIndex::SET_BASE);
         // bc = 2**(d*ell);
         // work = log(bc * log(bc))
-        work = std::log(1+ell) + ell +
-            std::max(work_space, std::log(proj_sample_ratio) + ell);
-        error += alpha * ell;
+        double log_basis = (d-1)*std::log(1+ell) + ell;
+        double log_pts = log_basis + std::log2(1+log_basis);
+        work = log_pts +
+            std::max(work_space, std::log(proj_sample_ratio) + log_basis);
+        error += alpha * log_basis;
         return work + error;
     }
 private:

@@ -669,10 +669,10 @@ Not needed if fnHierarchy is provided.")
         if verbose >= VERBOSE_INFO:
             output += "Eg={}\n\
 Bias={:.12e}\nStatErr={:.12e}\
-\nTotalErrEst={:.12e} | {:.12e}\n".format(str(self.last_itr.calcEg()),
+\nTotalErrEst={:.12e} | {:.12e}\nTotalWork={:.12e}\n".format(str(self.last_itr.calcEg()),
                                           self.bias, self.stat_error,
                                           self.totalErrorEst(),
-                                          self.last_itr.TOL)
+                                                           self.last_itr.TOL, self.last_itr.calcTotalWork())
 
             output += "max_lvl = {}\n".format(self.last_itr._lvls.
                                               to_sparse_matrix().max(axis=0).todense())
