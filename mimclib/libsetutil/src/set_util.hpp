@@ -25,7 +25,7 @@ extern "C"{
     PProfitCalculator CreateTDHCProfCalc(ind_t d, const double *td_w, const double *hc_w);
     PProfitCalculator CreateMIProjProfCalc(ind_t D, ind_t d,
                                            double beta, double gamma,
-                                           double alpha,
+                                           double alpha, double theta,
                                            double proj_sample_ratio);
 
     double GetMinOuterProfit(const PVarSizeList,

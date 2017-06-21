@@ -9,7 +9,7 @@ if [ -z "$EXAMPLE" ]; then
     EXAMPLE='sf-kink'
 fi
 DB_CONN='-db_engine mysql -db_name mimc -db_host 129.67.187.118 '
-BASETAG="dbl-$EXAMPLE-"
+BASETAG="sim-$EXAMPLE-"
 COMMON="-qoi_seed 0 -ksp_rtol 1e-15 -ksp_type gmres  $DB_CONN "
 EST_CMD="python miproj_esterr.py $COMMON "
 RUN_CMD="OPENBLAS_NUM_THREADS=1 python miproj_run.py -qoi_example $EXAMPLE \
@@ -81,15 +81,19 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
     do
         max_lvl=12
         # (gamma_space + w_space) / (N + kappa)
-        ALPHA=3
+        ALPHA=`echo "3/$N" | bc`
 
         all_cmds "" 2 $max_lvl $N -miproj_max_vars $N \
-                 -miproj_s_alpha $ALPHA -miproj_s_proj_sample_ratio 1 \
-                 -miproj_set apriori -mimc_min_dim 1 $CMN  -miproj_double_work True
-
-        all_cmds "-noproj" 2 $max_lvl $N -miproj_max_vars $N \
                  -miproj_s_alpha $ALPHA -miproj_s_proj_sample_ratio 0. \
                  -miproj_set apriori -mimc_min_dim 1 $CMN  -miproj_double_work True
+
+        all_cmds "-adapt" 2 $max_lvl $N -miproj_max_vars $N \
+                 -miproj_s_alpha $ALPHA -miproj_s_proj_sample_ratio 0. \
+                 -miproj_set apriori-adapt -mimc_min_dim 1 $CMN  -miproj_double_work True
+
+        # all_cmds "-noproj" 2 $max_lvl $N -miproj_max_vars $N \
+        #          -miproj_s_alpha $ALPHA -miproj_s_proj_sample_ratio 0. \
+        #          -miproj_set apriori -mimc_min_dim 1 $CMN  -miproj_double_work True
 
         # all_cmds -adapt 2 $max_lvl $N -miproj_max_vars $N -mimc_min_dim 1 \
         #          -miproj_set_maxadd 1 $CMN
@@ -101,8 +105,8 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
             #          -miproj_fix_lvl $i -miproj_set adaptive \
             #          $CMN
 
-            all_cmds -fix-$i 2 $((($i+3)*3)) $N -mimc_min_dim 0 -miproj_max_vars $N \
-                     -miproj_fix_lvl $i -miproj_set apriori \
+            all_cmds -fix-$i 2 $((($i+2))) $N -mimc_min_dim 0 -miproj_max_vars $N \
+                     -miproj_fix_lvl $i -miproj_set apriori -miproj_s_proj_sample_ratio 0. \
                      $CMN -miproj_double_work True
         done
     done

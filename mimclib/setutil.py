@@ -75,7 +75,7 @@ __lib__.CreateMIProfCalc.argtypes = [__ct_ind_t__, __arr_double__,
 __lib__.CreateMIProjProfCalc.restype = ct.c_voidp
 __lib__.CreateMIProjProfCalc.argtypes = [__ct_ind_t__, __ct_ind_t__,
                                          ct.c_double, ct.c_double,
-                                         ct.c_double, ct.c_double]
+                                         ct.c_double, ct.c_double, ct.c_double]
 
 __lib__.CreateTDFTProfCalc.restype = ct.c_voidp
 __lib__.CreateTDFTProfCalc.argtypes = [__ct_ind_t__, __arr_double__, __arr_double__]
@@ -541,9 +541,9 @@ class MIProfCalculator(ProfCalculator):
                                                 xi, sexp, mul)
 
 class MIProjProfCalculator(ProfCalculator):
-    def __init__(self, D, d, beta, gamma, alpha, proj_sample_ratio=1.):
+    def __init__(self, D, d, beta, gamma, alpha, theta=1, proj_sample_ratio=1.):
         self._handle = __lib__.CreateMIProjProfCalc(D, d, beta, gamma,
-                                                    alpha,
+                                                    alpha, theta,
                                                     proj_sample_ratio)
 
 class TDFTProfCalculator(ProfCalculator):
