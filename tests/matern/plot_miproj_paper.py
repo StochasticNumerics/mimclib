@@ -16,7 +16,33 @@ import numpy as np
 import mimclib.plot as miplot
 import matplotlib.pyplot as plt
 from mimclib import ipdb
+import mimclib.setutil as setutil
 
+def plotProfits(ax, itr, *args, **kwargs):
+    work_est = kwargs.pop('work_est', 'work')
+    error = itr.parent.fn.Norm(itr.calcDeltaEl())
+    if work_est == 'time':
+        work = itr.calcTl()
+    else:
+        work = itr.calcWl()
+        
+    lvls = list(itr.lvls_itr(min_dim=2))
+    assert(np.all([len(l) == 2 for l in lvls]))
+    lvls = np.array(lvls)
+    prof = setutil.calc_log_prof_from_EW(error, work)
+
+    max_lvl = np.max(lvls, axis=0)
+    
+    X, Y = np.meshgrid(np.arange(0, max_lvl[0]+1), np.arange(0, max_lvl[1]+1))
+    data = np.zeros((max_lvl[1]+1, max_lvl[0]+1))
+    data.fill(np.nan)
+    prof = setutil.calc_log_prof_from_EW(error, work)
+    for i, l in enumerate(lvls):
+        data[l[1], l[0]] = prof[i]
+    ax.contourf(X, Y, data)
+    ax.set_xlabel('$\\ell_1$')
+    ax.set_ylabel('$\\ell_2$')
+                                
 def plotSeeds(ax, runs, *args, **kwargs):
     ax.set_yscale('log')
     ax.set_xscale('log')
@@ -182,6 +208,16 @@ def plot_all(runs, **kwargs):
     except:
         miplot.plot_failed(ax)
 
+        
+    print_msg("plotPorfits")
+    ax = add_fig('profits')
+    plotProfits(ax, runs[0].last_itr)
+    ax.set_title('Err/Work')
+    
+    ax = add_fig('profits')
+    plotProfits(ax, runs[0].last_itr, work_est='time')
+    ax.set_title('Err/Time')
+
     print_msg("plotUserData")
     ax = add_fig('cond-vs-iteration')
     try:
@@ -200,7 +236,7 @@ def plot_all(runs, **kwargs):
     #try:
     miplot.plotDirections(ax, runs, miplot.plotExpectVsLvls,
                           fnNorm=fnNorm,
-                          dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'log_ell'}])
+                          dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'ell'}])
     # except:
     #     miplot.plot_failed(ax)
     #     raise
@@ -209,12 +245,22 @@ def plot_all(runs, **kwargs):
     ax = add_fig('work-vs-lvl')
     try:
         miplot.plotDirections(ax, runs, miplot.plotWorkVsLvls,
-                              fnNorm=fnNorm, dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'log_ell'}])
+                              fnNorm=fnNorm, dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'ell'}])
+    except:
+        miplot.plot_failed(ax)
+        raise
+    
+    print_msg("plotDirections")
+    ax = add_fig('time-vs-lvl')
+    try:
+        miplot.plotDirections(ax, runs, miplot.plotTimeVsLvls,
+                              fnNorm=fnNorm, dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'ell'}])
     except:
         miplot.plot_failed(ax)
         raise
 
     if runs[0].params.min_dim > 0 and runs[0].last_itr.lvls_max_dim() > 2:
+        print("Max dim", runs[0].last_itr.lvls_max_dim())
         run = runs[0]
         from mimclib import setutil
         if run.params.qoi_example == 'sf-matern':
@@ -237,7 +283,7 @@ def plot_all(runs, **kwargs):
         try:
             miplot.plotDirections(ax, [reduced_run],
                                   miplot.plotExpectVsLvls, fnNorm=fnNorm,
-                                  dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'log_ell'}])
+                                  dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'ell'}])
         except:
             miplot.plot_failed(ax)
         print_msg("plotDirections")
@@ -245,7 +291,7 @@ def plot_all(runs, **kwargs):
         try:
             miplot.plotDirections(ax, [reduced_run],
                                   miplot.plotWorkVsLvls, fnNorm=fnNorm,
-                                  dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'log_ell'}])
+                                  dir_kwargs=[{'x_axis':'ell'}, {'x_axis':'ell'}])
         except:
             miplot.plot_failed(ax)
     print_msg("plotBestNTerm")
@@ -284,8 +330,8 @@ def plot_all(runs, **kwargs):
 
 
 def plotSingleLevel(runs, input_args, *args, **kwargs):
-    cmp_labels = ['SL', 'ML', 'Adaptive ML', 'Prof ML', 'TD ML']
-    cmp_tags = [None, '-', '-adapt', '-prof', '-td']
+    cmp_labels = ['SL', 'ML', 'Adaptive ML', 'Time-Adapt ML', 'TD fit ML']
+    cmp_tags = [None, '', '-adapt', '-adapt-time', '-tdfit']
 
     modifier = kwargs.pop('modifier', None)
     fnNorm = kwargs.pop('fnNorm', None)
@@ -332,26 +378,21 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
     flip = True
     work_bins = 50
     work_spacing = np.sqrt(2)
-    if adaptive_runs:
-        runs_adaptive = runs
-        runs_priori = db.readRuns(tag=db_tag, done_flag=input_args.done_flag)
-    else:
-        runs_adaptive = db.readRuns(tag=db_tag + "-adapt", done_flag=input_args.done_flag)
-        runs_priori = runs
-
-    cmp_runs = [fix_runs]
-    for subtag in cmp_tags[1:]:
-        if db_tag + subtag == input_args.db_tag:
-            cmp_runs.append(runs)
+    cmp_runs = [None] * len(cmp_tags)
+    for i, subtag in enumerate(cmp_tags):
+        if i == 0:
+            cmp_runs[i] = fix_runs            
+        elif db_tag + subtag == input_args.db_tag:
+            cmp_runs[i] = runs
         else:
-            cmp_runs.append(db.readRuns(tag=db_tag + sub_tag,
-                                        done_flag=input_args.done_flag))
+            cmp_runs[i] = db.readRuns(tag=db_tag + subtag,
+                                      done_flag=input_args.done_flag)
 
     if input_args.qoi_exact is not None:
         print("Setting errors")
         fnExactErr = lambda itrs, e=input_args.qoi_exact: \
                      fnNorm([v.calcEg() + e*-1 for v in itrs])
-        miplot.set_exact_errors(cmp_runs, fnExactErr)
+        miplot.set_exact_errors(sum(cmp_runs, []), fnExactErr)
 
     def filter_dec(xy):
         xy = xy[xy[:, 1].argsort(), :]
@@ -469,6 +510,8 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
                                                 rr == runs else None,
                                                 zorder=zorder,
                                                 label=label)
+            if data is None:
+                continue;
             data = data[np.argsort(data[:, 0]), :]
             if rates is not None:
                 def fnRate(x, rr=rates):

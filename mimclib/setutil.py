@@ -284,13 +284,14 @@ class VarSizeList(object):
     def __iter__(self):
         return self.dense_itr()
 
-    def dense_itr(self, start=0, end=None):
+    def dense_itr(self, start=0, end=None, min_dim=None):
         if end is None:
             end = len(self)
         dims = self.get_dim()
         active_dims = self.get_active_dim()
+        min_dim = self.min_dim if min_dim is None else min_dim
         for i in xrange(start, end):
-            item = np.empty(np.maximum(self.min_dim, dims[i]), dtype=ind_t)
+            item = np.empty(np.maximum(min_dim, dims[i]), dtype=ind_t)
             data = np.empty(active_dims[i], dtype=ind_t)
             j    = np.empty(active_dims[i], dtype=ind_t)
             __lib__.VarSizeList_get(self._handle, i, data, j, len(data))

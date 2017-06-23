@@ -34,7 +34,7 @@ def l2_error_mc(itrs, fnSample, rel_tol=0.01, maxM=1000, max_L=None):
     except:
         N = np.minimum(N, np.max([itr.parent.params.miproj_max_dim-itr.parent.params.min_dim for itr in itrs]))
 
-    tStart = time.clock()
+    tStart = time.time()
     print("MaxL:", max_L, ", N:", N)
     # Evaluate L^2 norm using Monte Carlo
     val = [itr.calcEg() for itr in itrs]
@@ -61,7 +61,7 @@ def l2_error_mc(itrs, fnSample, rel_tol=0.01, maxM=1000, max_L=None):
         err = 3*np.sqrt((s2/M - (s1/M)**2)/M)    # Approximate error of error estimate
         max_rel_err = np.max(err / (err+np.abs(s1/M)))
         print("Estimate with", M, "samples -> max relative error: ", max_rel_err,
-              "in", (time.clock()-tStart)/60., "min")
+              "in", (time.time()-tStart)/60., "min")
         print("Expectation:", s1_E/M, ", Error:", 3*np.sqrt((s2_E/M - (s1_E/M)**2)/M))
         if max_rel_err < rel_tol:
             break

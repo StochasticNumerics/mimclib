@@ -138,15 +138,15 @@ class MyRun:
             else:
                 self.profit_calc_td = setutil.TDFTProfCalculator([run.params.miproj_d_beta +
                                                                   run.params.miproj_d_gamma,
-                                                                  2. * 1. + 2. * run.params.miproj_s_alpha])
-                self.profit_calc = setutil.MIProjProfCalculator(run.params.min_dim,
-                                                                run.params.miproj_max_vars,
-                                                                run.params.miproj_d_beta,
-                                                                run.params.miproj_d_gamma,
-                                                                run.params.miproj_s_alpha,
-                                                                run.params.miproj_s_theta,
-                                                                run.params.miproj_s_proj_sample_ratio)
-                #self.profit_calc = self.profit_calc_td
+                                                                  run.params.miproj_s_theta + run.params.miproj_s_alpha])
+                # self.profit_calc = setutil.MIProjProfCalculator(run.params.min_dim,
+                #                                                 run.params.miproj_max_vars,
+                #                                                 run.params.miproj_d_beta,
+                #                                                 run.params.miproj_d_gamma,
+                #                                                 run.params.miproj_s_alpha,
+                #                                                 run.params.miproj_s_theta,
+                #                                                 run.params.miproj_s_proj_sample_ratio)
+                self.profit_calc = self.profit_calc_td
         else:
             assert run.params.miproj_set == 'adaptive' or run.params.miproj_set == 'apriori-adapt'
 
@@ -163,7 +163,10 @@ class MyRun:
         if self.profit_calc is None:
             # Adaptive
             error = run.fn.Norm(run.last_itr.calcDeltaEl())
-            work = run.last_itr.calcWl()
+            if run.params.miproj_time:
+                work = run.last_itr.calcTl()
+            else:
+                work = run.last_itr.calcWl()
             prof = setutil.calc_log_prof_from_EW(error, work)
             max_added = run.params.miproj_set_maxadd
             lvls.expand_set(prof, max_dim=max_dim, max_added=max_added)
@@ -233,6 +236,7 @@ class MyRun:
         migrp.add_argument(pre + "min_vars", type=int, default=10, action="store")
         migrp.add_argument(pre + "max_vars", type=int, default=10**6, action="store")
         migrp.add_argument(pre + "max_lvl", type=int, default=1000, action="store")
+        migrp.add_argument(pre + "time", type="bool", default=False, action="store")
 
 
     def ItrDone(self, db, run_id, run):

@@ -2,7 +2,7 @@
 
 # make
 # rm -f data.sql
-VERBOSE="-db False -mimc_verbose 1 "
+VERBOSE="-db True -mimc_verbose 0 "
 SEL_CMD="$1"
 EXAMPLE="$2"
 if [ -z "$EXAMPLE" ]; then
@@ -75,22 +75,27 @@ if [ "$EXAMPLE" = "sf-matern" ]; then
 fi;
 
 if [ "$EXAMPLE" = "sf-kink" ]; then
-    CMN='-qoi_sigma -1 -mimc_beta 1.4142135623730951 -qoi_scale 0.5
--miproj_d_beta 1. -miproj_d_gamma 1. '
-    for N in 2 # 3 4 6
+    CMN='-qoi_sigma -1 -mimc_beta 1.4142135623730951 -qoi_scale 0.5 '
+    for N in 2 3 4 6
     do
-        max_lvl=12
+        max_lvl=10
         # (gamma_space + w_space) / (N + kappa)
-        ALPHA=`echo "3./$N" | bc -l`
+        #ALPHA=`echo "3./$N" | bc -l`
+	ALPHA=3.
+	THETA=`echo "$N/2" | bc -l`
 
-        all_cmds "" 2 $max_lvl $N -miproj_max_vars $N \
-                 -miproj_s_alpha $ALPHA -miproj_s_proj_sample_ratio 0. \
-                 -miproj_s_theta 1. -miproj_d_beta 1. -miproj_d_gamma 1. \
-                 -miproj_set apriori -mimc_min_dim 1 $CMN  -miproj_double_work True
+        # all_cmds "-tdfit" 2 $max_lvl $N -miproj_max_vars $N \
+        #          -miproj_s_alpha $ALPHA -miproj_s_proj_sample_ratio 0. \
+        #          -miproj_s_theta $THETA -miproj_d_beta 1. -miproj_d_gamma 1. \
+        #          -miproj_set apriori -mimc_min_dim 1 $CMN  -miproj_double_work True
 
-        all_cmds "-adapt" 2 $max_lvl $N -miproj_max_vars $N \
+        # all_cmds "-adapt" 2 $max_lvl $N -miproj_max_vars $N \
+        #          -miproj_s_proj_sample_ratio 0. -miproj_set_maxadd 1 \
+        #          -miproj_set apriori-adapt -mimc_min_dim 1 $CMN  
+
+        all_cmds "-adapt-time" 2 $max_lvl $N -miproj_max_vars $N \
                  -miproj_s_proj_sample_ratio 0. -miproj_set_maxadd 1 \
-                 -miproj_set apriori-adapt -mimc_min_dim 1 $CMN  -miproj_double_work True
+                 -miproj_time True -miproj_set apriori-adapt -mimc_min_dim 1 $CMN  
 
         # all_cmds "-noproj" 2 $max_lvl $N -miproj_max_vars $N \
         #          -miproj_s_alpha $ALPHA -miproj_s_proj_sample_ratio 0. \
@@ -99,16 +104,16 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
         # all_cmds -adapt 2 $max_lvl $N -miproj_max_vars $N -mimc_min_dim 1 \
         #          -miproj_set_maxadd 1 $CMN
 
-        max_lvl=9
+        # max_lvl=9
         # for (( i=0; i<=$max_lvl; i++ ))
         # do
         #     # all_cmds -fix-adapt-$i 2 $(($i+2)) $N -mimc_min_dim 0 -miproj_max_vars $N \
         #     #          -miproj_fix_lvl $i -miproj_set adaptive \
         #     #          $CMN
 
-        #     # all_cmds -fix-$i 2 $((($i+2))) $N -mimc_min_dim 0 -miproj_max_vars $N \
-        #     #          -miproj_fix_lvl $i -miproj_set apriori -miproj_s_proj_sample_ratio 0. \
-        #     #          $CMN -miproj_double_work True
+        #     all_cmds -fix-$i 2 $((($i+2))) $N -mimc_min_dim 0 -miproj_max_vars $N \
+        #              -miproj_fix_lvl $i -miproj_set apriori -miproj_s_proj_sample_ratio 0. \
+        #              $CMN -miproj_double_work True
         # done
     done
 fi;

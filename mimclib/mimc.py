@@ -331,11 +331,11 @@ class MIMCItrData(object):
     def lvls_count(self):
         return self._lvls_count
 
-    def lvls_itr(self, start=0, end=None):
+    def lvls_itr(self, start=0, end=None, min_dim=None):
         if end is None:
             end = self.lvls_count
         assert(end <= self.lvls_count)
-        return self._lvls.dense_itr(start, end)
+        return self._lvls.dense_itr(start, end, min_dim=min_dim)
 
     def lvls_sparse_itr(self, start=0, end=None):
         if end is None:
@@ -669,10 +669,12 @@ Not needed if fnHierarchy is provided.")
         if verbose >= VERBOSE_INFO:
             output += "Eg={}\n\
 Bias={:.12e}\nStatErr={:.12e}\
-\nTotalErrEst={:.12e} | {:.12e}\nTotalWork={:.12e}\n".format(str(self.last_itr.calcEg()),
-                                          self.bias, self.stat_error,
-                                          self.totalErrorEst(),
-                                                           self.last_itr.TOL, self.last_itr.calcTotalWork())
+\nTotalErrEst={:.12e} | {:.12e}\
+\nTotalWork={:.12e}\nTotalTime={:.12e}\n".format(str(self.last_itr.calcEg()),
+                                               self.bias, self.stat_error,
+                                               self.totalErrorEst(),
+                                               self.last_itr.TOL, self.last_itr.calcTotalWork(),
+                                               self.last_itr.calcTotalTime())
 
             output += "max_lvl = {}\n".format(self.last_itr._lvls.
                                               to_sparse_matrix().max(axis=0).todense())

@@ -448,17 +448,18 @@ def plotDirections(ax, runs, fnPlot,
         line_data, _ = fnPlot(fnNorm=fnNorm, **cur_kwargs)
         if rate is None and len(line_data[1:, :]) > 0:
             # Fit rate
+            fit_data = line_data[-3:, :]
             if beta is not None:
-                cur_rate = ratefit(np.log(beta) * line_data[1:, 0],
-                                   np.log(line_data[1:, 1]))[0]
+                cur_rate = ratefit(np.log(beta) * fit_data[:, 0],
+                                   np.log(fit_data[:, 1]))[0]
             else:
                 if 'x_axis' not in cur_kwargs or cur_kwargs['x_axis'] == 'ell':
-                    cur_rate = ratefit(line_data[1:, 0],
-                                       np.log(line_data[1:, 1]))[0]
+                    cur_rate = ratefit(fit_data[:, 0],
+                                       np.log(fit_data[:, 1]))[0]
                 else:
-                    cur_rate = ratefit(np.log(line_data[1:, 0]),
-                                       np.log(line_data[1:, 1]))[0]
-            add_rates[np.round(cur_rate, 2)] = line_data
+                    cur_rate = ratefit(np.log(fit_data[:, 0]),
+                                       np.log(fit_data[:, 1]))[0]                   
+            add_rates[np.round(cur_rate, 2)] = fit_data
         elif rate is not None:
             ind = np.nonzero(np.array(direction) != 0)[0]
             if np.all(ind < len(rate)):
@@ -481,7 +482,7 @@ def plotDirections(ax, runs, fnPlot,
     for j, r in enumerate(sorted(add_rates.keys(), key=lambda x:
                                  np.abs(x))):
         func, label = _getLevelRate(r, beta)
-        ax.add_line(FunctionLine2D(fn=func, data=add_rates[r][1:, :],
+        ax.add_line(FunctionLine2D(fn=func, data=add_rates[r],
                                    linestyle=next(linestyles),
                                    c='k', label=label_fmt.format(label=label)))
 
@@ -667,6 +668,8 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
                                       arr_fnAgg=[np.mean, np.mean,
                                                  fnAggError, np.min],
                                       **iter_stats_args)
+    if len(xy_binned) == 0:
+        return None, []
     xy_binned = xy_binned[:, 1:]
     plotObj = []
     ErrEst_kwargs = kwargs.pop('ErrEst_kwargs', None)
