@@ -15,6 +15,10 @@ from matplotlib.ticker import MaxNLocator
 __all__ = []
 
 
+def _scatter(ax, x, y, *args, **kwargs):
+    xy = np.unique(np.vstack(x,y), axis=0)
+    return ax.scatter(xy[:, 0], xy[:, 1], *args, **kwargs)
+    
 def public(sym):
     __all__.append(sym.__name__)
     return sym
@@ -530,7 +534,7 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     if np.sum(sel) == 0:
         plotObj.append(None)
     else:
-        plotObj.append(ax.scatter(xy[sel, 0], xy[sel, 1], *args, **kwargs))
+        plotObj.append(_scatter(ax, xy[sel, 0], xy[sel, 1], *args, **kwargs))
 
     if ErrEst_kwargs is not None:
         plotObj.append(ax.errorbar(TOLs, error_est[:, 1],
@@ -1134,7 +1138,7 @@ def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
     unique_a = a[idx]
     summary = a
 
-    scatter = ax.scatter(summary[:, 0], summary[:, 1], *args, **kwargs)
+    scatter = _scatter(ax, summary[:, 0], summary[:, 1], *args, **kwargs)
     return summary, [scatter]
 
 @public
@@ -1152,7 +1156,7 @@ def plotThetaVsTOL(ax, runs, *args, **kwargs):
     summary = np.array([[itr.TOL, itr.Q.theta]
                         for _, itr in enum_iter(runs, filteritr)])
 
-    scatter = ax.scatter(summary[:, 0], summary[:, 1], *args, **kwargs)
+    scatter = _scatter(ax, summary[:, 0], summary[:, 1], *args, **kwargs)
     return summary, [scatter]
 
 @public
@@ -1235,7 +1239,7 @@ def plotErrorsPP(ax, runs, label_fmt='${TOL}$', *args, **kwargs):
         arg = np.argsort(xx)
         plotObj.append(ax.plot(xx[arg], ec(x)[arg], *args, **kwargs)[0])
     else:
-        plotObj.append(ax.scatter(norm.cdf(x), ec(x), *args, **kwargs))
+        plotObj.append(_scatter(ax, norm.cdf(x), ec(x), *args, **kwargs))
 
     if Ref_kwargs is not None:
         plotObj.append(ax.add_line(FunctionLine2D.ExpLine(rate=1, **Ref_kwargs)))
