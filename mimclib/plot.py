@@ -15,10 +15,18 @@ from matplotlib.ticker import MaxNLocator
 __all__ = []
 
 
+
+def unique_rows(A):
+    sorted_idx = np.lexsort(A.T)
+    sorted_Ar =  A[sorted_idx,:]
+    mask = np.append(True,np.any(np.diff(sorted_Ar,axis=0),1))
+    unq_count = np.bincount(mask.cumsum()-1)
+    return sorted_Ar[mask][np.nonzero(unq_count==1)[0]]
+
 def _scatter(ax, x, y, *args, **kwargs):
-    xy = np.unique(np.vstack(x,y), axis=0)
+    xy = unique_rows(np.vstack(x,y).transpose())
     return ax.scatter(xy[:, 0], xy[:, 1], *args, **kwargs)
-    
+
 def public(sym):
     __all__.append(sym.__name__)
     return sym
@@ -406,7 +414,7 @@ def computeIterationStats(runs, fnItrStats, arr_fnAgg, work_bins=50,
 def plotDirections(ax, runs, fnPlot,
                    fnNorm=None,
                    plot_fine=False, plot_estimate=False,
-                   directions=None, rate=None, 
+                   directions=None, rate=None,
                    dir_kwargs=[{}],
                    label_fmt='{label}', beta=None):
     if directions is None:
@@ -462,7 +470,7 @@ def plotDirections(ax, runs, fnPlot,
                                        np.log(fit_data[:, 1]))[0]
                 else:
                     cur_rate = ratefit(np.log(fit_data[:, 0]),
-                                       np.log(fit_data[:, 1]))[0]                   
+                                       np.log(fit_data[:, 1]))[0]
             add_rates[np.round(cur_rate, 2)] = fit_data
         elif rate is not None:
             ind = np.nonzero(np.array(direction) != 0)[0]
@@ -1272,11 +1280,11 @@ def add_legend(ax, handles=None, labels=None, alpha=0.5,
         # Shrink current axis by 20%
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        kwargs['loc'] = 'center right'
+        kwargs['loc'] = 'center left'
         kwargs['fancybox'] = False
         kwargs['frameon'] = False
         kwargs['shadow'] = False
-        kwargs['bbox_to_anchor'] = (1, 0.5)
+        kwargs['bbox_to_anchor'] = (1., .5)
         return ax.legend(handles, labels, *args, **kwargs)
     else:
         kwargs['loc'] = loc

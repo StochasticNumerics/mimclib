@@ -382,11 +382,14 @@ class MIWProjSampler(object):
             projection_time = time.clock() - tStart
             # For now, only compute sampling time
             time_taken = sam_col.sampling_time + sam_col.pt_sampling_time
-            time_taken += assembly_time_1 + assembly_time_2 + projection_time
+            #time_taken += assembly_time_1 + assembly_time_2 + projection_time
+            print(sam_col.sampling_time, sam_col.pt_sampling_time,
+                  assembly_time_1, assembly_time_2, projection_time)
 
             total_time[sel_lvls] = time_taken * totalN_per_beta / np.sum(totalN_per_beta)
             total_work[sel_lvls] = work_per_sample * totalN_per_beta + \
                                    self.proj_sample_ratio * np.cumsum(totalN_per_beta) * np.cumsum(totalBasis_per_beta)
+            total_work[sel_lvls] += assembly_time_1 + assembly_time_2 + projection_time
             self.user_data.append(Bunch(alpha=alpha,
                                         max_cond=max_cond,
                                         matrix_size=BW.shape[1],

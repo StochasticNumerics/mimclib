@@ -159,7 +159,6 @@ class MyRun:
             max_dim = np.minimum(run.params.miproj_max_vars + run.params.min_dim,
                                  np.maximum(run.params.miproj_min_vars + run.params.min_dim,
                                             max_dim))
-        tStart = time.clock()
         if self.profit_calc is None:
             # Adaptive
             error = run.fn.Norm(run.last_itr.calcDeltaEl())
@@ -184,7 +183,7 @@ class MyRun:
         if len(lvls) >= 1:
             max_lvls = lvls.to_sparse_matrix().max(axis=0).todense()
             if max_lvls[0, 0] > run.params.miproj_max_lvl:
-                return  False # No more levels
+                return False  # No more levels
         return True
 
     def addExtraArguments(self, parser):

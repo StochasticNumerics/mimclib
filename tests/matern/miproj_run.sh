@@ -2,7 +2,7 @@
 
 # make
 # rm -f data.sql
-VERBOSE="-db True -mimc_verbose 0 "
+VERBOSE="-db False -mimc_verbose 1 "
 SEL_CMD="$1"
 EXAMPLE="$2"
 if [ -z "$EXAMPLE" ]; then
@@ -91,11 +91,11 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
 
         # all_cmds "-adapt" 2 $max_lvl $N -miproj_max_vars $N \
         #          -miproj_s_proj_sample_ratio 0. -miproj_set_maxadd 1 \
-        #          -miproj_set apriori-adapt -mimc_min_dim 1 $CMN  
+        #          -miproj_set apriori-adapt -mimc_min_dim 1 $CMN
 
         all_cmds "-adapt-time" 2 $max_lvl $N -miproj_max_vars $N \
                  -miproj_s_proj_sample_ratio 0. -miproj_set_maxadd 1 \
-                 -miproj_time True -miproj_set apriori-adapt -mimc_min_dim 1 $CMN  
+                 -miproj_time True -miproj_set apriori-adapt -mimc_min_dim 1 $CMN
 
         # all_cmds "-noproj" 2 $max_lvl $N -miproj_max_vars $N \
         #          -miproj_s_alpha $ALPHA -miproj_s_proj_sample_ratio 0. \

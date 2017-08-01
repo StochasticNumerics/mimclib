@@ -1,67 +1,10 @@
 {
-\nofooter \noheader \frame[noframenumbering]{\titlepage}
+\frame[noframenumbering]{\titlepage}
 }
 {
 \frame{\frametitle{Outline}\label{TableOfContents}
 \setcounter{tocdepth}{2}\tableofcontents}
 }
-
-\section{Library Overview}
-\begin{frame}{Vision (the ambitious version)}
-  \begin{itemize}
-  \item Provide an \textbf{easy to use}, \textbf{customizable} and
-    \textbf{extendable} open source library for UQ problems, both
-    forward and inverse.
-  \item Multilevel and Multi-index versions of Monte Carlo, Quasi Monte
-    Carlo, Stochastic collocation, Least square projection among
-    others.
-  \item Support parallel computation whenever possible.
-  \item Provide easy to use storage facility.
-  \item Provide easy to customize plotting facility (for common
-    plots).
-  \item Provide easy to run test cases.
-  \item Use \texttt{Python} for easier implementation of most parts of code
-    and use object code (\texttt{C++} or \texttt{FORTRAN}) for
-    computationally expensive parts.
-  \end{itemize}
-\end{frame}
-
-\begin{frame}{What has been done, \lib~\texttt{0.2.0.dev0}}
-  \begin{itemize}
-  \item Multilevel and Multi-index versions of Monte Carlo.
-  \item Provide easy to use storage facility in MySQL.
-  \item Provide easy to customize plotting facility (for common
-    plots).
-  \item Provide easy to run test cases.
-  \item Documentation is still in progress (these slides are part of it).
-  \item Interface is written with the other features in mind.
-  \end{itemize}
-\end{frame}
-
-\begin{frame}
-\centering
-\includegraphics[scale=0.4]{src/imgs/scheme}
-\end{frame}
-
-\begin{frame}{Why?}
-  \begin{itemize}
-  \item \texttt{Python}
-    \begin{itemize}
-    \item Open source. No need for licensing
-    \item An easy to use programming language. Familiar to
-      \texttt{MATLAB} users (Especially with \texttt{numpy} and \texttt{matplotlib})
-    \item Can call object code for computationally expensive parts,
-      e.g., samplers.
-    \end{itemize}
-    \item \texttt{MySQL}
-      \begin{itemize}
-      \item Relatively easy data modifications and querying.
-      \item Allows asynchronous access which is ideal for parallel computation.
-      \item Allows remote access.
-      \item Optimal storage and data querying.
-      \end{itemize}
-    \end{itemize}
-\end{frame}
 
 \section{Primer}
 \subsection{Problem}
@@ -198,7 +141,6 @@ The optimal work of MLMC is
 \end{cases}
 \end{equation*}
 }
-
 \uncover<5->{\textbf{Notice:} the cost exponentially increases with increasing $\alt<5->{\red{d}}{d}$.}
 }
 \end{frame}
@@ -227,25 +169,25 @@ where
     Main idea: variance reduction using cheaper approximations.
 \end{frame}
 
-\begin{frame}\frametitle{Optimal number of samples}
-Given the following estimates
-\begin{equation*}
-  V_\ell = \begin{cases} \var{\func_{0}} & \ell = 0, \\
-\var{\func_{{\ell}} - \func_{{\ell-1}}} & \ell \geq 1, \\
-\end{cases}
-\end{equation*}
-\begin{equation*}
-  W_\ell = \begin{cases} \text{Work of a single sample of } {\func_{0}} & \ell = 0, \\
-\text{Work of a single sample of } (\func_{{\ell}} - \func_{{\ell-1}}) & \ell \geq 1. \\
-\end{cases}
-\end{equation*}
-Then, using simple Lagrangian optimization of the total work subject to
-the variance constraint then, we can obtain the optimal number of samples
-\[ M_\ell \approx \op*{\frac{\theta
-      \tol}{\Phi^{-1}\op*{\frac{\epsilon + 1}{2}}}}^{-2}{
-    \sqrt{\frac{V_\ell}{W_\ell}}\left(\sum_{i=0}^L \sqrt{V_i
-        W_i}\right) },\quad \text{for }0\le \ell \le L. \]
-\end{frame}
+% \begin{frame}\frametitle{Optimal number of samples}
+% Given the following estimates
+% \begin{equation*}
+%   V_\ell = \begin{cases} \var{\func_{0}} & \ell = 0, \\
+% \var{\func_{{\ell}} - \func_{{\ell-1}}} & \ell \geq 1, \\
+% \end{cases}
+% \end{equation*}
+% \begin{equation*}
+%   W_\ell = \begin{cases} \text{Work of a single sample of } {\func_{0}} & \ell = 0, \\
+% \text{Work of a single sample of } (\func_{{\ell}} - \func_{{\ell-1}}) & \ell \geq 1. \\
+% \end{cases}
+% \end{equation*}
+% Then, using simple Lagrangian optimization of the total work subject to
+% the variance constraint then, we can obtain the optimal number of samples
+% \[ M_\ell \approx \op*{\frac{\theta
+%       \tol}{\Phi^{-1}\op*{\frac{\epsilon + 1}{2}}}}^{-2}{
+%     \sqrt{\frac{V_\ell}{W_\ell}}\left(\sum_{i=0}^L \sqrt{V_i
+%         W_i}\right) },\quad \text{for }0\le \ell \le L. \]
+% \end{frame}
 
 
 \againframe<3->{MCAssumptions}
@@ -270,21 +212,96 @@ the variance constraint then, we can obtain the optimal number of samples
   \end{itemize}
 \end{frame}
 
+\input{src/mimc}
 
-\section{Installation}
-
-\begin{frame}{\lib~showcase}
+\section{\lib}
+\subsection{Library Overview}
+\begin{frame}
   \begin{itemize}
-  \item Code required for basic MLMC run.
-  \item Show single run of \lib.
-  \item Show plots in pdf.
-  \item Show database in mysql.
+  \item These methods and others are common in UQ applications.
+  \item UQ research further requires \alert{systematic} studies of
+    deterministic or random runs.
+  \item \lib~is a library that was developed with that
+    objective in mind.
+  \item \lib~can also be used for non-academic purpose too.
   \end{itemize}
 \end{frame}
 
+\begin{frame}{Vision}
+  \begin{itemize}
+  \item Provide an \textbf{easy to use}, \textbf{customizable} and
+    \textbf{extendable} open source library for UQ problems, both
+    forward and inverse.
+  \item Multilevel and Multi-index versions of Monte Carlo, Quasi Monte
+    Carlo, Stochastic collocation, Least square projection among
+    others.
+  \item Support parallel computation whenever possible.
+  \item Provide easy to use storage facility.
+  \item Provide easy to customize plotting facility (for common
+    plots).
+  \item Provide some simple (and not so simple) test cases.
+  \item Use \texttt{Python} for easier implementation of most parts of code
+    and use object code (\texttt{C++} or \texttt{FORTRAN}) for
+    computationally expensive parts.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{What has been done, \lib~\texttt{0.2.0.dev0}}
+  \begin{itemize}
+  \item Multilevel and Multi-index versions of Monte Carlo, Stochastic
+    Collocation and Random Projection.
+  \item Provide easy to use storage facility in \texttt{SQLite} and \texttt{MySQL}.
+  \item Provide easy to customize plotting facility using \texttt{matplotlib} (for common
+    plots).
+  \item Provide easy to run test cases.
+  \item Documentation is still in progress (these slides are part of
+    it).
+  \item MPI friendly, but parallelization has to be implemented by
+    user.
+  \item Interface is written with the other features in mind.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+\centering
+\includegraphics[scale=0.4]{src/imgs/scheme}
+\end{frame}
+
+\begin{frame}{Why?}
+  \begin{itemize}
+  \item \texttt{Python}
+    \begin{itemize}
+    \item Open source. No need for licensing
+    \item An easy to use programming language. Familiar to
+      \texttt{MATLAB} users (Especially with \texttt{numpy} and \texttt{matplotlib})
+    \item Can call object code for computationally expensive parts,
+      e.g., samplers.
+    \end{itemize}
+    \item Database engine: \texttt{MySQL} and \texttt{SQLite}
+      \begin{itemize}
+      \item Relatively easy data modifications and querying.
+      \item Allows asynchronous access which is ideal for parallel computation.
+      \item Allows remote access.
+      \item Optimal storage and data querying.
+      \item No need to worry about it for average user.
+      \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\subsection{Installation}
+
+% \begin{frame}{\lib~showcase}
+%   \begin{itemize}
+%   \item Code required for basic MLMC run.
+%   \item Show single run of \lib.
+%   \item Show plots in pdf.
+%   \item Show database in mysql.
+%   \end{itemize}
+% \end{frame}
+
 \begin{frame}[fragile]{Installation}
 \begin{itemize}
-  \item Prerequisites: \texttt{gcc} (supporting \texttt{c++11}), \texttt{python2.7}, \texttt{pip}, \texttt{mysql-server}, \texttt{mysql-client}.
+  \item Prerequisites: \texttt{gcc} (supporting \texttt{c++11}), \texttt{python2.7}, \texttt{pip}.
   \item First step:
 \begin{verbatim}
 > git clone \
@@ -292,128 +309,164 @@ the variance constraint then, we can obtain the optimal number of samples
 > cd mimclib
 > make pip
 \end{verbatim}
-  \item Note: to update to latest version
-\begin{verbatim}
-> git pull
-\end{verbatim}
-\item Done! Sort of.
+    Or just google: ``mimclib github''
+%   \item Note: to update to latest version
+% \begin{verbatim}
+% > git pull
+% \end{verbatim}
+  \item Done!.
+  \item A bit more complicated to install \texttt{MySQL}. Not for the
+    faint of heart but very convenient if you are planning to run
+    thousands of simulations on a cluster.
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Setting up the database}
-  \begin{itemize}
-  \item Make sure \texttt{mysql-server}, \texttt{mysql-client}, and
-    \texttt{libmysqlclient-dev} are installed on your data server.
-  \item Create \texttt{mimclib} database on data server
+% \begin{frame}[fragile]{Setting up the database}
+%   \begin{itemize}
+%   \item Make sure \texttt{mysql-server}, \texttt{mysql-client}, and
+%     \texttt{libmysqlclient-dev} are installed on your data server.
+%   \item Create \texttt{mimclib} database on data server
+% \begin{verbatim}
+% > python -c 'from mimclib.db import MySQLDBConn ; \
+%          print MySQLDBConn.DBCreationScript();' \
+%          | mysql -u root -p
+% \end{verbatim}
+% \item Create database user for \lib~(hint: you can use local username)
+% \begin{verbatim}
+%      > mysql -u root -p
+% mysql> CREATE USER 'USER'@'%' \
+%               IDENTIFIED BY 'password';
+% mysql> GRANT ALL PRIVILEGES ON mimc.* TO \
+%              'USER'@'%' WITH GRANT OPTION;
+% \end{verbatim}
+%   \end{itemize}
+% \end{frame}
+
+% \begin{frame}[fragile]{Other useful \texttt{MySQL} commands}
+%   \begin{itemize}
+%   \item Change password
+% \begin{verbatim}
+%      > mysql -u USER -p
+% mysql> SET PASSWORD FOR 'USER'@'%' \
+%        = PASSWORD('newpassword');
+% \end{verbatim}
+%   \end{itemize}
+% \end{frame}
+
+% \begin{frame}{MIMC Database}
+% \centering
+% \includegraphics[scale=0.6]{src/imgs/db_schema}
+% \end{frame}
+
+% \begin{frame}[fragile]{Installation for Debian/Ubuntu}
+% \begin{itemize}
+%   \item
+% \begin{verbatim}
+% > git clone \
+%       https://github.com/StochasticNumerics/mimclib.git
+% > cd mimclib
+% > ./mimc_install.sh
+% \end{verbatim}
+%   \item Updates all packages on the system
+%   \item Installs all prerequisites
+%   \item Clones and installs the library
+%   \item Creates a database with the current user and no password.
+%   \item Standard GBM Example is ready to run.
+% \end{itemize}
+% \end{frame}
+
+\begin{frame}[fragile]{Minimal Sampler}
 \begin{verbatim}
-> python -c 'from mimclib.db import MySQLDBConn ; \
-         print MySQLDBConn.DBCreationScript();' \
-         | mysql -u root -p
+def mySampleQoI(run, inds, M):
+    #  run: is a reference to current run
+    # inds: is a dxN array that specifies the
+    #        discretization-level along each dimension
+    #    M: number of samples
+
+    return solves, t
+    # solves: and NxM array that returns the samples
+    #          for each discretization
+    #      t: time taken to generate these samples.
 \end{verbatim}
-\item Create database user for \lib~(hint: you can use local username)
-\begin{verbatim}
-     > mysql -u root -p
-mysql> CREATE USER 'USER'@'%' \
-              IDENTIFIED BY 'password';
-mysql> GRANT ALL PRIVILEGES ON mimc.* TO \
-             'USER'@'%' WITH GRANT OPTION;
-\end{verbatim}
-  \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Other useful \texttt{MySQL} commands}
-  \begin{itemize}
-  \item Change password
-\begin{verbatim}
-     > mysql -u USER -p
-mysql> SET PASSWORD FOR 'USER'@'%' \
-       = PASSWORD('newpassword');
-\end{verbatim}
-  \end{itemize}
+\subsection{Example output}
+\begin{frame}{Errors, customised}\centering
+  \includegraphics[page=1, scale=0.5]{src/imgs/mckean}
 \end{frame}
 
-\begin{frame}{MIMC Database}
-\centering
-\includegraphics[scale=0.6]{src/imgs/db_schema}
-\end{frame}
-
-\begin{frame}[fragile]{Installation for Debian/Ubuntu}
-\begin{itemize}
-  \item
-\begin{verbatim}
-> git clone \
-      https://github.com/StochasticNumerics/mimclib.git
-> cd mimclib
-> ./mimc_install.sh
-\end{verbatim}
-  \item Updates all packages on the system
-  \item Installs all prerequisites
-  \item Clones and installs the library
-  \item Creates a database with the current user and no password.
-  \item Standard GBM Example is ready to run.
-\end{itemize}
+\begin{frame}{PP-plot}\centering
+  \includegraphics[page=2, scale=0.5]{src/imgs/mckean}
 \end{frame}
 
 
-\section{GBM Example}
-\begin{frame}{Problem setup: Geometric Brownian Motion}
-Given $S(0), \mu$ and $\sigma$, define
-  \[
-    \di S(t) = \mu S(t) \di{t} + \sigma S(t) \di{W}(t)
-\]
-Euler-Maruyama discretization
-\[\aligned
-  S_{n+1} &= S_{n} + \mu  S_n \Delta t + \sigma S_n \Delta W_n\\
-&= S_{n} \op*{1 + \mu  \Delta t + \sigma \Delta W_n}
-\endaligned\]
-
-We can find (using It\^o integral and a log transformation)
-\[\aligned
-\E{S(t)} &= S(0) e^{\mu t}\\
-\var{S(t)} &= \op*{S(0)}^2 e^{2 \mu t} \op*{e^{\sigma^2 t} - 1}
-\endaligned\]
+\begin{frame}{Variance convergence}\centering
+  \includegraphics[page=9, scale=0.5]{src/imgs/mckean}
 \end{frame}
 
-\begin{frame}<2>{Numerical ex.: PDE with random coeffs.,
-    \myref{\tiny [H-ANTT, 2015]}}
-   \fontsize{9pt}{7.2}\selectfont
-   We solve a 3D elliptic PDE with random coefficient and forcing term
-\[ \aligned
-    - \nabla \cdot(e^{\kappa(\vec x,\vec y)}\,\nabla u(\vec x,\vec y)) = 1 &\quad \mbox{in}\quad \mathcal{D} = [0,1]^3  \\
-    u(\vec x,\vec y) \,=\, 0 								& \quad
-    \mbox{on}\quad \partial \mathcal{D},
-\endaligned
-\]
 
-where
-\[ \kappa(\vec x, \vec y) = {\sum_{k=0}^{n} \blue{y_{k}} \sqrt{3}\exp(-k) \Psi_{k}(\vec x) }.
-\]
-Here \blue{$\{y_{k}\}_{k=1}^n$} are
-\blue{i.i.d. $\mathcal U[-1,1]$}. Moreover, $\Psi_{k}$ is a
-tensorizable cosine/sine basis. Quantity of interest is:
-\[\func = \left( 2 \pi \sigma^2 \right)^{-\frac{3}{2}} \int_\mathcal{D} \exp
-\left( - \frac{ \| \vec x - \vec x_0 \|^2_2}{2 \sigma^2} \right)
-u(\vec x) d\vec x, \]
-for $\vec x_0 \in \mathcal D$ and $\sigma >0$.
-
-\pause \medskip Using 2\textsuperscript{nd} order Finite Difference Method with GMRES
-linear solver, for this problem we have
-\textcolor{darkred}{$\gamma \approx 1$}, \textcolor{darkred}{$w = 2$}
-(\textcolor{darkred}{isotropic case}).
+\begin{frame}{Running time}\centering
+  \includegraphics[page=5, scale=0.5]{src/imgs/mckean}
 \end{frame}
 
-\begin{frame}{The end}
-  \begin{itemize}
-  \item Slides can be found on GitHub under {``docs''}
-    \url{https://github.com/StochasticNumerics/mimclib}.
-    \item You can post questions in the ``Issues'' page.
-  \item Next time
-    \begin{itemize}
-    \item Next, next time: Multi-index Monte Carlo applied on PDEs in
-      3D.
-    \end{itemize}
-  \end{itemize}
-\end{frame}
+% \begin{frame}{Problem setup: Geometric Brownian Motion}
+% Given $S(0), \mu$ and $\sigma$, define
+%   \[
+%     \di S(t) = \mu S(t) \di{t} + \sigma S(t) \di{W}(t)
+% \]
+% Euler-Maruyama discretization
+% \[\aligned
+%   S_{n+1} &= S_{n} + \mu  S_n \Delta t + \sigma S_n \Delta W_n\\
+% &= S_{n} \op*{1 + \mu  \Delta t + \sigma \Delta W_n}
+% \endaligned\]
+
+% We can find (using It\^o integral and a log transformation)
+% \[\aligned
+% \E{S(t)} &= S(0) e^{\mu t}\\
+% \var{S(t)} &= \op*{S(0)}^2 e^{2 \mu t} \op*{e^{\sigma^2 t} - 1}
+% \endaligned\]
+% \end{frame}
+
+% \begin{frame}<2>{Numerical ex.: PDE with random coeffs.,
+%     \myref{\tiny [H-ANTT, 2015]}}
+%    \fontsize{9pt}{7.2}\selectfont
+%    We solve a 3D elliptic PDE with random coefficient and forcing term
+% \[ \aligned
+%     - \nabla \cdot(e^{\kappa(\vec x,\vec y)}\,\nabla u(\vec x,\vec y)) = 1 &\quad \mbox{in}\quad \mathcal{D} = [0,1]^3  \\
+%     u(\vec x,\vec y) \,=\, 0 								& \quad
+%     \mbox{on}\quad \partial \mathcal{D},
+% \endaligned
+% \]
+
+% where
+% \[ \kappa(\vec x, \vec y) = {\sum_{k=0}^{n} \blue{y_{k}} \sqrt{3}\exp(-k) \Psi_{k}(\vec x) }.
+% \]
+% Here \blue{$\{y_{k}\}_{k=1}^n$} are
+% \blue{i.i.d. $\mathcal U[-1,1]$}. Moreover, $\Psi_{k}$ is a
+% tensorizable cosine/sine basis. Quantity of interest is:
+% \[\func = \left( 2 \pi \sigma^2 \right)^{-\frac{3}{2}} \int_\mathcal{D} \exp
+% \left( - \frac{ \| \vec x - \vec x_0 \|^2_2}{2 \sigma^2} \right)
+% u(\vec x) d\vec x, \]
+% for $\vec x_0 \in \mathcal D$ and $\sigma >0$.
+
+% \pause \medskip Using 2\textsuperscript{nd} order Finite Difference Method with GMRES
+% linear solver, for this problem we have
+% \textcolor{darkred}{$\gamma \approx 1$}, \textcolor{darkred}{$w = 2$}
+% (\textcolor{darkred}{isotropic case}).
+% \end{frame}
+
+% \begin{frame}{The end}
+%   \begin{itemize}
+%   \item Slides can be found on GitHub under {``docs''}
+%     \url{https://github.com/StochasticNumerics/mimclib}.
+%     \item You can post questions in the ``Issues'' page.
+%   \item Next time
+%     \begin{itemize}
+%     \item Next, next time: Multi-index Monte Carlo applied on PDEs in
+%       3D.
+%     \end{itemize}
+%   \end{itemize}
+% \end{frame}
 
 % \begin{frame}[fragile]{A typical python example for a single MLMC run}
 % \begin{verbatim}
@@ -575,9 +628,20 @@ linear solver, for this problem we have
 % \end{verbatim}
 % \end{frame}
 
-% \begin{frame}{\lib\ needs your help!}
-% Questions?
-% \end{frame}
+\begin{frame}{Conclusions}
+  \begin{itemize}
+  \item Research in UQ methods is booming. \lib~can
+    provide you with a base to start from.
+  \item \lib is still growing, rapidly, to adapt to
+    different applications and different samplers.
+  \item If you feel that \lib~is missing a feature, fork \lib and
+    implement it!
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{\lib\ needs your help!}
+Questions?
+\end{frame}
 
 %%% Local Variables:
 %%% mode: latex
