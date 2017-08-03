@@ -268,23 +268,23 @@ class MIMCDatabase(object):
                         [TOL, tag, _pickle(params), _pickle(fn, dump=dill.dump), comment])
             return cur.getLastRowID()
 
-    def markRunDone(self, run_id, flag, totalTime=None, comment=''):
+    def markRunDone(self, run_id, flag, total_time=None, comment=''):
         with self.connect() as cur:
             cur.execute('''UPDATE tbl_runs SET done_flag=?, totalTime=?,
             comment = {}
             WHERE run_id=?'''.format('CONCAT(comment,  ?)' if self.engine=='mysql' else
-            'comment || ?'), [flag, totalTime, comment, run_id])
+            'comment || ?'), [flag, total_time, comment, run_id])
 
-    def markRunSuccessful(self, run_id, totalTime=None, comment=''):
-        self.markRunDone(run_id, flag=1, comment=comment, totalTime=totalTime)
+    def markRunSuccessful(self, run_id, total_time=None, comment=''):
+        self.markRunDone(run_id, flag=1, comment=comment, total_time=total_time)
 
-    def markRunFailed(self, run_id, totalTime=None, comment='', add_exception=True):
+    def markRunFailed(self, run_id, total_time=None, comment='', add_exception=True):
         if add_exception:
             import sys
             exc_type, exc_obj, exc_tb = sys.exc_info()
             if exc_obj is not None:
                 comment += "{}: {}".format(exc_type.__name__, exc_obj)
-        self.markRunDone(run_id, flag=0, comment=comment, totalTime=totalTime)
+        self.markRunDone(run_id, flag=0, comment=comment, total_time=total_time)
 
     def writeRunData(self, run_id, mimc_run, iteration_idx):
         base = 0
@@ -307,7 +307,7 @@ class MIMCDatabase(object):
 INSERT INTO tbl_iters(creation_date, totalTime, TOL, bias, stat_error,
 exact_error, Qparams, userdata, iteration_idx, run_id)
 VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                        _nan2none([iteration.totalTime, iteration.TOL,
+                        _nan2none([iteration.total_time, iteration.TOL,
                                    iteration.bias, iteration.stat_error,
                                    iteration.exact_error])
                         +[_pickle(iteration.Q), _pickle(iteration.userdata),
@@ -383,7 +383,7 @@ ORDER BY dr.run_id, dr.iteration_idx
             run.db_data.finalTOL = run_data[2]
             run.db_data.comment = run_data[3]
             run.db_data.tag = run_data[5]
-            run.db_data.totalTime = run_data[6]
+            run.db_data.total_time = run_data[6]
             run.db_data.run_id = run_data[0]
 
             run.setFunctions(**_unpickle(run_data[4], load=dill.load))
@@ -401,10 +401,10 @@ ORDER BY dr.run_id, dr.iteration_idx
                 iteration.TOL = data[2]
                 iteration.db_data = mimc.Bunch()
                 iteration.db_data.iter_id = iter_id
-                iteration.db_data.user_data = _unpickle(data[8])
+                iteration.userdata = _unpickle(data[8])
                 iteration.db_data.creation_date = data[3]
                 iteration.db_data.iter_idx = data[9]
-                iteration.totalTime = data[4]
+                iteration.total_time = data[4]
                 iteration.bias = _none2nan(data[5])
                 iteration.stat_error = _none2nan(data[6])
                 iteration.exact_error = _none2nan(data[10])

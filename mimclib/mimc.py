@@ -22,19 +22,20 @@ def public(sym):
     return sym
 
 class Timer():
-    def __init__(self):
+    def __init__(self, clock=time.clock):
         self._tics = []
+        self._clock = clock
         self.tic()
 
     def tic(self):
-        self._tics.append(time.clock())
+        self._tics.append(self._clock())
 
     def toc(self, pop=True):
         assert(len(self._tics) > 0)
         if pop:
-            return time.clock()-self._tics.pop()
+            return self._clock()-self._tics.pop()
         else:
-            return time.clock()-self._tics[-1]
+            return self._clock()-self._tics[-1]
 
     def ptoc(self, msg='Time since last tic: {:.4f} sec.', pop=False):
         assert(len(self._tics) > 0)
@@ -164,7 +165,7 @@ class MIMCItrData(object):
         self.stat_error = np.inf     # Sampling error (based on M)
         self.exact_error = np.nan    # Sampling error (based on M)
         self.TOL = None              # Target tolerance
-        self.totalTime = None
+        self.total_time = None
         self.Q = None
         self.Vl_estimate = np.zeros(0)
         self._lvls_count = 0
@@ -185,7 +186,7 @@ class MIMCItrData(object):
         ret.M = self.M.copy()
         ret.bias = self.bias
         ret.stat_error = self.stat_error
-        ret.totalTime = self.totalTime
+        ret.total_time = self.total_time
         ret.TOL = self.TOL
         ret.Q = copy.copy(self.Q)
         ret.Vl_estimate = self.Vl_estimate.copy() if self.Vl_estimate is not None else None
@@ -479,7 +480,7 @@ class MIMCRun(object):
 
     @property
     def iter_total_times(self):
-        return np.cumsum([itr.totalTime for itr in self.iters])
+        return np.cumsum([itr.total_time for itr in self.iters])
 
     @property
     def iter_calc_total_times(self):
@@ -538,7 +539,7 @@ supported with a given work model")
         # fnSampleLvl(moments, mods, inds, M):
         #    Returns M, array: M sums of mods*inds, and total
         #    (linear) time it took to compute them
-        # fnItrDone(i, TOLs, totalTime): Called at the end of iteration
+        # fnItrDone(i, TOLs, total_time): Called at the end of iteration
         #    i out of TOLs
         # fnWorkModel(lvls): Returns work estimate of lvls
         # fnHierarchy(lvls): Returns associated hierarchy of lvls
@@ -673,17 +674,21 @@ Not needed if fnHierarchy is provided.")
     def output(self, verbose):
         output = ''
         if verbose >= VERBOSE_INFO:
-            output += "Eg={}\n\
-Bias={:.12e}\nStatErr={:.12e}\
-\nTotalErrEst={:.12e} | {:.12e}\
-\nTotalWork={:.12e}\nTotalTime={:.12e}\n".format(str(self.last_itr.calcEg()),
-                                               self.bias, self.stat_error,
-                                               self.totalErrorEst(),
-                                               self.last_itr.TOL, self.last_itr.calcTotalWork(),
-                                               self.last_itr.calcTotalTime())
+            output += '''Eg             = {}
+Bias           = {:.12g}
+Stat. err      = {:.12g}
+Error est.     = {:.12g} | {:.12g}
+Iteration Work = {:.12g}
+Iteration Time = {:.12g}
+TotalTime      = {:.12g}
+max_lvl        = {}
+'''.format(str(self.last_itr.calcEg()), self.bias, self.stat_error,
+           self.totalErrorEst(), self.last_itr.TOL,
+           self.last_itr.calcTotalWork(),
+           self.last_itr.total_time,
+           self.iter_total_times[-1],
+           self.last_itr._lvls.to_sparse_matrix().max(axis=0).todense())
 
-            output += "max_lvl = {}\n".format(self.last_itr._lvls.
-                                              to_sparse_matrix().max(axis=0).todense())
         if verbose < VERBOSE_DEBUG:
             print(output, end="")
             return
@@ -1027,7 +1032,7 @@ estimate optimal number of levels"
                     self.last_itr.zero_samples()
 
                 samples_added = self._genSamples(todoM) or samples_added
-                self.last_itr.totalTime = timer.toc()
+                self.last_itr.total_time = timer.toc()
                 self.output(verbose=self.params.verbose)
                 self.print_info("------------------------------------------------")
                 if samples_added:
@@ -1058,7 +1063,7 @@ estimate optimal number of levels"
         new_itr.stat_error = itr.stat_error
         new_itr.exact_error = itr.exact_error
         new_itr.TOL = itr.exact_error
-        new_itr.totalTime = itr.exact_error
+        new_itr.total_time = itr.exact_error
         new_itr.Q = itr.Q
         if hasattr(itr, "db_data"):
             new_itr.db_data = itr.db_data

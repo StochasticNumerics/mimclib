@@ -11,11 +11,11 @@ EST_CMD="OPENBLAS_NUM_THREADS=40 python miproj_esterr.py "
 #          -verbose True -all_itr True
 # done
 
-for N in 3 4 6
+for N in 2 3 4 6
 do
-    echo -n $EST_CMD $DB_CONN -db_tag "sim-sf-kink-2-$N%" "&& " 
+    echo $EST_CMD $DB_CONN -db_tag "sf-kink-2-$N%" "&& "
     echo ./plot_miproj_paper.py $DB_CONN \
-         -db_tag sim-sf-kink-2-$N-adapt -o output/poisson-kink-$N \
+         -db_tag sf-kink-2-$N-tdfit -o output/poisson-kink-$N-all \
          -formats pdf -relative False \
          -verbose True -all_itr True # -qoi_exact_tag sf-kink-2-$N-adapt
 done
