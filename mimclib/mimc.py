@@ -427,7 +427,6 @@ class MIMCRun(object):
     def __init__(self, **kwargs):
         self.fn = Bunch(# Hierarchy=None, ExtendLvls=None,
                         # WorkModel=None, SampleAll=None,
-                        # ItrDone=None,
                         Norm=np.abs)
         self.params = Bunch(**kwargs)
         self.iters = []
@@ -504,6 +503,11 @@ class MIMCRun(object):
                                                              self.params.h0inv,
                                                              self.params.beta)
 
+        if not hasattr(self.fn, "EstimateBias"):
+            self.fn.EstimateBias = (self._estimateBayesianBias
+                                    if self.params.bayesian
+                                    else self._estimateBias)
+
         if self.params.dynamic_lvls and not hasattr(self.fn, "WorkModel"):
             raise NotImplementedError("Bayesian parameter fitting is only \
 supported with a given work model")
@@ -526,8 +530,9 @@ supported with a given work model")
                 raise ValueError("No default ExtendLvls for ")
 
             profCalc = setutil.TDFTProfCalculator(weights)
-            self.fn.ExtendLvls = lambda lvls: extend_prof_lvls(lvls, profCalc,
-                                                               self.params.min_lvl)
+            self.fn.ExtendLvls = lambda s=self: extend_prof_lvls(s,
+                                                                 profCalc,
+                                                                 s.params.min_lvl)
 
     def setFunctions(self, **kwargs):
         # fnSampleLvl(moments, mods, inds, M):
@@ -541,7 +546,8 @@ supported with a given work model")
             kk = k[2:] if k.startswith('fn') else k
             if kk not in ["SampleLvl", "SampleAll", "ExtendLvls",
                           "ItrStart", "ItrDone", "WorkModel",
-                          "Hierarchy", "SampleQoI", "Norm"]:
+                          "EstimateBias", "Hierarchy", "SampleQoI",
+                          "Norm"]:
                 raise KeyError("Invalid function name `{}`".format(kk))
             if kk == "SampleLvl":
                 if kwargs[k] is not None:
@@ -691,35 +697,30 @@ Bias={:.12e}\nStatErr={:.12e}\
         return self.fn.Norm(np.array([x]))[0]
 
     def _estimateBias(self):
-        if self.last_itr.lvls_count <= 1:
-            # Cannot estimate bias with only one level
-            return np.inf
-        if not self.params.bayesian:
-            El = self.last_itr.calcEl()
-            El[self.last_itr.active_lvls == 0] = np.inf
-            bias_calc = self.params.bias_calc.lower()
-            if bias_calc == 'new':
-                El_norm = np.empty(self.last_itr.lvls_count)
-                El_norm.fill(np.inf)
-                act = self.last_itr.active_lvls > 0
-                El_norm[act] = self.fn.Norm(El[act])
-                bias = self.last_itr.get_lvls().estimate_bias(El_norm)
-            elif bias_calc == 'bnd':
-                El_bnd = El[self.last_itr.get_lvls().is_boundary()]
-                if np.any([e is None for e in El_bnd]):
-                    bias = np.inf
-                else:
-                    bias = self.fnNorm1(np.sum(El_bnd))
-            elif bias_calc == 'abs-bnd':
-                El_norm = np.empty(len(self.last_itr.lvls_count))
-                El_norm.fill(np.inf)
-                act = self.last_itr.active_lvls >= 0
-                El_bnd = El[self.last_itr.get_lvls().is_boundary()]
-                bias = np.sum(El_norm[El_bnd])
+        El = self.last_itr.calcEl()
+        El[self.last_itr.active_lvls == 0] = np.inf
+        bias_calc = self.params.bias_calc.lower()
+        if bias_calc == 'new':
+            El_norm = np.empty(self.last_itr.lvls_count)
+            El_norm.fill(np.inf)
+            act = self.last_itr.active_lvls > 0
+            El_norm[act] = self.fn.Norm(El[act])
+            bias = self.last_itr.get_lvls().estimate_bias(El_norm)
+        elif bias_calc == 'bnd':
+            El_bnd = El[self.last_itr.get_lvls().is_boundary()]
+            if np.any([e is None for e in El_bnd]):
+                bias = np.inf
             else:
-                raise ValueError("bias_calc")
-            return bias
-        return self._estimateBayesianBias()
+                bias = self.fnNorm1(np.sum(El_bnd))
+        elif bias_calc == 'abs-bnd':
+            El_norm = np.empty(len(self.last_itr.lvls_count))
+            El_norm.fill(np.inf)
+            act = self.last_itr.active_lvls >= 0
+            El_bnd = El[self.last_itr.get_lvls().is_boundary()]
+            bias = np.sum(El_norm[El_bnd])
+        else:
+            raise ValueError("bias_calc")
+        return bias
 
     def estimateMonteCarloSampleCount(self, TOL):
         # TODO: Should only be based on base_level
@@ -840,7 +841,7 @@ estimate optimal number of levels"
         self.iters[-1].Vl_estimate = np.empty(len(self.last_itr.get_lvls()))
         self.iters[-1].Vl_estimate.fill(np.nan)
         self.iters[-1].stat_error = np.nan
-        self.iters[-1].bias = self._estimateBias()
+        self.iters[-1].bias = self.fn.EstimateBias()
         if self.iters[-1].moments >= 2:
             act = self.last_itr.active_lvls >= 0
             if self.params.bayesian:
@@ -858,11 +859,11 @@ estimate optimal number of levels"
         if new_lvls is not None:
             self.last_itr.lvls_add_from_list(new_lvls)
         else:
-            retVal = self.fn.ExtendLvls(lvls=self.last_itr.get_lvls())
+            retVal = self.fn.ExtendLvls()  # TODO: only add levels if bias is not satisfied
         self.last_itr._levels_added()
         self.all_itr._levels_added()
         if not retVal or prev == self.last_itr.lvls_count:
-            return None
+            return self.last_itr.M[:prev]  # No more levels
 
         newTodoM = self.params.M0
         if self.params.M0_coeff > 0:
@@ -956,15 +957,15 @@ estimate optimal number of levels"
 
         def less(a, b, rel_tol=1e-09, abs_tol=0.0):
             return a-b <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
-        add_new_iteration = True
         for TOL in TOLs:
             self.print_info("TOL", TOL)
             timer.tic()
             samples_added = False
+            add_new_iteration = True
             while True:
                 # Skip adding an iteration if the previous one is empty
                 timer.tic()
-                ## Add new iteration
+                # Add new iteration
                 if len(self.iters) == 0:
                     self.iters.append(MIMCItrData(parent=self,
                                                   min_dim=self.params.min_dim,
@@ -980,7 +981,6 @@ estimate optimal number of levels"
                         self._all_itr = self.last_itr.next_itr()
                 elif add_new_iteration:
                     self.iters.append(self.last_itr.next_itr())
-
                 add_new_iteration = False
                 self.last_itr.TOL = TOL
 
@@ -1000,9 +1000,7 @@ estimate optimal number of levels"
                 self.Q.theta = self._calcTheta(TOL, self.bias)
 
                 # Added levels if not bayesian
-                if self.last_itr.lvls_count == 0 or \
-                   (not self.params.dynamic_lvls and
-                    self.bias > (1 - self.params.theta) * TOL):
+                if not self.params.bayesian:
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
                     newTodoM = self._extendLevels()
@@ -1017,9 +1015,10 @@ estimate optimal number of levels"
 
                 self._check_levels()
                 todoM = _calcTheoryM(TOL, self.Q.theta,
-                                          self.Vl_estimate,
-                                          self.last_itr.calcWl(),
-                                          self.last_itr.active_lvls, Ca=self._Ca)
+                                     self.Vl_estimate,
+                                     self.last_itr.calcWl(),
+                                     self.last_itr.active_lvls,
+                                     Ca=self._Ca)
                 self.print_debug("theta", self.Q.theta)
                 self.print_debug("Wl: ", self.Wl_estimate)
                 self.print_debug("Vl: ", self.Vl_estimate)
@@ -1033,8 +1032,8 @@ estimate optimal number of levels"
                 self.print_info("------------------------------------------------")
                 if samples_added:
                     if self.fn.ItrDone is not None:
-                        self.fn.ItrDone()
-                    add_new_iteration = True
+                        # ItrDone should return true if a new iteration must be added
+                        add_new_iteration = self.fn.ItrDone()
 
                 if self.params.dynamic_lvls or self.totalErrorEst() < TOL \
                    or (TOL < finalTOL and self.totalErrorEst() < finalTOL):
