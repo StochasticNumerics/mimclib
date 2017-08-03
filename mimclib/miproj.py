@@ -262,8 +262,9 @@ class MIWProjSampler(object):
 
         # Add previous times and works from previous iteration
         from .mimc import Bunch
+        timer = mimc.Timer(clock=time.time)
         for alpha, ind in self.alpha_dict.iteritems():
-            tStart = time.clock()
+            timer.tic()
             sam_col = self.prev_samples[ind]
             sel_lvls = np.nonzero(self.alpha_ind == ind)[0]
             work_per_sample = self.fnWorkModel(setutil.VarSizeList([alpha]))[0]
@@ -274,9 +275,6 @@ class MIWProjSampler(object):
 
             beta_indset = lvls.sublist(sel_lvls[sam_col.beta_count:],
                                        d_start=self.d, min_dim=0)
-
-            # TODO: This assumes that beta_indset is ordered (in 1D)
-            #new_basis = setutil.VarSizeList()
             for i, beta in enumerate(beta_indset):
                 new_b = self.fnBasisFromLvl(beta)
                 if isinstance(new_b, setutil.VarSizeList):
@@ -319,22 +317,22 @@ class MIWProjSampler(object):
                 X, N_done = self.fnSamplePoints(N_todo, sam_col.basis, sam_col.min_dim)
                 N_done[:len(sam_col.N_per_basis)] += sam_col.N_per_basis
                 sam_col.N_per_basis = N_done
-                sam_col.pt_sampling_time += time.clock() - tStart
+                sam_col.pt_sampling_time += timer.toc()
 
-                tStart = time.clock()
+                timer.tic()
                 sam_col.add_points(fnSample, sub_alphas, X)
-                sam_col.sampling_time += time.clock() - tStart
+                sam_col.sampling_time += timer.toc()
             else:
-                sam_col.pt_sampling_time += time.clock() - tStart
+                sam_col.pt_sampling_time += timer.toc()
 
-            tStart = time.clock()
+            timer.tic()
             # sam_col.basis_values.re size(len(sam_col.X), len(sam_col.basis))
             # TODO: should only compute new basis_values
             basis_values = TensorExpansion.evaluate_basis(
                 self.fnBasis, sam_col.basis, sam_col.X)
             W = self.fnWeightPoints(sam_col.X, basis_values)
-            assembly_time_1 = time.clock() - tStart
-            tStart = time.clock()
+            assembly_time_1 = timer.toc()
+            timer.tic()
             from scipy.linalg import solve
             from scipy.sparse.linalg import gmres, LinearOperator
             BW = np.sqrt(W)[:, None] * basis_values
@@ -344,7 +342,7 @@ class MIWProjSampler(object):
                 G = LinearOperator((BW.shape[1], BW.shape[1]),
                                    matvec=lambda v: np.dot(BW.transpose(), np.dot(BW, v)),
                                    rmatvec=lambda v: np.dot(BW, np.dot(BW.transpose(), v)))
-            assembly_time_2 = time.clock() - tStart
+            assembly_time_2 = timer.toc()
 
             max_cond = np.nan
             # # This following operation is only needed for diagnosis purposes
@@ -354,7 +352,7 @@ class MIWProjSampler(object):
             # except:
             #     pass
 
-            tStart = time.clock()
+            timer.tic()
             for i in xrange(0, len(sub_alphas)):
                 # Add each element separately
                 R = np.dot(basis_values.transpose(), (sam_col.Y[i] * W))
@@ -379,16 +377,17 @@ class MIWProjSampler(object):
                     psums_fine[sel_lvls, 0] = projections
                 else:
                     psums_delta[sel_lvls, 0] += projections*mods[i]
-            projection_time = time.clock() - tStart
+            projection_time = timer.toc()
             # For now, only compute sampling time
             time_taken = sam_col.sampling_time + sam_col.pt_sampling_time
-            time_taken += assembly_time_1 + assembly_time_2 + projection_time
+            #time_taken += assembly_time_1 + assembly_time_2 + projection_time
 
             total_time[sel_lvls] = time_taken * totalN_per_beta / np.sum(totalN_per_beta)
             total_work[sel_lvls] = work_per_sample * totalN_per_beta + \
                                    self.proj_sample_ratio * np.cumsum(totalN_per_beta) * np.cumsum(totalBasis_per_beta)
             self.user_data.append(Bunch(alpha=alpha,
                                         max_cond=max_cond,
+                                        work_per_sample=work_per_sample,
                                         matrix_size=BW.shape[1],
                                         todoN_per_beta=todoN_per_beta,
                                         sampling_time=sam_col.sampling_time,
@@ -396,15 +395,6 @@ class MIWProjSampler(object):
                                         assembly_time_1=assembly_time_1,
                                         assembly_time_2=assembly_time_2,
                                         projection_time=projection_time))
-            ## WARNING: Not accounting for projection time!!!
-            # print("{}, {}, {}, {}, {:.12f}, {:.12f}, {:.12f}, {:.12f}, {:.12f}"
-            #       .format(len(sam_col.basis), alpha[0], work_per_sample,
-            #               np.sum(totalN_per_beta),
-            #               sampling_time,
-            #               pt_sampling_time,
-            #               assembly_time_1,
-            #               assembly_time_2,
-            #               projection_time))
         return M, psums_delta, psums_fine, total_time, total_work
 
     @staticmethod

@@ -14,9 +14,30 @@ from matplotlib.ticker import MaxNLocator
 
 __all__ = []
 
+def unique_rows(A, return_index=False, return_inverse=False):
+    """
+    Similar to MATLAB's unique(A, 'rows'), this returns B, I, J
+    where B is the unique rows of A and I and J satisfy
+    A = B[J,:] and B = A[I,:]
 
+    Returns I if return_index is True
+    Returns J if return_inverse is True
+    """
+    A = np.require(A, requirements='C')
+    assert A.ndim == 2, "array must be 2-dim'l"
+
+    B = np.unique(A.view([('', A.dtype)]*A.shape[1]),
+                  return_index=return_index,
+                  return_inverse=return_inverse)
+
+    if return_index or return_inverse:
+        return (B[0].view(A.dtype).reshape((-1, A.shape[1]), order='C'),) \
+            + B[1:]
+    else:
+        return B.view(A.dtype).reshape((-1, A.shape[1]), order='C')
+                    
 def _scatter(ax, x, y, *args, **kwargs):
-    xy = np.unique(np.vstack(x,y), axis=0)
+    xy = unique_rows(np.vstack((x,y)).transpose())
     return ax.scatter(xy[:, 0], xy[:, 1], *args, **kwargs)
     
 def public(sym):
@@ -406,7 +427,7 @@ def computeIterationStats(runs, fnItrStats, arr_fnAgg, work_bins=50,
 def plotDirections(ax, runs, fnPlot,
                    fnNorm=None,
                    plot_fine=False, plot_estimate=False,
-                   directions=None, rate=None, 
+                   directions=None, rate=None,
                    dir_kwargs=[{}],
                    label_fmt='{label}', beta=None):
     if directions is None:
@@ -462,7 +483,7 @@ def plotDirections(ax, runs, fnPlot,
                                        np.log(fit_data[:, 1]))[0]
                 else:
                     cur_rate = ratefit(np.log(fit_data[:, 0]),
-                                       np.log(fit_data[:, 1]))[0]                   
+                                       np.log(fit_data[:, 1]))[0]
             add_rates[np.round(cur_rate, 2)] = fit_data
         elif rate is not None:
             ind = np.nonzero(np.array(direction) != 0)[0]
@@ -503,14 +524,14 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     run_data[i].db_data.Creation_date
     run_data[i].db_data.niteration_index
     run_data[i].db_data.total_iterations
-    run_data[i].db_data.totalTime
+    run_data[i].db_data.total_time
     run_data[i] is an instance of mimc.MIMCRun
     run_data[i].data is an instance of mimc.MIMCData
     """
 
     num_kwargs = kwargs.pop('num_kwargs', None)
     modifier = kwargs.pop('modifier', None)
-    relative = modifier is None
+    relative = modifier is not None
     modifier = modifier if relative else 1.
     filteritr = kwargs.pop("filteritr", filteritr_convergent)
 
@@ -712,7 +733,7 @@ def plotAvgWorkVsTime(ax, runs, *args, **kwargs):
 
     def fnItrStats(run, i):
         itr = run.iters[i]
-        return [itr.calcTotalWork()] + [itr.totalTime]*3
+        return [itr.calcTotalWork()] + [itr.total_time]*3
 
     xy_binned = computeIterationStats(runs,
                                       work_bins=len(runs[0].iters),
@@ -1065,12 +1086,14 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
     scalar = lambda itr: 1
     if min_samples is not None:
         new_samples = lambda itr: np.maximum(np.float(min_samples),
-                                             itr.parent._calcTheoryM(
-                                             itr.TOL,
-                                             theta=itr.parent._calcTheta(itr.TOL, itr.bias),
-                                             Vl=itr.parent.fn.Norm(itr.calcDeltaVl()),
-                                             Wl=itr.calcWl(),
-                                             ceil=False))
+                                             mimc._calcTheoryM(
+                                                 itr.TOL,
+                                                 active_lvls=itr.active_lvls,
+                                                 theta=itr.parent._calcTheta(itr.TOL,
+                                                                             itr.bias),
+                                                 Vl=itr.parent.fn.Norm(itr.calcDeltaVl()),
+                                                 Wl=itr.calcWl(),
+                                                 ceil=False, Ca=itr.parent._Ca))
         if min_samples == 0:
             scalar = lambda itr: new_samples(itr) / itr.M
         else:
@@ -1272,7 +1295,7 @@ def add_legend(ax, handles=None, labels=None, alpha=0.5,
         # Shrink current axis by 20%
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        kwargs['loc'] = 'center right'
+        kwargs['loc'] = 'center left'
         kwargs['fancybox'] = False
         kwargs['frameon'] = False
         kwargs['shadow'] = False
@@ -1708,11 +1731,12 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
         for i, fig in enumerate(figures):
-            tikz_save("{}/{:03}.tex".format(dir_name, i), fig,
+            print("Saving", fig.label)
+            tikz_save("{}/{}.tex".format(dir_name, fig.label), fig,
                       show_info=False,
                       figurewidth=r'\figurewidth',
                       figureheight=r'\figureheight',
-                      figlabel=fig.label if hasattr(fig, "label") else '')
+                      figlabel=r'\figlabel')
 
     if args.cmd is not None:
         os.system(args.cmd.format(args.o))
