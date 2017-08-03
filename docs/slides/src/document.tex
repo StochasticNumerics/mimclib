@@ -6,7 +6,7 @@
 \setcounter{tocdepth}{2}\tableofcontents}
 }
 
-\section{Primer}
+\section{Theory: Monte Carlo methods}
 \subsection{Problem}
 \begin{frame}\frametitle{The central question}
   Given an $\rset^n$-valued random variable, $\vec X$ with PDF
@@ -85,7 +85,7 @@
 
 \end{frame}
 
-\subsection{Monte Carlo (MC)}
+\subsection{Monte Carlo}
 \begin{frame}[label=MC]\frametitle{Monte Carlo}
 The simplest (and most popular) estimator is the Monte Carlo estimator
 \[\estmc{\func_L ; M} =  \frac{1}{M}\sum_{m=1}^M {\func}_{L}(\vec
@@ -198,7 +198,7 @@ where
   $V_\ell$.
 \pause
     \item Instead of running for the small required $\tol$, CMLMC runs
-      a sequence of MLMC realizations, for decreasing
+      a sequence of MLMC realisations, for decreasing
       tolerances, ending with the required $\tol$.
     \item In each step, estimates of $V_\ell$ are generated using a
       Bayesian setting which uses {\bf Assumption MLMC3} coupled with
@@ -214,12 +214,12 @@ where
 
 \input{src/mimc}
 
-\section{\lib}
+\section{Implementation: \lib}
 \subsection{Library Overview}
 \begin{frame}
   \begin{itemize}
   \item These methods and others are common in UQ applications.
-  \item UQ research further requires \alert{systematic} studies of
+  \item UQ research requires \alert{systematic} studies of
     deterministic or random runs.
   \item \lib~is a library that was developed with that
     objective in mind.
@@ -249,7 +249,8 @@ where
 \begin{frame}{What has been done, \lib~\texttt{0.2.0.dev0}}
   \begin{itemize}
   \item Multilevel and Multi-index versions of Monte Carlo, Stochastic
-    Collocation and Random Projection.
+    Collocation and Random Projection. Adaptive and non-adaptive
+    construction of index sets.
   \item Provide easy to use storage facility in \texttt{SQLite} and \texttt{MySQL}.
   \item Provide easy to customize plotting facility using \texttt{matplotlib} (for common
     plots).
@@ -275,7 +276,7 @@ where
     \item An easy to use programming language. Familiar to
       \texttt{MATLAB} users (Especially with \texttt{numpy} and \texttt{matplotlib})
     \item Can call object code for computationally expensive parts,
-      e.g., samplers.
+      e.g., index set constructors and samplers.
     \end{itemize}
     \item Database engine: \texttt{MySQL} and \texttt{SQLite}
       \begin{itemize}
@@ -305,7 +306,7 @@ where
   \item First step:
 \begin{verbatim}
 > git clone \
-      https://github.com/StochasticNumerics/mimclib.git
+    https://github.com/StochasticNumerics/mimclib.git
 > cd mimclib
 > make pip
 \end{verbatim}
@@ -630,12 +631,20 @@ def mySampleQoI(run, inds, M):
 
 \begin{frame}{Conclusions}
   \begin{itemize}
+  \item Monte Carlo methods have slow convergence but do not suffer
+    from curse-of-dimensionality (in parameter space).
+  \item MLMC allows tackling problems that require expensive
+    computation but, like Monte Carlo, suffers from
+    curse-of-dimensionality (in physical space).
+  \item MIMC exploits extra regularity to get a complexity that is
+    independent of (or slowly growing with) number of physical
+    dimensions.
+  \pause
   \item Research in UQ methods is booming. \lib~can
     provide you with a base to start from.
-  \item \lib is still growing, rapidly, to adapt to
+  \item \lib~is still growing, rapidly, to adapt to
     different applications and different samplers.
-  \item If you feel that \lib~is missing a feature, fork \lib and
-    implement it!
+  \item If you feel that \lib~is missing a feature, fork it!
   \end{itemize}
 \end{frame}
 
