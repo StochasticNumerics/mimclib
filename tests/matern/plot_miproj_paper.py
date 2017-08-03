@@ -25,14 +25,14 @@ def plotProfits(ax, itr, *args, **kwargs):
         work = itr.calcTl()
     else:
         work = itr.calcWl()
-        
+
     lvls = list(itr.lvls_itr(min_dim=2))
     assert(np.all([len(l) == 2 for l in lvls]))
     lvls = np.array(lvls)
     prof = setutil.calc_log_prof_from_EW(error, work)
 
     max_lvl = np.max(lvls, axis=0)
-    
+
     X, Y = np.meshgrid(np.arange(0, max_lvl[0]+1), np.arange(0, max_lvl[1]+1))
     data = np.zeros((max_lvl[1]+1, max_lvl[0]+1))
     data.fill(np.nan)
@@ -42,7 +42,7 @@ def plotProfits(ax, itr, *args, **kwargs):
     ax.contourf(X, Y, data)
     ax.set_xlabel('$\\ell_1$')
     ax.set_ylabel('$\\ell_2$')
-                                
+
 def plotSeeds(ax, runs, *args, **kwargs):
     ax.set_yscale('log')
     ax.set_xscale('log')
@@ -113,8 +113,8 @@ def plotUserData(ax, runs, *args, **kwargs):
     which = kwargs.pop('which', 'cond').lower()
     def fnItrStats(run, i):
         itr = run.iters[i]
-        max_cond = np.max([d.max_cond for d in itr.db_data.user_data])
-        max_size = np.max([d.matrix_size for d in itr.db_data.user_data])
+        max_cond = np.max([d.max_cond for d in itr.userdata])
+        max_size = np.max([d.matrix_size for d in itr.userdata])
         return [i, max_size, max_cond]
 
     xy_binned = miplot.computeIterationStats(runs,
@@ -208,12 +208,12 @@ def plot_all(runs, **kwargs):
     except:
         miplot.plot_failed(ax)
 
-        
+
     print_msg("plotPorfits")
     ax = add_fig('profits')
     plotProfits(ax, runs[0].last_itr)
     ax.set_title('Err/Work')
-    
+
     ax = add_fig('profits')
     plotProfits(ax, runs[0].last_itr, work_est='time')
     ax.set_title('Err/Time')
@@ -249,7 +249,7 @@ def plot_all(runs, **kwargs):
     except:
         miplot.plot_failed(ax)
         raise
-    
+
     print_msg("plotDirections")
     ax = add_fig('time-vs-lvl')
     try:
@@ -330,11 +330,17 @@ def plot_all(runs, **kwargs):
 
 
 def plotSingleLevel(runs, input_args, *args, **kwargs):
-    cmp_labels = ['SL', 'ML', 'Adaptive ML', 'Time-Adapt ML', 'TD fit ML']
-    cmp_tags = [None, '', '-adapt', '-adapt-time', '-tdfit']
+    cmp_labels = ['SL', 'Adaptive ML', 'Time-Adapt ML',
+                  'TD fit ML', 'Full Adapt ML', 'TD Theory']
+    cmp_tags = [None, '-adapt', '-adapt-time',
+                '-tdfit', '-full-adapt', '-td-theory']
+
+    # cmp_labels = ['SL', 'ML', 'Adaptive ML']
+    # cmp_tags = [None, '-tdfit', '-full-adapt']
 
     modifier = kwargs.pop('modifier', None)
     fnNorm = kwargs.pop('fnNorm', None)
+    flip = kwargs.pop('flip', True)
     Ref_kwargs = kwargs.pop('Ref_kwargs', None)
     plotIndividual  = kwargs.pop('plot_individual', True)
     from mimclib import db as mimcdb
@@ -342,51 +348,70 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
     print("Reading data")
 
     db_tag = input_args.db_tag
-    adaptive_runs = False
-    if db_tag.endswith('-adapt'):
-        adaptive_runs = True
-        db_tag = db_tag[:-len('-adapt')]
+    for t in cmp_tags:
+        if t is not None and len(t) > 0 and db_tag.endswith(t):
+            db_tag = db_tag[:-len(t)]
+            break
 
     figures = []
+    axes = []
     def add_fig(name):
         figures.append(plt.figure())
         figures[-1].label = "fig:" + name
         figures[-1].file_name = name
+        axes.append(figures[-1].gca())
         return figures[-1].gca()
 
-    fig_W = add_fig('errors-vs-work')
-    fig_T = add_fig('times-vs-work')
-    fig_Tc = add_fig('total-times-vs-work')
+    time_vars = ['sampling_time', 'pt_sampling_time',
+                 'assembly_time_1', 'assembly_time_2',
+                 'projection_time']
+    time_vars_name = ["Sampling", "PtSampling",
+                      "Assembly1", "Assembly2", "Projection"]
+
+    def calcTime(run, i, time_vars):
+        itr = run.iters[i]
+        time_taken = 0
+        for b in itr.userdata:
+            for v in time_vars:
+                time_taken += getattr(b, v)
+        return time_taken
+
+    add_fig('work-est-vs-error')
+    add_fig('total-time-vs-error')
+
+    fnWork = lambda run, i: run.iters[i].calcTotalWork()
+    fnTimes = [fnWork]
+    fnTimes.append(lambda run, i, v=time_vars: calcTime(run, i, v))
+    for i, v in enumerate(time_vars):
+        add_fig('times%d-vs-error' % i)
+        fnTimes.append(lambda run, i, v=time_vars[:(i+1)]: calcTime(run, i, v))
+
     fix_runs = []
     while True:
         fix_tag = db_tag + "-fix-" + str(len(fix_runs))
         run_data = db.readRuns(tag=fix_tag, done_flag=input_args.done_flag)
         if len(run_data) == 0:
-            print("Couldn't get", fix_tag, input_args.done_flag)
+            print("Couldn't get", fix_tag)
             break
         print("Got", fix_tag)
         assert(len(run_data) == 1)
         fix_runs.append(run_data[0])
 
-    fnWork = lambda run, i: run.iters[i].calcTotalWork()
-    if runs[0].params.miproj_reuse_samples:
-        fnTime = lambda run, i: run.iter_total_times[i]
-    else:
-        fnTime = lambda run, i: run.iters[i].totalTime #run.iter_total_times[i]
-    fnTime_calc = lambda run, i: run.iters[i].calcTotalTime()
-
-    flip = True
     work_bins = 50
     work_spacing = np.sqrt(2)
     cmp_runs = [None] * len(cmp_tags)
     for i, subtag in enumerate(cmp_tags):
         if i == 0:
-            cmp_runs[i] = fix_runs            
+            cmp_runs[i] = fix_runs
         elif db_tag + subtag == input_args.db_tag:
             cmp_runs[i] = runs
         else:
             cmp_runs[i] = db.readRuns(tag=db_tag + subtag,
                                       done_flag=input_args.done_flag)
+            if len(cmp_runs[i]) == 0:
+                print("Couldn't get", db_tag + subtag)
+            else:
+                print("Got", db_tag + subtag)
 
     if input_args.qoi_exact is not None:
         print("Setting errors")
@@ -408,32 +433,16 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
     iter_stats_args = dict(work_bins=1000)
     if plotIndividual:
         for i, rr in enumerate(fix_runs):
-            miplot.plotWorkVsMaxError(fig_W, [rr],
-                                      flip=flip,
-                                      iter_stats_args=iter_stats_args,
-                                      modifier=modifier, fnWork=fnWork,
-                                      fnAggError=np.min, fmt=':xk',
-                                      linewidth=2, markersize=4,
-                                      #label='\\ell={}'.format(i),
-                                      alpha=0.4)
-            miplot.plotWorkVsMaxError(fig_T, [rr],
-                                      flip=flip,
-                                      iter_stats_args=iter_stats_args,
-                                      fnWork=fnTime,
-                                      modifier=modifier, fmt=':xk',
-                                      fnAggError=np.min,
-                                      linewidth=2, markersize=4,
-                                      #label='\\ell={}'.format(i),
-                                      alpha=0.4)
-            miplot.plotWorkVsMaxError(fig_Tc, [rr],
-                                      flip=flip,
-                                      iter_stats_args=iter_stats_args,
-                                      fnWork=fnTime_calc,
-                                      modifier=modifier, fmt=':xk',
-                                      fnAggError=np.min,
-                                      linewidth=2, markersize=4,
-                                      #label='\\ell={}'.format(i),
-                                      alpha=0.4)
+            for i, fig_T in enumerate(axes):
+                miplot.plotWorkVsMaxError(fig_T, [rr],
+                                          flip=flip,
+                                          iter_stats_args=iter_stats_args,
+                                          fnWork=fnTimes[i],
+                                          modifier=modifier, fmt=':xk',
+                                          fnAggError=np.min,
+                                          linewidth=2, markersize=4,
+                                          #label='\\ell={}'.format(i),
+                                          alpha=0.4)
 
     rates_ML, rates_SL = None, None
     if runs[0].params.qoi_example == 'sf-kink':
@@ -496,12 +505,10 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
             Ref_kwargs['label'] = '${}{}$'.format(base, log_factor)
             Ref_kwargs['ls'] = ref_ls
 
-        for fig, curFnWork in [[fig_W, fnWork], [fig_T, fnTime],
-                               [fig_Tc, fnTime_calc]]:
-            data, _ = miplot.plotWorkVsMaxError(fig, rr,
-                                                flip=True,
+        for i, fig_T  in enumerate(axes):
+            data, _ = miplot.plotWorkVsMaxError(fig_T, rr, flip=True,
                                                 modifier=modifier,
-                                                fnWork=curFnWork,
+                                                fnWork=fnTimes[i],
                                                 fnAggError=np.min,
                                                 fmt='-',
                                                 iter_stats_args=iter_stats_args,
@@ -516,21 +523,24 @@ def plotSingleLevel(runs, input_args, *args, **kwargs):
             if rates is not None:
                 def fnRate(x, rr=rates):
                     return (x)**(-rr[0]/rr[1])*np.abs(np.log(x)**rr[2])
-                fig.add_line(miplot.FunctionLine2D(fn=fnRate,
-                                                   linewidth=2,
-                                                   zorder=5,
-                                                   data=data[:len(data)//3, :],
-                                                   **Ref_kwargs))
+                fig_T.add_line(miplot.FunctionLine2D(fn=fnRate,
+                                                     linewidth=2,
+                                                     zorder=5,
+                                                     data=data[:len(data)//3,
+                                                               :], **Ref_kwargs))
 
     if flip:
-        fig_W.set_ylabel('Work Estimate')
-        fig_T.set_ylabel('Time, total [s.]')
-        fig_Tc.set_ylabel('Time [s.]')
+        axes[0].set_ylabel('Work Estimate')
+        axes[1].set_ylabel('Time [s.]')
+        for i in range(2, len(axes)):
+            axes[i].set_ylabel('Time [s.]')
+            axes[i].set_title("+".join(time_vars_name[:(i-1)]))
     else:
-        fig_W.set_xlabel('Work Estimate')
-        fig_T.set_xlabel('Time, total [s.]')
-        fig_T.set_xlabel('Time [s.]')
-
+        axes[0].set_xlabel('Work Estimate')
+        axes[1].set_xlabel('Time [s.]')
+        for i in range(2, len(axes)):
+            axes[i].set_xlabel('Time [s.]')
+            axes[i].set_title("+".join(time_vars_name[:(i-1)]))
     return figures
 
 if __name__ == "__main__":
