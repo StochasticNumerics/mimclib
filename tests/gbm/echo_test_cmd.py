@@ -10,7 +10,7 @@ if __name__ == "__main__":
                         default=0, help="Number of realizations")
     parser.add_argument("-db_tag", type=str, action="store",
                         default="GBM_testcase", help="Database tag")
-    parser.add_argument("-mimc_bayesian", type="bool", action="store",
+    parser.add_argument("-mimc_dynamic_lvls", type="bool", action="store",
                         default=False)
 
     args, unknowns = parser.parse_known_args()
@@ -21,10 +21,10 @@ if __name__ == "__main__":
     -mimc_confidence 0.95 -mimc_theta 0.5 -mimc_bayes_fit_lvls 5 \
     -mimc_bayes_k1 0.01 -mimc_reuse_samples True "
 
-    if args.mimc_bayesian:
-        base += " -mimc_bayesian True -mimc_theta 0.2 "
+    if args.mimc_dynamic_lvls:
+        base += " -mimc_dynamic_lvls True -mimc_theta 0.2 "
     else:
-        base += " -mimc_bayesian False -mimc_theta 0.5 "
+        base += " -mimc_dynamic_lvls False -mimc_theta 0.5 "
 
     base += " ".join(unknowns)
 

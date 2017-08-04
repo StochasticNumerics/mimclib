@@ -506,7 +506,7 @@ class MIMCRun(object):
 
         if not hasattr(self.fn, "EstimateBias"):
             self.fn.EstimateBias = (self._estimateBayesianBias
-                                    if self.params.bayesian
+                                    if self.params.dynamic_lvls
                                     else self._estimateBias)
 
         if self.params.dynamic_lvls and not hasattr(self.fn, "WorkModel"):
@@ -534,6 +534,10 @@ supported with a given work model")
             self.fn.ExtendLvls = lambda s=self: extend_prof_lvls(s,
                                                                  profCalc,
                                                                  s.params.min_lvl)
+
+        if not hasattr(self.fn, "WorkModel") and hasattr(self.params, "gamma"):
+            self.fn.WorkModel = lambda lvls: work_estimate(lvls,
+                                                           self.params.gamma)
 
     def setFunctions(self, **kwargs):
         # fnSampleLvl(moments, mods, inds, M):
@@ -581,11 +585,9 @@ supported with a given work model")
 
         add_store('min_dim', type=int, default=0, help="Number of minimum dimensions used in the index set.")
         add_store('verbose', type=int, default=0, help="Verbose output")
-        add_store('bayesian', type='bool', default=False,
+        add_store('dynamic_lvls', type='bool', default=False,
                   help="Use Bayesian fitting to estimate bias, variance and optimize number \
 of levels in every iteration. This is based on CMLMC.")
-        add_store('dynamic_lvls', type='bool', default=False,
-                  help="TODO.")
         add_store('dynamic_first_lvl', type='bool', default=False,
                   help="If true, the first level will be found dynamically")
         add_store('moments', type=int, default=4, help="Number of moments to compute")
@@ -605,10 +607,10 @@ of levels in every iteration. This is based on CMLMC.")
 between iterations")
         add_store('w', nargs='+', type=float, action=Store_as_array,
                   help="Weak convergence rates. \
-Not needed if a profit calculator is specified and -bayesian is False.")
+Not needed if a profit calculator is specified and -dynamic_lvls is False.")
         add_store('s', nargs='+', type=float, action=Store_as_array,
                   help="Strong convergence rates.  \
-Not needed if a profit calculator is specified and -bayesian is False.")
+Not needed if a profit calculator is specified and -dynamic_lvls is False.")
         add_store('TOL', type=float,
                   help="The required tolerance for the MIMC run")
         add_store('beta', type=float, nargs='+', action=Store_as_array,
@@ -622,21 +624,21 @@ Not needed if fnWorkModel and profit calculator are provided.")
         if default_bayes:
             add_store('bayes_k0', type=float, default=0.1,
                       help="Variance in prior of the constant \
-in the weak convergence model. Not needed if -bayesian is False.")
+in the weak convergence model. Not needed if -dynamic_lvls is False.")
             add_store('bayes_k1', type=float, default=0.1,
                       help="Variance in prior of the constant \
-in the strong convergence model. Not needed if -bayesian is False.")
+in the strong convergence model. Not needed if -dynamic_lvls is False.")
             add_store('bayes_w_sig', type=float, default=-1,
                       help="Variance in prior of the power \
 in the weak convergence model, negative values lead to disabling the fitting. \
-Not needed if -bayesian is False.")
+Not needed if -dynamic_lvls is False.")
             add_store('bayes_s_sig', type=float, default=-1,
                       help="Variance in prior of the power \
 in the weak convergence model, negative values lead to disabling the fitting. \
-Not needed if -bayesian is False.")
+Not needed if -dynamic_lvls is False.")
             add_store('bayes_fit_lvls', type=int, default=1000,
                       help="Maximum number of levels used to fit data. \
-Not needed if -bayesian is False.")
+Not needed if -dynamic_lvls is False.")
 
         # The following arguments are not always needed, and they have
         # a default value
@@ -786,7 +788,7 @@ max_lvl        = {}
         return Vl
 
     def _estimateQParams(self):
-        if not self.params.bayesian:
+        if not self.params.dynamic_lvls:
             return
         if np.sum(self.all_itr.M, axis=0) == 0:
             return   # Cannot really estimate anything without at least some samples
@@ -816,7 +818,7 @@ max_lvl        = {}
             raise NotImplemented("TODO, estimate w and s")
 
     def _estimateOptimalL(self, TOL):
-        assert self.params.bayesian, "MIMC should be Bayesian to \
+        assert self.params.dynamic_lvls, "MIMC should be Bayesian to \
 estimate optimal number of levels"
         minL = self.last_itr.lvls_count
         minWork = np.inf
@@ -849,7 +851,7 @@ estimate optimal number of levels"
         self.iters[-1].bias = self.fn.EstimateBias()
         if self.iters[-1].moments >= 2:
             act = self.last_itr.active_lvls >= 0
-            if self.params.bayesian:
+            if self.params.dynamic_lvls:
                 self.iters[-1].Vl_estimate = self._estimateBayesianVl()
             else:
                 self.iters[-1].Vl_estimate[act] = self.fn.Norm(self.all_itr.calcVl()[act])
@@ -867,7 +869,8 @@ estimate optimal number of levels"
             retVal = self.fn.ExtendLvls()  # TODO: only add levels if bias is not satisfied
         self.last_itr._levels_added()
         self.all_itr._levels_added()
-        if not retVal or prev == self.last_itr.lvls_count:
+        if (retVal is not None and not retVal) or \
+           prev == self.last_itr.lvls_count:
             return self.last_itr.M[:prev]  # No more levels
 
         newTodoM = self.params.M0
@@ -975,7 +978,7 @@ estimate optimal number of levels"
                     self.iters.append(MIMCItrData(parent=self,
                                                   min_dim=self.params.min_dim,
                                                   moments=self.params.moments))
-                    if self.params.bayesian:
+                    if self.params.dynamic_lvls:
                         self.last_itr.Q = Bunch(S=np.inf, W=np.inf,
                                                 w=self.params.w,
                                                 s=self.params.s,
@@ -1005,7 +1008,7 @@ estimate optimal number of levels"
                 self.Q.theta = self._calcTheta(TOL, self.bias)
 
                 # Added levels if not bayesian
-                if not self.params.bayesian:
+                if not self.params.dynamic_lvls:
                     # Bias is not satisfied (or this is the first iteration)
                     # Add more levels
                     newTodoM = self._extendLevels()
@@ -1202,10 +1205,15 @@ def calcMIMCRate(w, s, gamma):
         log_rate = d-1 + 2*(dz-1)*(1+zeta)
     return rate, log_rate
 
-def extend_prof_lvls(lvls, profCalc, min_lvls):
+def extend_prof_lvls(run, profCalc, min_lvls):
     # TODO: Do we need to add more levels that are beyond the minimum
     # number of levels
+    # Only add levels if bias is not satisfied
+    if run.last_itr.bias < (1-run.Q.theta) * run.last_itr.TOL:
+        return
+
     added = 0
+    lvls = run.last_itr.get_lvls()
     if len(lvls) == 0:
         # add seed
         lvls.add_from_list([[]])

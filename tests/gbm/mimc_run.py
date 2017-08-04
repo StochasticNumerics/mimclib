@@ -102,6 +102,8 @@ def initRun(run):
 
 if __name__ == "__main__":
     import mimclib.test
+    from mimclib import ipdb
+    ipdb.set_excepthook()
     import sys
     mimclib.test.RunStandardTest(fnSampleLvl=mySampleQoI,
                                  fnAddExtraArgs=addExtraArguments,
