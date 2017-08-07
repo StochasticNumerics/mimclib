@@ -107,6 +107,7 @@ def RunStandardTest(fnSampleLvl=None,
                               tag=mimcRun.params.db_tag)
         if fnItrDone is None:
             def ItrDone(db=db, r_id=run_id, r=mimcRun):
+                if r.is_itr_tol_satisfied():   # Only save iterations that have tol satisifed
                     db.writeRunData(r_id, r, iteration_idx=len(r.iters)-1)
             fnItrDone = ItrDone
         else:
@@ -121,11 +122,11 @@ def RunStandardTest(fnSampleLvl=None,
         mimcRun.doRun()
     except:
         if mimcRun.params.db:
-            db.markRunFailed(run_id, totalTime=time.clock()-tStart)
+            db.markRunFailed(run_id, total_time=time.clock()-tStart)
         raise   # If you don't want to raise, make sure the following code is not executed
 
     if mimcRun.params.db:
-        db.markRunSuccessful(run_id, totalTime=time.clock()-tStart)
+        db.markRunSuccessful(run_id, total_time=time.clock()-tStart)
     return mimcRun
 
 def run_errors_est_program(fnExactErr=None):

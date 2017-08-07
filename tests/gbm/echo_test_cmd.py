@@ -10,7 +10,7 @@ if __name__ == "__main__":
                         default=0, help="Number of realizations")
     parser.add_argument("-db_tag", type=str, action="store",
                         default="GBM_testcase", help="Database tag")
-    parser.add_argument("-mimc_dynamic_lvls", type="bool", action="store",
+    parser.add_argument("-mimc_lsq_est", type="bool", action="store",
                         default=False)
 
     args, unknowns = parser.parse_known_args()
@@ -21,10 +21,10 @@ if __name__ == "__main__":
     -mimc_confidence 0.95 -mimc_theta 0.5 -mimc_bayes_fit_lvls 5 \
     -mimc_bayes_k1 0.01 -mimc_reuse_samples True "
 
-    if args.mimc_dynamic_lvls:
-        base += " -mimc_dynamic_lvls True -mimc_theta 0.2 "
+    if args.mimc_lsq_est:
+        base += " -mimc_lsq_est True -mimc_theta 0.2 "
     else:
-        base += " -mimc_dynamic_lvls False -mimc_theta 0.5 "
+        base += " -mimc_lsq_est False -mimc_theta 0.5 "
 
     base += " ".join(unknowns)
 
@@ -33,7 +33,7 @@ if __name__ == "__main__":
         print(cmd_single.format(seed=0, TOL=0.001, tag=args.db_tag))
     else:
         cmd_multi = "python " + base + \
-                    " -mimc_verbose 0 -db True -db_tag {tag} "
+                    " -mimc_verbose 0 -db True -db_tag {tag} -db_engine sqlite -db_name mimc.sqlite "
         #TOLs = 0.05*np.sqrt(2.)**-np.arange(0., 21.)
         TOL = 1e-7
         for i in range(0, args.tries):
