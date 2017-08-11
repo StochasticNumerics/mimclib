@@ -364,7 +364,7 @@ def filteritr_last(run, iter_idx):
     return len(run.iters)-1 == iter_idx
 
 def filteritr_convergent(run, iter_idx):
-    return run.iters[iter_idx].totalErrorEst() <= run.iters[iter_idx].TOL
+    return run.iters[iter_idx].total_error_est <= run.iters[iter_idx].TOL
 
 def filteritr_all(run, iter_idx):
     return True
@@ -542,7 +542,7 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
 
     xy = np.array([[itr.TOL,
                     itr.exact_error,
-                    itr.totalErrorEst()] for _, itr in enum_iter(runs, filteritr)])
+                    itr.total_error_est] for _, itr in enum_iter(runs, filteritr)])
     xy[:, 1:3] = xy[:, 1:3] * modifier
 
     TOLs, error_est = __get_stats(xy, staton=2)
@@ -683,10 +683,10 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
         work = in_fn(run, i)
         if in_flip:
             return [np.log(itr.exact_error), itr.exact_error, work,
-                    in_mod*itr.totalErrorEst()]
+                    in_mod*itr.total_error_est]
         else:
             return [np.log(work), work, itr.exact_error,
-                    in_mod*itr.totalErrorEst()]
+                    in_mod*itr.total_error_est]
 
     xy_binned = computeIterationStats(runs,
                                       fnItrStats=fnItrStats,
@@ -1380,7 +1380,7 @@ def genBooklet(runs, **kwargs):
     else:
         label_MIMC = label_fmt.format(label='')
 
-    any_bayesian = np.any([r.params.bayesian for r in runs])
+    any_bayesian = np.any([r.params.lsq_est for r in runs])
 
     legend_outside = kwargs.pop("legend_outside", 5)
 
@@ -1485,7 +1485,7 @@ def genBooklet(runs, **kwargs):
         try:
             _, _ = plotTimeVsTOL(ax_time, runs, fmt='-.',
                                  label=label_fmt.format(label="Wall clock"),
-                                 filteritr=filteritr, real_time=True,
+                                 filteritr=filteritr, fnTime="real_time",
                                  MC_kwargs=None)
         except:
             __plot_except(ax_time)
@@ -1504,7 +1504,7 @@ def genBooklet(runs, **kwargs):
         try:
             data_est, _ = plotTimeVsTOL(ax_est, runs, label=label_MIMC,
                                         filteritr=filteritr,
-                                        work_estimate=True,
+                                        fnTime="work",
                                         MC_kwargs= None if max_dim > 1
                                         else {"label": label_fmt.format(label="MC Estimate"),
                                               "fmt": "--r"})
@@ -1595,8 +1595,8 @@ def set_exact_errors(runs, fnExactErr, filteritr=filteritr_all):
         itr.exact_error = errs[i]
 
 def estimate_exact(runs):
-    minErr = np.min([r.totalErrorEst() for r in runs])
-    d = [r.calcEg() for r in runs if r.totalErrorEst() == minErr]
+    minErr = np.min([r.total_error_est for r in runs])
+    d = [r.calcEg() for r in runs if r.total_error_est == minErr]
     return np.sum(d, axis=0) * (1./ len(d)), minErr
 
 def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
@@ -1642,8 +1642,9 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
                             help="Command to execute after plotting")
         parser.add_argument("-verbose", type='bool', action="store",
                             default=False)
-        parser.add_argument("-all_itr", type='bool', action="store",
-                            default=False)
+        parser.add_argument("-filteritr", type=str, action="store",
+                            choices=['convergent', 'all', 'last'],
+                            default='convergent')
         parser.add_argument("-relative", type='bool', action="store",
                             default=True)
         parser.add_argument("-done_flag", type=int, nargs='+',
@@ -1703,7 +1704,13 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
         # TODO: Need to somehow set it as relative
         modifier = 1.
 
-    filteritr = filteritr_all if args.all_itr else filteritr_convergent
+    if args.filteritr == 'last':
+        filteritr = filteritr_last
+    elif args.filteritr == 'convergent':
+        filteritr = filteritr_convergent
+    elif args.filteritr == 'all':
+        filteritr = filteritr_all
+        
     if fnExactErr is not None:
         if args.verbose:
             print("Setting errors")
