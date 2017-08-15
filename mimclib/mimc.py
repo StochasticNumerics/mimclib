@@ -854,7 +854,6 @@ estimate optimal number of levels"
         self.iters[-1].Vl_estimate = np.empty(len(self.last_itr.get_lvls()))
         self.iters[-1].Vl_estimate.fill(np.nan)
         self.iters[-1].stat_error = np.nan
-        self.iters[-1].bias = self.fn.EstimateBias()
         if self.iters[-1].moments >= 2:
             act = self.last_itr.active_lvls >= 0
             if self.params.lsq_est:
@@ -865,6 +864,7 @@ estimate optimal number of levels"
                                     else self._Ca * \
                                          np.sqrt(np.sum(self.Vl_estimate[act]
                                                         / self.last_itr.M[act]))
+        self.iters[-1].bias = self.fn.EstimateBias()
 
     def _extendLevels(self, new_lvls=None):
         prev = self.last_itr.lvls_count
