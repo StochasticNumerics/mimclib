@@ -2,15 +2,24 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import matplotlib
+# import matplotlib
 # Force matplotlib to not use any Xwindows backend.
 # matplotlib.use('Agg')
 
 import numpy as np
-import matplotlib as mpl
 import matplotlib.pylab as plt
 from . import mimc
 from matplotlib.ticker import MaxNLocator
+import os
+from matplotlib2tikz import save as tikz_save
+from . import db as mimcdb
+from . import test
+import argparse
+import warnings
+import itertools
+from mimclib import Bunch
+from scipy.stats import norm
+import traceback
 
 __all__ = []
 
@@ -61,9 +70,9 @@ def _formatPower(rate):
     return rate
 
 try:
+    import statsmodels.api as sm
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("ignore")
-        import statsmodels.api as sm
         def ratefit(x, y):
             f = sm.RLM(y, sm.add_constant(x)).fit()
             return f.params[1], f.params[0]
@@ -112,7 +121,6 @@ class FunctionLine2D(plt.Line2D):
 
 
     def draw(self, renderer):
-        import matplotlib.pylab as plt
         ax = self.axes
         if self.flip:
             y = self._linspace(ax.get_ylim(), ax.get_yscale())
@@ -122,7 +130,6 @@ class FunctionLine2D(plt.Line2D):
             x = self._linspace(ax.get_xlim(), ax.get_xscale())
             self.set_xdata(x)
             self.set_ydata(self.fn(x))
-
         plt.Line2D.draw(self, renderer)
 
     @staticmethod
@@ -262,7 +269,6 @@ class ECDF(StepFunction):
 
 
 def __get_stats(data, groupby=0, staton=1):
-    import itertools
     data = sorted(data, key=lambda xx: xx[groupby])
     x = []
     y = []
@@ -345,7 +351,6 @@ def __calc_moments(runs, seed=None, direction=None, fnNorm=None):
         central_delta_moments[:, m-1] = fnNorm(mimc.compute_central_moment(psums_delta, M, m))
         central_fine_moments[:, m-1] = fnNorm(mimc.compute_central_moment(psums_fine, M, m))
 
-    from mimclib import Bunch
     ret = Bunch()
     ret.central_delta_moments = central_delta_moments
     ret.central_fine_moments = central_fine_moments
@@ -355,32 +360,43 @@ def __calc_moments(runs, seed=None, direction=None, fnNorm=None):
     ret.M = M
     return ret
 
-def __normalize_fmt(args, kwargs):
+@public
+def normalize_fmt(args, kwargs):
     if "fmt" in kwargs:        # Normalize behavior of errorbar() and plot()
         args = (kwargs.pop('fmt'), ) + args
     return args, kwargs
 
+
+@public
 def filteritr_last(run, iter_idx):
     return len(run.iters)-1 == iter_idx
 
+
+@public
 def filteritr_convergent(run, iter_idx):
     return run.iters[iter_idx].total_error_est <= run.iters[iter_idx].TOL
 
+@public
 def filteritr_all(run, iter_idx):
     return True
 
+
+@public
 def enum_iter(runs, fnFilter=filteritr_all):
     for r in runs:
         for i in xrange(0, len(r.iters)):
             if fnFilter(r, i):
                 yield r, r.iters[i]
 
+
+@public
 def enum_iter_i(runs, fnFilter=filteritr_all):
     for r in runs:
         for i in xrange(0, len(r.iters)):
             if fnFilter(r, i):
                 yield i, r, r.iters[i]
 
+@public
 def computeIterationStats(runs, fnItrStats, arr_fnAgg, work_bins=50,
                           filteritr=filteritr_all, work_spacing=None,
                           fnFilterData=None):
@@ -424,6 +440,8 @@ def computeIterationStats(runs, fnItrStats, arr_fnAgg, work_bins=50,
         xy_binned = xy_binned[sel, :]
     return xy_binned
 
+
+@public
 def plotDirections(ax, runs, fnPlot,
                    fnNorm=None,
                    plot_fine=False, plot_estimate=False,
@@ -439,10 +457,9 @@ def plotDirections(ax, runs, fnPlot,
             cur += np.array(directions[i])
             directions.append(cur.tolist())
     add_rates = dict()
-    from itertools import cycle
-    markers = cycle(['o', 'v', '^', '<', '>', '8', 's', 'p',
+    markers = itertools.cycle(['o', 'v', '^', '<', '>', '8', 's', 'p',
                      '*', 'h', 'H', 'D', 'd'])
-    linestyles = cycle(['--', '-.', '-', ':', '-'])
+    linestyles = itertools.cycle(['--', '-.', '-', ':', '-'])
     cycler = ax._get_lines.prop_cycler
     if beta is not None and hasattr(beta, '__iter__'):
         beta = beta[0]
@@ -568,7 +585,6 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
 
     if num_kwargs is not None:
         shift = num_kwargs.pop("shift", 1.5)
-        import itertools
         xy = xy[xy[:,0].argsort(), :]
         for TOL, itr in itertools.groupby(xy, key=lambda x: x[0]):
             curItr = np.array(list(itr))
@@ -634,7 +650,7 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
     maxrefine_kwargs = kwargs.pop('maxrefine_kwargs', None)
     active_kwargs = kwargs.pop('active_kwargs', None)
 
-    dim_args, dim_kwargs = __normalize_fmt(args, kwargs)
+    dim_args, dim_kwargs = normalize_fmt(args, kwargs)
     # Max dimensions
     if (np.max(xy_binned[:, 1]) - np.min(xy_binned[:, 1])) > 100:
         ax2 = ax.twinx()
@@ -646,13 +662,13 @@ def plotWorkVsLvlStats(ax, runs, *args, **kwargs):
 
     # Max level in all dimension
     if maxrefine_kwargs is not None:
-        maxrefine_args, maxrefine_kwargs = __normalize_fmt((), maxrefine_kwargs)
+        maxrefine_args, maxrefine_kwargs = normalize_fmt((), maxrefine_kwargs)
         plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 2],
                                *maxrefine_args, **maxrefine_kwargs))
 
     # Max active dim
     if active_kwargs is not None:
-        active_args, active_kwargs = __normalize_fmt((), active_kwargs)
+        active_args, active_kwargs = normalize_fmt((), active_kwargs)
         plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 3],
                                *active_args, **active_kwargs))
 
@@ -705,11 +721,11 @@ def plotWorkVsMaxError(ax, runs, *args, **kwargs):
     if len(sel) == 0:
         plotObj.append(None)
     else:
-        args, kwargs = __normalize_fmt(args, kwargs)
+        args, kwargs = normalize_fmt(args, kwargs)
         plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 1], *args, **kwargs))
 
     if ErrEst_kwargs is not None:
-        ErrEst_args, ErrEst_kwargs = __normalize_fmt((), ErrEst_kwargs)
+        ErrEst_args, ErrEst_kwargs = normalize_fmt((), ErrEst_kwargs)
         plotObj.append(ax.plot(xy_binned[:, 0], xy_binned[:, 2], *ErrEst_args, **ErrEst_kwargs))
     #sel = sel[np.log(xy_binned[sel, 0]) > np.median(np.log(xy_binned[:, 0]))]
     if len(sel) > 0 and Ref_kwargs is not None:
@@ -783,7 +799,6 @@ def plotTotalWorkVsLvls(ax, runs, *args, **kwargs):
 
     plotObj = []
     iters = sorted(enum_iter(runs, filteritr), key=lambda itr: itr[1].TOL)
-    import itertools
     label_fmt = kwargs.pop('label_fmt', None)
     TOLs = np.unique([itr.TOL for r, itr in iters])
     TOLs = TOLs[:kwargs.pop("max_TOLs", len(TOLs))]
@@ -919,7 +934,7 @@ def plotVarVsLvls(ax, runs, *args, **kwargs):
                                    yerr=3*np.sqrt(np.abs(El4[sorted_ind]/ret.M[sorted_ind])),
                                    *args, **kwargs))
     else:
-        args, kwargs = __normalize_fmt(args, kwargs)
+        args, kwargs = normalize_fmt(args, kwargs)
         plotObj.append(ax.plot(x[sorted_ind], Vl[sorted_ind], *args, **kwargs))
 
     if fine_kwargs is not None:
@@ -931,7 +946,7 @@ def plotVarVsLvls(ax, runs, *args, **kwargs):
                                        yerr=3*np.sqrt(np.abs(El4[sorted_ind]/ret.M[sorted_ind])),
                                        **fine_kwargs))
         else:
-            fine_args, fine_kwargs = __normalize_fmt((), fine_kwargs)
+            fine_args, fine_kwargs = normalize_fmt((), fine_kwargs)
             plotObj.append(ax.plot(x[sorted_ind], Vl[sorted_ind],
                                    *fine_args, **fine_kwargs))
 
@@ -954,7 +969,7 @@ def plotKurtosisVsLvls(ax, runs, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
-    args, kwargs = __normalize_fmt(args, kwargs)
+    args, kwargs = normalize_fmt(args, kwargs)
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$\textnormal{Kurt}_\ell$')
     ax.set_yscale('log')
@@ -979,7 +994,7 @@ def plotSkewnessVsLvls(ax, runs, *args, **kwargs):
     returned by MIMCDatabase.readRunData()
     ax is in instance of matplotlib.axes
     """
-    args, kwargs = __normalize_fmt(args, kwargs)
+    args, kwargs = normalize_fmt(args, kwargs)
     ax.set_xlabel(r'$\ell$')
     ax.set_ylabel(r'$\textnormal{Skew}_\ell$')
     ax.set_yscale('log')
@@ -1234,7 +1249,6 @@ def plotErrorsPP(ax, runs, label_fmt='${TOL}$', *args, **kwargs):
     else:
         tol = kwargs.pop("tol")
 
-    from scipy.stats import norm
     x_data = np.array([itr.calcEg() for _, itr in enum_iter(runs, filteritr) if
                        itr.TOL == tol])
     x = x_data - np.mean(x_data, axis=0)
@@ -1244,7 +1258,6 @@ def plotErrorsPP(ax, runs, label_fmt='${TOL}$', *args, **kwargs):
             raise Exception("Not correct size")
     except:
         plot_failed(ax)
-        import warnings
         warnings.warn("PP plots require the object to implement __float__")
         return
 
@@ -1268,7 +1281,7 @@ def plotErrorsPP(ax, runs, label_fmt='${TOL}$', *args, **kwargs):
         plotObj.append(ax.add_line(FunctionLine2D.ExpLine(rate=1, **Ref_kwargs)))
     return (plotObj[0].get_offsets() if not smooth else plotObj[0].get_xydata()), plotObj
 
-
+@public
 def add_legend(ax, handles=None, labels=None, alpha=0.5,
                outside=None, loc='best', *args, **kwargs):
     if not handles:
@@ -1334,28 +1347,35 @@ def plot_failed(ax):
             rotation=45, fontsize=60, color='red', alpha=0.5,
             transform=ax.transAxes)
 
-def __plot_except(ax):
-    plot_failed(ax)
-    import traceback
-    print('-----------------------------------------------------')
-    traceback.print_exc(limit=None)
-    print('-----------------------------------------------------')
-    #raise
 
 @public
-def genBooklet(runs, **kwargs):
-    import matplotlib.pyplot as plt
+def plot_except(ax, verbose=True, reraise=True):
+    plot_failed(ax)
+    if verbose:
+        print('-----------------------------------------------------')
+        traceback.print_exc(limit=None)
+        print('-----------------------------------------------------')
+    if reraise:
+        raise
+
+@public
+def genBooklet(runs, filteritr=None, input_args=dict(),
+               modifier=1., fnNorm=None):
+    if len(runs) == 1:
+        raise Exception("Only one tag is supported")
+    runs = runs[0]
     if len(runs) == 0:
         raise Exception("No runs!!!")
 
-    label_fmt = kwargs.pop("label_fmt", None)
-    call_add_legend = kwargs.pop("add_legend", True)
-    filteritr = kwargs.pop("filteritr", filteritr_all)
-    modifier = kwargs.pop("modifier", 1)
+    filteritr = filteritr if filteritr is not None else filteritr_all
+    reraise = False
+    label_fmt = input_args.pop("label_fmt", None)
+    call_add_legend = input_args.pop("add_legend", True)
     TOLs_count = len(np.unique([itr.TOL for _, itr in enum_iter(runs, filteritr)]))
     convergent_count = len([itr.TOL for _, itr in enum_iter(runs, filteritr_convergent)])
     iters_count = np.sum([len(r.iters) for r in runs])
-    verbose = kwargs.pop('verbose', False)
+    verbose = input_args.pop('verbose', False)
+    legend_outside = input_args.pop("legend_outside", 5)
     if verbose:
         def print_msg(*args):
             print(*args)
@@ -1363,12 +1383,10 @@ def genBooklet(runs, **kwargs):
         def print_msg(*args):
             return
 
-    if "params" in kwargs:
-        params = kwargs.pop("params")
-        fnNorm = kwargs.pop("fn").Norm
-    else:
-        maxTOL = np.max([r.db_data.finalTOL for r in runs])
-        params = next(r.params for r in runs if r.db_data.finalTOL == maxTOL)
+    maxTOL = np.max([r.db_data.finalTOL for r in runs])
+    params = next(r.params for r in runs if r.db_data.finalTOL == maxTOL)
+
+    if fnNorm is None:
         fn = next(r.fn for r in runs if r.db_data.finalTOL == maxTOL)
         fnNorm = fn.Norm
 
@@ -1381,9 +1399,6 @@ def genBooklet(runs, **kwargs):
         label_MIMC = label_fmt.format(label='')
 
     any_bayesian = np.any([r.params.lsq_est for r in runs])
-
-    legend_outside = kwargs.pop("legend_outside", 5)
-
     has_gamma_rate = hasattr(params, 'gamma')
     has_w_rate = hasattr(params, 'w')
     has_s_rate = hasattr(params, 's')
@@ -1411,7 +1426,7 @@ def genBooklet(runs, **kwargs):
                                         'label': label_fmt.format(label='TOL')},
                             num_kwargs={'color': 'r'})
         except:
-            __plot_except(ax)
+            plot_except(ax, verbose, reraise)
 
     print_msg("plotWorkVsMaxError")
     ax = add_fig()
@@ -1428,7 +1443,7 @@ def genBooklet(runs, **kwargs):
                            Ref_ErrEst_kwargs=Ref_ErrEst_kwargs)
         ax.set_xlabel('Avg. Iteration Work')
     except:
-        __plot_except(ax)
+        plot_except(ax, verbose, reraise)
 
     print_msg("plotWorkVsMaxError")
     ax = add_fig()
@@ -1442,7 +1457,7 @@ def genBooklet(runs, **kwargs):
                            Ref_ErrEst_kwargs=Ref_ErrEst_kwargs)
         ax.set_xlabel('Avg. Iteration Time')
     except:
-        __plot_except(ax)
+        plot_except(ax, verbose, reraise)
 
     print_msg("plotAvgWorkVsTime")
     ax = add_fig()
@@ -1453,7 +1468,7 @@ def genBooklet(runs, **kwargs):
                           Ref_kwargs={'ls': '--', 'c':'k',
                                       'label': label_fmt.format(label='{rate:.2g}')})
     except:
-        __plot_except(ax)
+        plot_except(ax, verbose, reraise)
 
     print_msg("plotWorkVsLvlStats")
     ax = add_fig()
@@ -1465,7 +1480,7 @@ def genBooklet(runs, **kwargs):
                            maxrefine_kwargs={'fmt': '-sr',
                                              'label': label_fmt.format(label='Max refinement')})
     except:
-        __plot_except(ax)
+        plot_except(ax, verbose, reraise)
 
     if (convergent_count > 10):   # Need at least 10 plots for this plot to be significant
         print_msg("plotErrorsPP")
@@ -1475,7 +1490,7 @@ def genBooklet(runs, **kwargs):
             plotErrorsPP(ax, runs, filteritr=filteritr_convergent,
                          Ref_kwargs={'ls': '--', 'c': 'k'})
         except:
-            __plot_except(ax)
+            plot_except(ax, verbose, reraise)
 
 
     if (TOLs_count > 1):
@@ -1488,7 +1503,7 @@ def genBooklet(runs, **kwargs):
                                  filteritr=filteritr, fnTime="real_time",
                                  MC_kwargs=None)
         except:
-            __plot_except(ax_time)
+            plot_except(ax_time, verbose, reraise)
 
         try:
             data_time, _ = plotTimeVsTOL(ax_time, runs, label=label_MIMC,
@@ -1497,7 +1512,7 @@ def genBooklet(runs, **kwargs):
                                          else {"label": label_fmt.format(label="MC Estimate"),
                                                "fmt": "--r"})
         except:
-            __plot_except(ax_time)
+            plot_except(ax_time, verbose, reraise)
 
         print_msg("plotTimeVsTOL")
         ax_est = add_fig()
@@ -1526,7 +1541,7 @@ def genBooklet(runs, **kwargs):
                                                linestyle='--', c='k',
                                                label=label_fmt.format(label=label)))
         except:
-            __plot_except(ax_est)
+            plot_except(ax_est, verbose, reraise)
 
     lvl_funcs = [[0, False, False, plotTimeVsLvls, np.array(params.gamma)
                   if has_gamma_rate else None],
@@ -1550,7 +1565,7 @@ def genBooklet(runs, **kwargs):
                            beta=params.beta if has_beta else None,
                            rate=rate)
         except:
-            __plot_except(ax)
+            plot_except(ax, verbose, reraise)
 
     if TOLs_count > 1:
         print_msg("plotLvlsNumVsTOL")
@@ -1569,7 +1584,7 @@ def genBooklet(runs, **kwargs):
                                            linestyle='--', c='k',
                                            label=label_fmt.format(label=label)))
         except:
-            __plot_except(ax)
+            plot_except(ax, verbose, reraise)
 
         print_msg("plotThetaVsTOL")
         ax = add_fig()
@@ -1580,7 +1595,7 @@ def genBooklet(runs, **kwargs):
                 eta = params.w[0]/params.gamma[0]
                 plotThetaRefVsTOL(ax, runs, filteritr=filteritr, eta=eta, chi=chi, fmt='--k')
         except:
-            __plot_except(ax)
+            plot_except(ax, verbose, reraise)
 
     if call_add_legend:
         for fig in figures:
@@ -1599,14 +1614,14 @@ def estimate_exact(runs):
     d = [r.calcEg() for r in runs if r.total_error_est == minErr]
     return np.sum(d, axis=0) * (1./ len(d)), minErr
 
-def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
-    from . import db as mimcdb
-    from . import plot as miplot
-    from . import test
 
-    import argparse
-    import warnings
-    import os
+def append_ext(path, ext):
+    if path.lower().endswith(ext.lower()):
+        return path
+    return path + ext
+
+
+def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
     warnings.formatwarning = lambda msg, cat, filename, lineno, line: \
                              "{}:{}: ({}) {}\n".format(os.path.basename(filename),
                                                        lineno, cat.__name__, msg)
@@ -1629,13 +1644,11 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
         parser.add_argument("-db_host", type=str, action="store",
                             help="Database Host")
         parser.add_argument("-db_tag", type=str, action="store",
-                            help="Database Tags")
+                            nargs='+', help="Database Tags")
         parser.add_argument("-label_fmt", type=str, action="store",
                             default=None, help="Output labels")
         parser.add_argument("-qoi_exact", type=float, action="store",
                             help="Exact value")
-        parser.add_argument("-only_final", type='bool', action="store",
-                            default=True, help="Plot only final iterations")
         parser.add_argument("-o", type=str,
                             action="store", help="Output file")
         parser.add_argument("-cmd", type=str, action="store",
@@ -1643,8 +1656,7 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
         parser.add_argument("-verbose", type='bool', action="store",
                             default=False)
         parser.add_argument("-filteritr", type=str, action="store",
-                            choices=['convergent', 'all', 'last'],
-                            default='convergent')
+                            choices=['convergent', 'all', 'last'])
         parser.add_argument("-relative", type='bool', action="store",
                             default=True)
         parser.add_argument("-done_flag", type=int, nargs='+',
@@ -1659,36 +1671,42 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
     for k in kwargs.keys():
         args.__dict__[k] = kwargs[k]
 
-    args.db_args = dict()
+    db_args = dict()
     if args.db_name is not None:
-        args.db_args["db"] = args.db_name
+        db_args["db"] = args.db_name
     if args.db_user is not None:
-        args.db_args["user"] = args.db_user
+        db_args["user"] = args.db_user
     if args.db_host is not None:
-        args.db_args["host"] = args.db_host
+        db_args["host"] = args.db_host
     if args.db_engine is not None:
-        args.db_args["engine"] = args.db_engine
+        db_args["engine"] = args.db_engine
     if args.o is None:
-        args.o = args.db_tag + ".pdf"
+        warnings.warn("Outputting to mimclib_out.pdf")
+        args.o = "mimclib_out"
 
-    db = mimcdb.MIMCDatabase(**args.db_args)
+    db = mimcdb.MIMCDatabase(**db_args)
     if args.db_tag is None:
         warnings.warn("You did not select a database tag!!")
     if args.verbose:
         print("Reading data")
 
-    run_data = db.readRuns(tag=args.db_tag, done_flag=args.done_flag)
-    if len(run_data) == 0:
+    total_runs = 0
+    run_data = []
+    for db_tag in args.db_tag:
+        run_data.append(db.readRuns(tag=db_tag, done_flag=args.done_flag))
+        total_runs += len(run_data[-1])
+
+    if total_runs == 0:
         raise Exception("No runs!!!")
 
-    fnNorm = run_data[0].fn.Norm
+    fnNorm = run_data[0][0].fn.Norm
     if args.verbose:
         print("Plotting data")
 
     if args.qoi_exact_tag is not None:
         assert args.qoi_exact is None, "An exact value and exact tag are given"
-        if args.qoi_exact_tag == args.db_tag:
-            args.qoi_exact, _ = estimate_exact(run_data)
+        if args.qoi_exact_tag in args.db_tag:
+            args.qoi_exact, _ = estimate_exact(run_data[args.db_tag.index(args.qoi_exact_tag)])
         else:
             exact_runs = db.readRuns(tag=args.qoi_exact_tag, done_flag=args.done_flag)
             args.qoi_exact, _ = estimate_exact(exact_runs)
@@ -1704,36 +1722,36 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
         # TODO: Need to somehow set it as relative
         modifier = 1.
 
+    filteritr = None
     if args.filteritr == 'last':
         filteritr = filteritr_last
     elif args.filteritr == 'convergent':
         filteritr = filteritr_convergent
     elif args.filteritr == 'all':
         filteritr = filteritr_all
-        
+
     if fnExactErr is not None:
         if args.verbose:
             print("Setting errors")
-        set_exact_errors(run_data, fnExactErr, filteritr=filteritr)
+        for r in run_data:
+            set_exact_errors(r, fnExactErr, filteritr=filteritr)
 
-    figures = fnPlot(run_data, modifier=modifier if args.relative else
-                     None, verbose=args.verbose,
-                     fnNorm=fnNorm, filteritr=filteritr,
-                     label_fmt=args.label_fmt,
-                     input_args=args)
+    figures = fnPlot(run_data,
+                     modifier=modifier if args.relative else None,
+                     fnNorm=fnNorm,
+                     filteritr=filteritr,
+                     input_args=vars(args).copy())
 
     if args.verbose:
         print("Saving file")
 
     if 'pdf' in args.formats:
         from matplotlib.backends.backend_pdf import PdfPages
-        with PdfPages(args.o + '.pdf') as pdf:
+        with PdfPages(append_ext(args.o, '.pdf')) as pdf:
             for fig in figures:
                 pdf.savefig(fig)
 
     if 'tikz' in args.formats:
-        import os
-        from matplotlib2tikz import save as tikz_save
         dir_name = args.o
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
