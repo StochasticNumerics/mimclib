@@ -23,6 +23,15 @@ import traceback
 
 __all__ = []
 
+def save_pdf(out, figures, close=True):
+    from matplotlib.backends.backend_pdf import PdfPages
+    with PdfPages(out) as pdf:
+        for fig in figures:
+            pdf.savefig(fig)
+            if close:
+                plt.close(fig)
+
+
 def unique_rows(A, return_index=False, return_inverse=False):
     """
     Similar to MATLAB's unique(A, 'rows'), this returns B, I, J
@@ -70,6 +79,7 @@ def _formatPower(rate):
     return rate
 
 try:
+    raise Exception()
     import statsmodels.api as sm
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("ignore")
@@ -1746,10 +1756,7 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
         print("Saving file")
 
     if 'pdf' in args.formats:
-        from matplotlib.backends.backend_pdf import PdfPages
-        with PdfPages(append_ext(args.o, '.pdf')) as pdf:
-            for fig in figures:
-                pdf.savefig(fig)
+        save_pdf(append_ext(args.o, '.pdf'), figures, close=False)
 
     if 'tikz' in args.formats:
         dir_name = args.o
