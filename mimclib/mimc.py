@@ -395,8 +395,6 @@ class MIMCItrData(object):
         header_fmt = "".join(sum([["{:", c[1], "}"] for c in columns], [])) + "\n"
         value_fmt = "".join(sum([["{:", c[2], "}"] for c in columns], [])) + "\n"
 
-        real_stat_error = self.parent._Ca * np.sum(np.sqrt(self.Vl_estimate / self.M))
-
         output = header_fmt.format(*[c[0] for c in columns])
 
         for i in range(0, self.lvls_count):
@@ -867,18 +865,17 @@ estimate optimal number of levels"
         self.iters[-1].bias = self.fn.EstimateBias()
 
     def _extendLevels(self, new_lvls=None):
-        prev = self.last_itr.lvls_count
-        retVal = True
+        todoM = None
         if new_lvls is not None:
             self.last_itr.lvls_add_from_list(new_lvls)
         else:
-            retVal = self.fn.ExtendLvls()
+            todoM = self.fn.ExtendLvls()
         self.last_itr._levels_added()
         self.all_itr._levels_added()
-        if (retVal is not None and not retVal) or \
-           prev == self.last_itr.lvls_count:
-            return self.last_itr.M.copy()                # No more levels
-        return np.maximum(self.last_itr.M, self.params.M0)
+        if todoM is None:
+            # TODO: Allow for array todoM
+            todoM = np.ones(self.last_itr.lvls_count) * self.params.M0[0]
+        return np.maximum(self.last_itr.M, todoM)
         # newTodoM = self.params.M0
         # if self.params.M0_coeff > 0:
         #     newTodoM = np.maximum(newTodoM, (int)(self.params.M0_coeff *
@@ -896,8 +893,9 @@ estimate optimal number of levels"
         lvls_count = self.last_itr.lvls_count
         assert(lvls_count == len(lvls))
         t = np.zeros(lvls_count)
-        active = totalM > self.last_itr.M
-        totalM[totalM <= self.last_itr.M] = 0    # No need to do any samples
+        active = np.logical_and(totalM > self.last_itr.M,
+                                self.last_itr.active_lvls >= 0)
+        totalM[np.logical_not(active)] = 0    # No need to do any samples
         totalM[active] -= self.last_itr.M[active]
         if np.sum(totalM) == 0:
             return False
@@ -928,18 +926,24 @@ estimate optimal number of levels"
             return
         if self.last_itr.lvls_max_dim() > 1:
             raise NotImplementedError("Dynamic first level is not implemented for more than one dimension")
-        deltaVl = self.fn.Norm(self.last_itr.calcDeltaVl())
-        fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
         if not hasattr(self, "cur_start_level"):
             self.cur_start_level = 0
-        if self.cur_start_level < len(fineVl)-1 and \
-           np.minimum(fineVl[self.cur_start_level],
-                      fineVl[self.cur_start_level+1]) < deltaVl[self.cur_start_level+1]:
+        if self.cur_start_level >= self.last_itr.lvls_count-1:
+            return   # Not enough levels to skip.
+        # Y: Old var              (level 1)
+        # X: Control variate      (level 0)
+        # Z: Y-X                  (difference)
+        # \sqrt{W_Z V_Z} + \sqrt{W_X V_X} \leq \sqrt{W_Y V_Y}
+        deltaWl = self.last_itr.calcWl()
+        deltaVl = self.fn.Norm(self.last_itr.calcDeltaVl())
+        fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
+        VW_Z = deltaVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
+        VW_Y = fineVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
+        VW_X = fineVl[self.cur_start_level]*deltaWl[self.cur_start_level]
+        if np.sqrt(VW_Z) + np.sqrt(VW_X) > np.sqrt(VW_Y):
             # Increase minimum level one at a time.
-            self.cur_start_level = np.minimum(self.cur_start_level+1,
-                                              len(fineVl)-1)
+            self.cur_start_level += 1
             self.print_info("New start level", self.cur_start_level)
-            lvls = self.last_itr.get_lvls().to_dense_matrix()
             self._update_active_lvls()
             self._estimateAll()
 
