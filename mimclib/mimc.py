@@ -429,6 +429,7 @@ class MIMCRun(object):
                         # WorkModel=None, SampleAll=None,
                         Norm=np.abs)
         self.params = Bunch(**kwargs)
+        self.cur_start_level = 0
         self.iters = []
         dims = np.array([len(getattr(self.params, a))
                 for a in ["w", "s", "gamma", "beta"] if hasattr(self.params, a)])
@@ -874,7 +875,7 @@ estimate optimal number of levels"
         self.all_itr._levels_added()
         if todoM is None:
             # TODO: Allow for array todoM
-            todoM = np.ones(self.last_itr.lvls_count) * self.params.M0[0]
+            todoM = np.ones(self.last_itr.lvls_count, dtype=np.int) * self.params.M0[0]
         return np.maximum(self.last_itr.M, todoM)
         # newTodoM = self.params.M0
         # if self.params.M0_coeff > 0:
@@ -926,8 +927,6 @@ estimate optimal number of levels"
             return
         if self.last_itr.lvls_max_dim() > 1:
             raise NotImplementedError("Dynamic first level is not implemented for more than one dimension")
-        if not hasattr(self, "cur_start_level"):
-            self.cur_start_level = 0
         if self.cur_start_level >= self.last_itr.lvls_count-1:
             return   # Not enough levels to skip.
         # Y: Old var              (level 1)
@@ -946,6 +945,8 @@ estimate optimal number of levels"
             self.print_info("New start level", self.cur_start_level)
             self._update_active_lvls()
             self._estimateAll()
+            return True
+        return False
 
     def _update_active_lvls(self):
         if hasattr(self, "cur_start_level"):
@@ -1013,28 +1014,36 @@ estimate optimal number of levels"
                     self.fn.ItrStart()
 
                 gc.collect()
-                # Added levels if bayesian
-                if self.params.lsq_est and self.last_itr.lvls_count > 0:
-                    L = self._estimateOptimalL(TOL)
-                    if L > self.last_itr.lvls_count:
-                        self._extendLevels(new_lvls=np.arange(
-                            self.last_itr.lvls_count, L+1).reshape((-1, 1)))
-                        self._update_active_lvls()
-                        self._estimateAll()
-                else:
-                    # Bias is not satisfied (or this is the first iteration)
-                    # Add more levels
-                    newTodoM = self._extendLevels()
-                    if newTodoM is None:
-                        self.print_info("WARNING: MIMC did not converge with the maximum number of levels")
-                        break
-                    self._update_active_lvls()
-                    # TODO: We might not need newTodoM is some of the
-                    # levels are inactive. This is needed for MIMC, not MLMC
-                    samples_added = self._genSamples(newTodoM) or samples_added
 
-                self.Q.theta = self._calcTheta(TOL, self.bias)
-                self._check_levels()
+                # TODO: This is a temporary solution. Essentially sometimes the
+                # user would like to discard samples when the first level changes
+                # Right now this is done in level extension.
+                Done = False
+                while not Done:
+                    # Added levels if bayesian
+                    if self.params.lsq_est and self.last_itr.lvls_count > 0:
+                        # TODO: Do we really need this?
+                        L = self._estimateOptimalL(TOL)
+                        if L > self.last_itr.lvls_count:
+                            self._extendLevels(new_lvls=np.arange(
+                                self.last_itr.lvls_count, L+1).reshape((-1, 1)))
+                            self._update_active_lvls()
+                            self._estimateAll()
+                    else:
+                        # Bias is not satisfied (or this is the first iteration)
+                        # Add more levels
+                        newTodoM = self._extendLevels()
+                        if newTodoM is None:
+                            self.print_info("WARNING: MIMC did not converge with the maximum number of levels")
+                            break
+                        self._update_active_lvls()
+                        # TODO: We might not need newTodoM is some of the
+                        # levels are inactive. This is needed for MIMC, not MLMC
+                        samples_added = self._genSamples(newTodoM) or samples_added
+
+                    self.Q.theta = self._calcTheta(TOL, self.bias)
+                    Done = not self._check_levels()
+
                 todoM = _calcTheoryM(TOL, self.Q.theta,
                                      self.Vl_estimate,
                                      self.last_itr.calcWl(),
