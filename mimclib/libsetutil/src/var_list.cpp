@@ -506,6 +506,8 @@ double VarSizeList::estimate_bias(const double *err_contributions,
             }
         }
     }
+    if (!map_contrib.size())
+        return std::numeric_limits<double>::infinity();
     double bias=0;
     for (auto itr=map_contrib.begin();itr!=map_contrib.end();itr++){
         bias += itr->second;

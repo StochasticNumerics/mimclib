@@ -1292,27 +1292,34 @@ def plotErrorsPP(ax, runs, label_fmt='${TOL}$', *args, **kwargs):
     return (plotObj[0].get_offsets() if not smooth else plotObj[0].get_xydata()), plotObj
 
 @public
-def add_legend(ax, handles=None, labels=None, alpha=0.5,
-               outside=None, loc='best', *args, **kwargs):
+def add_legend(ax, handles=None, labels=None, alpha=0.5, outside=None,
+               loc='best', sort=False, *args, **kwargs):
     if not handles:
         handles, labels = ax.get_legend_handles_labels()
         if not handles:
             return None
 
     lines = np.array([type(h) is FunctionLine2D for h in handles], dtype=np.bool)
+
     # Order handles so that FunctionLine2D is always at the end
     if np.any(lines) and not np.all(lines):
         nlines = np.logical_not(lines)
         handles = np.array(handles)
         labels = np.array(labels)
-        handles_lines, labels_lines = zip(*sorted(zip(handles[lines].tolist(), labels[lines].tolist()),
-                                                  key=lambda t: t[1]))
-        handles_nlines, labels_nlines = zip(*sorted(zip(handles[nlines].tolist(), labels[nlines].tolist()),
-                                                    key=lambda t: t[1]))
+        if sort:
+            handles_lines, labels_lines = zip(*sorted(zip(handles[lines].tolist(), labels[lines].tolist()),
+                                                      key=lambda t: t[1]))
+            handles_nlines, labels_nlines = zip(*sorted(zip(handles[nlines].tolist(), labels[nlines].tolist()),
+                                                        key=lambda t: t[1]))
+        else:
+            handles_lines, labels_lines = handles[lines].tolist(), labels[lines].tolist()
+            handles_nlines, labels_nlines = handles[nlines].tolist(), labels[nlines].tolist()
+
         handles = handles_nlines + handles_lines
         labels = labels_nlines + labels_lines
     else:
-        handles, labels = zip(*sorted(zip(handles, labels), key=lambda t: t[1]))
+        if sort:
+            handles, labels = zip(*sorted(zip(handles, labels), key=lambda t: t[1]))
 
     if outside is not None and len(handles) >= outside:
         # Shrink current axis by 20%
@@ -1613,12 +1620,14 @@ def genBooklet(runs, filteritr=None, input_args=dict(),
                 add_legend(ax, outside=legend_outside)
     return figures
 
+@public
 def set_exact_errors(runs, fnExactErr, filteritr=filteritr_all):
     itrs = [itr for _, itr in enum_iter(runs, filteritr)]
     errs = fnExactErr(itrs)
     for i, itr in enumerate(itrs):
         itr.exact_error = errs[i]
 
+@public
 def estimate_exact(runs):
     minErr = np.min([r.total_error_est for r in runs])
     d = [r.calcEg() for r in runs if r.total_error_est == minErr]
