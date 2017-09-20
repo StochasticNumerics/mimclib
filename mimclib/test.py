@@ -58,8 +58,8 @@ def RunStandardTest(fnSampleLvl=None,
                         action="store", help="Database Host")
     parser.add_argument("-db_tag", type=str, default="NoTag",
                         action="store", help="Database Tag")
-    parser.add_argument("-db", type='bool', default=False,
-                        action="store", help="Save in Database")
+    parser.add_argument("-db", default=False, action="store_true",
+                        help="Save in Database")
     parser.add_argument("-qoi_seed", type=int,
                         action="store", help="Seed for random generator")
     parser.add_argument("-db_name", type=str, action="store", help="")

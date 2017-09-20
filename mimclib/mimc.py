@@ -206,7 +206,7 @@ class MIMCItrData(object):
         El[self.active_lvls==0] = self.calcFineCentralMoment(moment=moment)[self.active_lvls==0]
         El[self.active_lvls<0] = None
         if active_only:
-            return El[self.active_lvls >= 0];
+            return El[self.active_lvls >= 0]
         return El
 
     def calcVl(self, active_only=False):
@@ -590,10 +590,10 @@ supported with a given work model")
 
         add_store('min_dim', type=int, default=0, help="Number of minimum dimensions used in the index set.")
         add_store('verbose', type=int, default=0, help="Verbose output")
-        add_store('lsq_est', type='bool', default=False,
+        add_store('lsq_est', action='store_true',
                   help="Use Bayesian fitting to estimate bias, variance and optimize number \
 of levels in every iteration. This is based on CMLMC.")
-        add_store('dynamic_first_lvl', type='bool', default=False,
+        add_store('dynamic_first_lvl', action='store_true',
                   help="If true, the first level will be found dynamically")
         add_store('moments', type=int, default=4, help="Number of moments to compute")
         add_store('reuse_samples', type='bool', default=True,
@@ -601,7 +601,7 @@ of levels in every iteration. This is based on CMLMC.")
         add_store('bias_calc', type=str, default='new',
                   choices=['new', 'bnd', 'abs-bnd'],
                   help="new, bnd or abs-bnd")
-        add_store('const_theta', type='bool', default=False,
+        add_store('const_theta', action='store_true',
                   help="Use the same theta for all iterations")
         add_store('confidence', type=float, default=0.95,
                   help="Parameter to control confidence level")
