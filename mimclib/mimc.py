@@ -175,9 +175,12 @@ class MIMCItrData(object):
         self._levels_added()
 
     def next_itr(self):
+        return self.copy(copy_lvls=False)
+
+    def copy(self, copy_lvls=True):
         ret = MIMCItrData(parent=self.parent,
                           moments=self.moments,
-                          lvls=self._lvls)
+                          lvls=self._lvls.copy() if copy_lvls else self._lvls)
         ret._lvls_count = self._lvls_count
         ret.psums_delta = self.psums_delta.copy() if self.psums_delta is not None else None
         ret.psums_fine = self.psums_fine.copy() if self.psums_fine is not None else None
@@ -982,11 +985,11 @@ estimate optimal number of levels"
 
         def less(a, b, rel_tol=1e-09, abs_tol=0.0):
             return a-b <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
+        add_new_iteration = False
         for TOL in TOLs:
             self.print_info("TOL", TOL)
             timer.tic()
             samples_added = False
-            add_new_iteration = True
             while True:
                 # Skip adding an iteration if the previous one is empty
                 timer.tic()
@@ -1070,6 +1073,8 @@ estimate optimal number of levels"
             self.print_info("################################################")
             if less(TOL, finalTOL) and self.total_error_est <= finalTOL:
                 break
+            add_new_iteration = True  # Force adding a new iteration for new tolerance
+
         self.print_info("MIMC run for TOL={} took {} seconds".format(finalTOL, timer.toc()))
 
     def reduceDims(self, dim_to_keep, profits, bins=np.inf):

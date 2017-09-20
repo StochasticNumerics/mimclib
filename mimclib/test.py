@@ -4,6 +4,12 @@ from __future__ import print_function
 #warnings.filterwarnings('error')
 import numpy as np
 import warnings
+import warnings
+import os.path
+import mimclib.mimc as mimc
+import mimclib.db as mimcdb
+import argparse
+import time
 
 __all__ = []
 
@@ -31,20 +37,26 @@ def parse_known_args(parser, return_unknown=False):
     return knowns
 
 
-def RunStandardTest(fnSampleLvl=None,
-                    fnSampleAll=None,
-                    fnAddExtraArgs=None,
-                    fnInit=None,
-                    fnItrDone=None,
-                    fnSeed=np.random.seed, profCalc=None):
-    import warnings
-    import os.path
-    import mimclib.mimc as mimc
-    import mimclib.db as mimcdb
+def CreateDBConnection(mimcRun):
+    db_args = {}
+    if hasattr(mimcRun.params, "db_user"):
+        db_args["user"] = mimcRun.params.db_user
+    if hasattr(mimcRun.params, "db_password"):
+        db_args["passwd"] = mimcRun.params.db_password
+    if hasattr(mimcRun.params, "db_host"):
+        db_args["host"] = mimcRun.params.db_host
+    if hasattr(mimcRun.params, "db_engine"):
+        db_args["engine"] = mimcRun.params.db_engine
+    if hasattr(mimcRun.params, "db_name"):
+        db_args["db"] = mimcRun.params.db_name
+    return mimcdb.MIMCDatabase(**db_args)
+
+def CreateStandardTest(fnSampleLvl=None, fnSampleAll=None,
+                       fnAddExtraArgs=None, fnInit=None, fnItrDone=None,
+                       fnSeed=np.random.seed, profCalc=None):
     warnings.formatwarning = lambda msg, cat, filename, lineno, line: \
                              "{}:{}: ({}) {}\n".format(os.path.basename(filename),
                                                        lineno, cat.__name__, msg)
-    import argparse
     parser = argparse.ArgumentParser(add_help=True)
     parser.register('type', 'bool',
                     lambda v: v.lower() in ("yes", "true", "t", "1"))
@@ -77,8 +89,6 @@ def RunStandardTest(fnSampleLvl=None,
                       fn(mimcRun, lvls, M, moments)
         mimcRun.setFunctions(fnSampleAll=fnSampleAll)
 
-    import time
-    tStart = time.clock()
     if not hasattr(mimcRun.params, 'qoi_seed'):
         mimcRun.params.qoi_seed = np.random.randint(2**32-1)
 
@@ -91,43 +101,50 @@ def RunStandardTest(fnSampleLvl=None,
         fnSeed(mimcRun.params.qoi_seed)
 
     if mimcRun.params.db:
-        db_args = {}
-        if hasattr(mimcRun.params, "db_user"):
-            db_args["user"] = mimcRun.params.db_user
-        if hasattr(mimcRun.params, "db_password"):
-            db_args["passwd"] = mimcRun.params.db_password
-        if hasattr(mimcRun.params, "db_host"):
-            db_args["host"] = mimcRun.params.db_host
-        if hasattr(mimcRun.params, "db_engine"):
-            db_args["engine"] = mimcRun.params.db_engine
-        if hasattr(mimcRun.params, "db_name"):
-            db_args["db"] = mimcRun.params.db_name
-        db = mimcdb.MIMCDatabase(**db_args)
-        run_id = db.createRun(mimc_run=mimcRun,
-                              tag=mimcRun.params.db_tag)
+        db = CreateDBConnection(mimcRun)
+        mimcRun.db_data = mimc.Bunch()
+        mimcRun.db_data.run_id = db.createRun(mimc_run=mimcRun,
+                                              tag=mimcRun.params.db_tag)
         if fnItrDone is None:
-            def ItrDone(db=db, r_id=run_id, r=mimcRun):
+            def ItrDone(db=db, r_id=mimcRun.db_args.run_id, r=mimcRun):
                 if r.is_itr_tol_satisfied():   # Only save iterations that have tol satisifed
                     db.writeRunData(r_id, r, iteration_idx=len(r.iters)-1)
             fnItrDone = ItrDone
         else:
-            fnItrDone = lambda db=db, r_id=run_id, r=mimcRun, fn=fnItrDone: \
+            fnItrDone = lambda db=db, r_id=mimcRun.db_data.run_id, r=mimcRun, fn=fnItrDone: \
                         fn(db, r_id, r)
     elif fnItrDone is not None:
         fnItrDone = lambda r=mimcRun, fn=fnItrDone: \
                         fn(None, None, r)
     mimcRun.setFunctions(fnItrDone=fnItrDone)
+    return mimcRun
 
+
+def RunStandardTest(fnSampleLvl=None,
+                    fnSampleAll=None,
+                    fnAddExtraArgs=None,
+                    fnInit=None,
+                    fnItrDone=None,
+                    fnSeed=np.random.seed, profCalc=None):
+    tStart = time.clock()
+    mimcRun = CreateStandardTest(fnSampleLvl=fnSampleLvl,
+                                 fnSampleAll=fnSampleAll,
+                                 fnAddExtraArgs=fnAddExtraArgs,
+                                 fnInit=fnInit, fnItrDone=fnItrDone,
+                                 fnSeed=fnSeed, profCalc=profCalc)
+
+    db = CreateDBConnection(mimcRun)
     try:
         mimcRun.doRun()
     except:
         if mimcRun.params.db:
-            db.markRunFailed(run_id, total_time=time.clock()-tStart)
+            db.markRunFailed(mimcRun.db_data.run_id, total_time=time.clock()-tStart)
         raise   # If you don't want to raise, make sure the following code is not executed
 
     if mimcRun.params.db:
-        db.markRunSuccessful(run_id, total_time=time.clock()-tStart)
+        db.markRunSuccessful(mimcRun.db_data.run_id, total_time=time.clock()-tStart)
     return mimcRun
+
 
 def run_errors_est_program(fnExactErr=None):
     from . import db as mimcdb

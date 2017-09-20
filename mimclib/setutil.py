@@ -243,6 +243,9 @@ class VarSizeList(object):
         return VarSizeList(_handle=__lib__.VarSizeList_copy(self._handle),
                            min_dim=self.min_dim)
 
+    def __copy__(self):
+        return self.copy()
+
     def __del__(self):
         if self._handle is not None:
             __lib__.FreeIndexSet(self._handle)
