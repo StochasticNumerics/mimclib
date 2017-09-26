@@ -562,7 +562,7 @@ def plotErrorsVsTOL(ax, runs, *args, **kwargs):
     modifier = modifier if relative else 1.
     filteritr = kwargs.pop("filteritr", filteritr_convergent)
 
-    ax.set_xlabel('TOL')
+    ax.set_xlabel(r'\tol')
     ax.set_ylabel('Relative error' if relative else 'Error')
     ax.set_yscale('log')
     ax.set_xscale('log')
@@ -1075,38 +1075,46 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
     ax is in instance of matplotlib.axes
     """
     filteritr = kwargs.pop("filteritr", filteritr_all)
-    fnTime = kwargs.pop("fnTime", None)
+    fnTime = kwargs.pop("fnTime", 'time')
     MC_kwargs = kwargs.pop("MC_kwargs", None)
     min_samples = kwargs.pop("min_samples", None)
+    scale_tol2 = kwargs.pop('scale_tol2', True)
+
+    if scale_tol2:
+        tol2_scale = lambda TOL: TOL**2
+        tol2_label = r" $\times \tol^2$"
+    else:
+        tol2_scale = lambda TOL: 1.
+        tol2_label = r""
 
     if fnTime == "work":
-        ax.set_ylabel('Work estimate')
+        ax.set_ylabel('Work estimate' + tol2_label)
         fnTime = lambda r, itr: np.sum(itr.tW * scalar(itr))
         fnMCWork = lambda r, itr: np.max(itr.calcWl())
     elif fnTime == "real_time":
         assert min_samples is None
         assert MC_kwargs is None
-        ax.set_ylabel('Wall clock time, [s]')
+        ax.set_ylabel('Wall clock time [s]' + tol2_label)
         fnMCWork = lambda r, itr: 0.
         fnTime = lambda r, itr: r.iter_total_times[i]
-    elif fnTime is None:
-        ax.set_ylabel('Running time, [s]')
+    elif fnTime is 'time':
+        ax.set_ylabel('Running time [s]' + tol2_label)
         fnTime = lambda r, itr: np.sum(itr.tT * scalar(itr))
         fnMCWork = lambda r, itr: np.max(itr.calcTl())
     elif fnTime == "max_work":
         assert min_samples is None
-        ax.set_ylabel('Work estimate')
+        ax.set_ylabel('Work estimate' + tol2_label)
         fnMCWork = lambda r, itr: np.max(itr.calcWl())
         fnTime = fnMCWork
     elif fnTime == "max_time":
         assert min_samples is None
-        ax.set_ylabel('Running time, [s]')
+        ax.set_ylabel('Running time [s]' + tol2_label)
         fnMCWork = lambda r, itr: np.max(itr.calcTl())
         fnTime = fnMCWork
 
     ax.set_xscale('log')
     ax.set_yscale('log')
-    ax.set_xlabel('TOL')
+    ax.set_xlabel(r'\tol')
 
     scalar = lambda itr: 1
     if min_samples is not None:
@@ -1116,7 +1124,7 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
                                                  active_lvls=itr.active_lvls,
                                                  theta=itr.parent._calcTheta(itr.TOL,
                                                                              itr.bias),
-                                                 Vl=itr.parent.fn.Norm(itr.calcDeltaVl()),
+                                                 Vl=itr.parent.fn.Norm(itr.calcVl()),
                                                  Wl=itr.calcWl(),
                                                  ceil=False, Ca=itr.parent._Ca))
         if min_samples == 0:
@@ -1124,8 +1132,13 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
         else:
             scalar = lambda itr: np.ceil(new_samples(itr)) / itr.M
 
-    xy = [[itr.TOL, fnTime(r, itr),
-           fnMCWork(r, itr) * r.estimateMonteCarloSampleCount(itr.TOL)]
+    if scale_tol2:
+        tol2_scale = lambda TOL: TOL**2
+    else:
+        tol2_scale = lambda TOL: 1.
+    xy = [[itr.TOL, fnTime(r, itr) * tol2_scale(itr.TOL),
+           fnMCWork(r, itr) * r.estimateMonteCarloSampleCount(itr.TOL)
+           * tol2_scale(itr.TOL)]
           for i, r, itr in enum_iter_i(runs, filteritr)]
 
     plotObj = []
@@ -1150,7 +1163,7 @@ def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
     """
     lvl_index = kwargs.pop('lvl_index', None)
     ax.set_xscale('log')
-    ax.set_xlabel('TOL')
+    ax.set_xlabel(r'\tol')
     ax.set_ylabel(r'$L$')
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
@@ -1196,7 +1209,7 @@ def plotThetaVsTOL(ax, runs, *args, **kwargs):
     ax is in instance of matplotlib.axes
     """
     ax.set_xscale('log')
-    ax.set_xlabel('TOL')
+    ax.set_xlabel(r'\tol')
     ax.set_ylabel(r'$\theta$')
     ax.set_ylim([0, 1.])
 
@@ -1214,7 +1227,7 @@ def plotThetaRefVsTOL(ax, runs, eta, chi, *args, **kwargs):
     ax is in instance of matplotlib.axes
     """
     ax.set_xscale('log')
-    ax.set_xlabel('TOL')
+    ax.set_xlabel(r'\tol')
     ax.set_ylabel(r'$\theta$')
     ax.set_ylim([0, 1.])
 
@@ -1339,7 +1352,8 @@ def add_legend(ax, handles=None, labels=None, alpha=0.5, outside=None,
         return ax.legend(handles, labels, *args, **kwargs)
 
 
-def __formatMIMCRate(rate, log_rate, lbl_base=r"\textrm{TOL}", lbl_log_base=None):
+def __formatMIMCRate(rate, log_rate, lbl_base=r"\tol",
+                     scale_tol2=True, lbl_log_base=None):
     txt_rate = '{:.2g}'.format(rate)
     txt_log_rate = '{:.2g}'.format(log_rate)
     lbl_log_base = lbl_log_base or "{}^{{-1}}".format(lbl_base)
@@ -1349,6 +1363,8 @@ def __formatMIMCRate(rate, log_rate, lbl_base=r"\textrm{TOL}", lbl_log_base=None
     if txt_log_rate != "0":
         label += r'\log\left({}\right)^{{ {} }}'.format(lbl_log_base,
                                                         txt_log_rate)
+    if scale_tol2:
+        rate -= 2
     return (lambda x, r=rate, lr=log_rate: x**r * np.abs(np.log(x))**lr), \
         "${}$".format(label)
 
@@ -1425,6 +1441,7 @@ def genBooklet(runs, filteritr=None, input_args=dict(),
     mpl.rc('text', usetex=True)
     mpl.rc('font', **{'family': 'normal', 'weight': 'demibold',
                       'size': 15})
+    plt.rc('text.latex', preamble=r'\usepackage{amsmath} \def{\tol}{\ensuremath{\varepsilon}}')
 
     figures = []
     def add_fig():
@@ -1440,7 +1457,7 @@ def genBooklet(runs, filteritr=None, input_args=dict(),
                             ErrEst_kwargs={'label':
                                            label_fmt.format(label='Error Estimate')},
                             Ref_kwargs={'ls': '--', 'c':'k',
-                                        'label': label_fmt.format(label='TOL')},
+                                        'label': label_fmt.format(label=r'\tol')},
                             num_kwargs={'color': 'r'})
         except:
             plot_except(ax, verbose, reraise)
@@ -1594,7 +1611,7 @@ def genBooklet(runs, filteritr=None, input_args=dict(),
                     rate = 1./np.min(np.array(params.w) * np.log(params.beta))
                 else:
                     rate = 1./np.min(np.array(params.w))
-                label = r'${}\log\left(\textrm{{TOL}}^{{-1}}\right)$'.format(_formatPower(rate))
+                label = r'${}\log\left({\tol}^{{-1}}\right)$'.format(_formatPower(rate))
                 ax.add_line(FunctionLine2D(fn=lambda x, r=rate: -rate*np.log(x),
                                            data=line_data,
                                            log_data=False,

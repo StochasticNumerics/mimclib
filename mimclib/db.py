@@ -289,7 +289,7 @@ class MIMCDatabase(object):
     def writeRunData(self, run_id, mimc_run, iteration_idx):
         base = 0
         iteration = mimc_run.iters[iteration_idx]
-        El = mimc_run.fn.Norm(iteration.calcDeltaEl())
+        El = mimc_run.fn.Norm(iteration.calcEl())
         Vl = iteration.Vl_estimate
         tT = iteration.tT
         tW = iteration.tW

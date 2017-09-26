@@ -169,6 +169,7 @@ class MIMCItrData(object):
         self.Q = None
         self.Vl_estimate = np.zeros(0)
         self._lvls_count = 0
+        self.weights = np.zeros(0)
 
         # Any level < start_lvl is not active
         self.active_lvls = np.array([])  # -1: inactive, 0: base, 1: active
@@ -192,6 +193,7 @@ class MIMCItrData(object):
         ret.total_time = self.total_time
         ret.TOL = self.TOL
         ret.Q = copy.copy(self.Q)
+        ret.weights = copy.copy(self.weights)
         ret.Vl_estimate = self.Vl_estimate.copy() if self.Vl_estimate is not None else None
 
         ret.active_lvls = self.active_lvls.copy()
@@ -206,43 +208,47 @@ class MIMCItrData(object):
 
     def calcEl(self, moment=1, active_only=False):
         El = self.calcDeltaCentralMoment(moment=moment)
-        El[self.active_lvls==0] = self.calcFineCentralMoment(moment=moment)[self.active_lvls==0]
-        El[self.active_lvls<0] = None
+        El[self.active_lvls==0, :] = self.calcFineCentralMoment(moment=moment)[self.active_lvls==0]
+        El[self.active_lvls<0, :] = None
         if active_only:
-            return El[self.active_lvls >= 0]
+            return El[self.active_lvls >= 0, :]
         return El
 
     def calcVl(self, active_only=False):
         return self.calcEl(moment=2, active_only=active_only)
 
-    def computedMoments(self):
-        return self.moments
+    # def computedMoments(self):
+    #     return self.moments
 
-    def calcDeltaVl(self):
-        return self.calcDeltaCentralMoment(2)
+    # def calcDeltaVl(self):
+    #     return self.calcDeltaCentralMoment(2)
 
-    def calcDeltaEl(self):
-        '''
-        Returns the sample estimators for moments for each level.
-        '''
+    # def calcDeltaEl(self):
+    #     '''
+    #     Returns the sample estimators for moments for each level.
+    #     '''
+    #     if self.psums_delta is None:
+    #         return np.array([])
+    #     idx = self.M != 0
+    #     val = np.empty_like(self.psums_delta[:, 0])
+    #     val[idx] = self.psums_delta[idx, 0] * \
+    #                (1./_expand(self.M[idx], 0 ,self.psums_delta[idx, 0].shape))
+    #     val[np.logical_not(idx)] = None
+    #     return val
+
+    def calcDeltaCentralMoment(self, moment, weighted=True):
         if self.psums_delta is None:
             return np.array([])
-        idx = self.M != 0
-        val = np.empty_like(self.psums_delta[:, 0])
-        val[idx] = self.psums_delta[idx, 0] * \
-                   (1./_expand(self.M[idx], 0 ,self.psums_delta[idx, 0].shape))
-        val[np.logical_not(idx)] = None
-        return val
+        w = self.weights**moment if weighted else 1.
+        return w[:, None] * compute_central_moment(self.psums_delta,
+                                                   self.M, moment)
 
-    def calcDeltaCentralMoment(self, moment):
+    def calcFineCentralMoment(self, moment, weighted=True):
         if self.psums_delta is None:
             return np.array([])
-        return compute_central_moment(self.psums_delta, self.M, moment)
-
-    def calcFineCentralMoment(self, moment):
-        if self.psums_delta is None:
-            return np.array([])
-        return compute_central_moment(self.psums_fine, self.M, moment)
+        w = self.weights**moment if weighted else 1.
+        return w[:, None] * compute_central_moment(self.psums_fine,
+                                                   self.M, moment)
 
     def calcTl(self):
         idx = self.M != 0
@@ -261,7 +267,7 @@ class MIMCItrData(object):
 
     def addSamples(self, lvl_idx, M, psums_delta, psums_fine, tT, tW):
         assert psums_delta.shape == psums_fine.shape and \
-            psums_fine.shape[0] == self.computedMoments(), "Inconsistent arguments "
+            psums_fine.shape[0] == self.moments, "Inconsistent arguments "
         #assert lvl_idx is not None, "Level was not found"
         if self.M[lvl_idx] == 0:
             if self.psums_delta is None:
@@ -302,9 +308,10 @@ class MIMCItrData(object):
         self.tT.resize(new_count, refcheck=False)
         self.tW.resize(new_count, refcheck=False)
         self.M.resize(new_count, refcheck=False)
+        self.weights.resize(new_count, refcheck=False)
         self.active_lvls.resize(new_count, refcheck=False)
         self.active_lvls[self._lvls_count:new_count] = 1 # Make all active
-
+        self.weights[self._lvls_count:new_count] = 1.
         self._lvls_count = new_count
 
     def calcTotalWork(self):
@@ -316,13 +323,13 @@ class MIMCItrData(object):
 
     def zero_samples(self, ind=None):
         if ind is None:
-            self.M = np.zeros_like(self.M)
-            self.tT = np.zeros_like(self.tT)
-            self.tW = np.zeros_like(self.tW)
+            self.M[:] = 0
+            self.tT[:] = 0
+            self.tW[:] = 0
             if self.psums_delta is not None:
-                self.psums_delta = np.zeros_like(self.psums_delta)
+                self.psums_delta[:] = np.zeros_like(self.psums_delta)
             if self.psums_fine is not None:
-                self.psums_fine = np.zeros_like(self.psums_fine)
+                self.psums_fine[:] = np.zeros_like(self.psums_fine)
         else:
             self.M[ind] = 0
             self.tT[ind] = 0
@@ -375,9 +382,9 @@ class MIMCItrData(object):
         if has_var:
             V = self.Vl_estimate
             V_fine = fnNorm(self.calcFineCentralMoment(moment=2))
-            sample_V = fnNorm(self.calcDeltaVl())
+            V_sample = fnNorm(self.calcDeltaCentralMoment(moment=2))
 
-        E = fnNorm(self.calcDeltaEl())
+        E = fnNorm(self.calcEl())
         T = self.calcTl()
 
         columns = []
@@ -390,7 +397,7 @@ class MIMCItrData(object):
         if has_var:
             add_column("V", "^20", ">20.12e", lambda i: V[i])
             add_column("fineV", "^20", ">20.12e", lambda i: V_fine[i])
-            add_column("DeltaV", "^20", ">20.12e", lambda i: sample_V[i])
+            add_column("DeltaV", "^20", ">20.12e", lambda i: V_sample[i])
         add_column("W", "^20", ">20.12e", lambda i: Wl[i])
         add_column("M", "^8", ">8", lambda i: self.M[i])
         add_column("Time", "^15", ">15.6e", lambda i: T[i])
@@ -574,23 +581,22 @@ supported with a given work model")
 
     @staticmethod
     def addOptionsToParser(parser, pre='-mimc_', additional=True, default_bayes=True):
-        def str2bool(v):
-            # susendberg's function
-            return v.lower() in ("yes", "true", "t", "1")
         mimcgrp = parser.add_argument_group('MIMC', 'Arguments to control MIMC logic')
-        mimcgrp.register('type', 'bool', str2bool)
 
         class Store_as_array(argparse._StoreAction):
             def __call__(self, parser, namespace, values, option_string=None):
                 setattr(namespace, self.dest, np.array(values))
 
-        def add_store(name, action="store", **kwargs):
+        def add_store(name, action="store", dest=None, **kwargs):
+            if dest is None:
+                dest = name
             if "default" in kwargs and "help" in kwargs:
                 kwargs["help"] += " (default: {})".format(kwargs["default"])
-            mimcgrp.add_argument(pre + name, dest=name,
-                                 action=action,
+            mimcgrp.add_argument(pre + name, dest=dest, action=action,
                                  **kwargs)
 
+        add_store('ml2r', default=False, action='store_true',
+                  help="Enable ML2R. Only For 1 dim, requires 'w'")
         add_store('min_dim', type=int, default=0, help="Number of minimum dimensions used in the index set.")
         add_store('verbose', type=int, default=0, help="Verbose output")
         add_store('lsq_est', action='store_true',
@@ -599,8 +605,9 @@ of levels in every iteration. This is based on CMLMC.")
         add_store('dynamic_first_lvl', action='store_true',
                   help="If true, the first level will be found dynamically")
         add_store('moments', type=int, default=4, help="Number of moments to compute")
-        add_store('reuse_samples', type='bool', default=True,
-                  help="Reuse samples between iterations")
+        add_store('discard_samples', action='store_false',
+                  dest='reuse_samples',
+                  default=True, help="Discard samples between iterations")
         add_store('bias_calc', type=str, default='new',
                   choices=['new', 'bnd', 'abs-bnd'],
                   help="new, bnd or abs-bnd")
@@ -759,7 +766,7 @@ max_lvl        = {}
 
     def _estimateBayesianVl(self, L=None):
         if np.sum(self.all_itr.M, axis=0) == 0:
-            return self.fn.Norm(self.all_itr.calcDeltaVl())
+            return self.fn.Norm(self.all_itr.calcVl())
         # TODO: This assumes that we have correct ordering
         # of levels
         oL = self.all_itr.lvls_count-1
@@ -772,7 +779,7 @@ max_lvl        = {}
         hl = self._get_hl(L)
         M = self.all_itr.M[included]
         s1 = self.all_itr.psums_delta[included, 0]
-        m1 = self.all_itr.calcDeltaEl()[included]
+        m1 = self.all_itr.calcEl()[included]
         s2 = self.all_itr.psums_delta[included, 1]
         mu = self.Q.W*(hl[included-1]**self.Q.w[0] - hl[included]**self.Q.w[0])
 
@@ -876,6 +883,8 @@ estimate optimal number of levels"
             todoM = self.fn.ExtendLvls()
         self.last_itr._levels_added()
         self.all_itr._levels_added()
+        if self.params.ml2r:
+            self.last_itr.weights = self.ml2r_weights()
         if todoM is None:
             # TODO: Allow for array todoM
             todoM = np.ones(self.last_itr.lvls_count, dtype=np.int) * self.params.M0[0]
@@ -905,7 +914,7 @@ estimate optimal number of levels"
             return False
         calcM, psums_delta, psums_fine, \
             total_time, total_work = self.fn.SampleAll(lvls, totalM,
-                                                       self.last_itr.computedMoments())
+                                                       self.last_itr.moments)
         for i in range(0, lvls_count):
             if calcM[i] <= 0:
                 continue
@@ -937,7 +946,7 @@ estimate optimal number of levels"
         # Z: Y-X                  (difference)
         # \sqrt{W_Z V_Z} + \sqrt{W_X V_X} \leq \sqrt{W_Y V_Y}
         deltaWl = self.last_itr.calcWl()
-        deltaVl = self.fn.Norm(self.last_itr.calcDeltaVl())
+        deltaVl = self.fn.Norm(self.last_itr.calcVl())
         fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
         VW_Z = deltaVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
         VW_Y = fineVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
@@ -948,8 +957,6 @@ estimate optimal number of levels"
             self.print_info("New start level", self.cur_start_level)
             self._update_active_lvls()
             self._estimateAll()
-            return True
-        return False
 
     def _update_active_lvls(self):
         if hasattr(self, "cur_start_level"):
@@ -969,6 +976,19 @@ estimate optimal number of levels"
         if itr is None:
             itr = self.last_itr
         return itr.total_error_est < np.maximum(self.params.TOL, itr.TOL)
+
+    def ml2r_weights(self):
+        ell = self.last_itr.get_lvls().to_dense_matrix()
+        assert ell.shape[1] == 1, "ML2R is supported for one dimensional problems only."
+        ell = ell[self.last_itr.active_lvls >= 0, 0]
+        ell -= np.min(ell)
+        L = np.max(ell)
+        alpha = float(self.params.w[0] * np.log(self.params.beta[0]))
+        denom = np.hstack(([1.], np.cumprod(1-np.exp(-alpha*(ell+1)))))
+        w = (-1) ** (L-ell) * np.exp(-alpha*(L-ell)*(L+1-ell)/2.) / (denom[ell] * denom[L-ell])
+        W = np.zeros(self.last_itr.lvls_count)
+        W[self.last_itr.active_lvls >= 0] = np.cumsum(w[::-1])[::-1]
+        return W
 
     def doRun(self, TOLs=None):
         timer = Timer()
@@ -1021,31 +1041,29 @@ estimate optimal number of levels"
                 # TODO: This is a temporary solution. Essentially sometimes the
                 # user would like to discard samples when the first level changes
                 # Right now this is done in level extension.
-                Done = False
-                while not Done:
-                    # Added levels if bayesian
-                    if self.params.lsq_est and self.last_itr.lvls_count > 0:
-                        # TODO: Do we really need this?
-                        L = self._estimateOptimalL(TOL)
-                        if L > self.last_itr.lvls_count:
-                            self._extendLevels(new_lvls=np.arange(
-                                self.last_itr.lvls_count, L+1).reshape((-1, 1)))
-                            self._update_active_lvls()
-                            self._estimateAll()
-                    else:
-                        # Bias is not satisfied (or this is the first iteration)
-                        # Add more levels
-                        newTodoM = self._extendLevels()
-                        if newTodoM is None:
-                            self.print_info("WARNING: MIMC did not converge with the maximum number of levels")
-                            break
+                # Added levels if bayesian
+                if self.params.lsq_est and self.last_itr.lvls_count > 0:
+                    # TODO: Do we really need this?
+                    L = self._estimateOptimalL(TOL)
+                    if L > self.last_itr.lvls_count:
+                        self._extendLevels(new_lvls=np.arange(
+                            self.last_itr.lvls_count, L+1).reshape((-1, 1)))
                         self._update_active_lvls()
-                        # TODO: We might not need newTodoM is some of the
-                        # levels are inactive. This is needed for MIMC, not MLMC
-                        samples_added = self._genSamples(newTodoM) or samples_added
+                        self._estimateAll()
+                else:
+                    # Bias is not satisfied (or this is the first iteration)
+                    # Add more levels
+                    newTodoM = self._extendLevels()
+                    if newTodoM is None:
+                        self.print_info("WARNING: MIMC did not converge with the maximum number of levels")
+                        break
+                    self._update_active_lvls()
+                    # TODO: We might not need newTodoM is some of the
+                    # levels are inactive. This is needed for MIMC, not MLMC
+                    samples_added = self._genSamples(newTodoM) or samples_added
 
-                    self.Q.theta = self._calcTheta(TOL, self.bias)
-                    Done = not self._check_levels()
+                self.Q.theta = self._calcTheta(TOL, self.bias)
+                not self._check_levels()
 
                 todoM = _calcTheoryM(TOL, self.Q.theta,
                                      self.Vl_estimate,

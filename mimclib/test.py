@@ -106,7 +106,7 @@ def CreateStandardTest(fnSampleLvl=None, fnSampleAll=None,
         mimcRun.db_data.run_id = db.createRun(mimc_run=mimcRun,
                                               tag=mimcRun.params.db_tag)
         if fnItrDone is None:
-            def ItrDone(db=db, r_id=mimcRun.db_args.run_id, r=mimcRun):
+            def ItrDone(db=db, r_id=mimcRun.db_data.run_id, r=mimcRun):
                 if r.is_itr_tol_satisfied():   # Only save iterations that have tol satisifed
                     db.writeRunData(r_id, r, iteration_idx=len(r.iters)-1)
             fnItrDone = ItrDone

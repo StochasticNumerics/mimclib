@@ -20,13 +20,15 @@ import numpy as np
 import time
 from wcumsum import wcumsum
 
-warnings.filterwarnings("error")
+warnings.filterwarnings("default")
 
 
 def addExtraArguments(parser):
     parser.add_argument("-qoi_sigma", type=float, default=1.,
                         action="store", help="Volatility in GBM")
     parser.add_argument("-qoi_mu", type=float, default=1.,
+                        action="store", help="Drift in GBM")
+    parser.add_argument("-qoi_K", type=float, default=80.,
                         action="store", help="Drift in GBM")
     parser.add_argument("-qoi_T", type=float, default=1.,
                         action="store", help="Final time in GBM")
@@ -62,6 +64,7 @@ class CustomClass(mimclib.mimc.custom_obj):
         return self.data
 
 def mySampleQoI(run, inds, M):
+    M = np.minimum(M, 1000)
     meshes = (run.params.qoi_T/run.fn.Hierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
 
@@ -88,6 +91,9 @@ def mySampleQoI(run, inds, M):
         elif run.params.qoi_type == "arr":
             solves[:, i, 0] = val
             solves[:, i, 1] = val
+
+    # Call option
+    solves = np.exp(-run.params.qoi_mu * run.params.qoi_T) * np.maximum(solves - run.params.qoi_K, 0)
     return solves, time.clock()-tStart
 
 def initRun(run):
