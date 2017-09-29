@@ -1364,7 +1364,7 @@ def __formatMIMCRate(rate, log_rate, lbl_base=r"\tol",
         label += r'\log\left({}\right)^{{ {} }}'.format(lbl_log_base,
                                                         txt_log_rate)
     if scale_tol2:
-        rate -= 2
+        rate += 2
     return (lambda x, r=rate, lr=log_rate: x**r * np.abs(np.log(x))**lr), \
         "${}$".format(label)
 
@@ -1441,7 +1441,7 @@ def genBooklet(runs, filteritr=None, input_args=dict(),
     mpl.rc('text', usetex=True)
     mpl.rc('font', **{'family': 'normal', 'weight': 'demibold',
                       'size': 15})
-    plt.rc('text.latex', preamble=r'\usepackage{amsmath} \def{\tol}{\ensuremath{\varepsilon}}')
+    plt.rc('text.latex', preamble=r'\providecommand{\tol}{\ensuremath{\varepsilon}}')
 
     figures = []
     def add_fig():

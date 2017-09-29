@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     tT            REAL,
     tW            REAL,
     Ml            BIGINT,
+    weight        REAL,
     psums_delta   mediumblob,
     psums_fine    mediumblob,
     FOREIGN KEY (iter_id) REFERENCES tbl_iters(iter_id) ON DELETE CASCADE,
@@ -229,6 +230,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     tT            REAL,
     tW            REAL,
     Ml            INTEGER,
+    weight        REAL,
     psums_delta   mediumblob,
     psums_fine    mediumblob,
     FOREIGN KEY (iter_id) REFERENCES tbl_iters(iter_id) ON DELETE CASCADE,
@@ -331,12 +333,12 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 lvl = ",".join(["%d|%d" % (i, j) for i, j in
                                 enumerate(iteration.lvls_get(k)) if j > base])
                 cur.execute('''
-INSERT INTO tbl_lvls(active, lvl, lvl_hash, psums_delta, psums_fine, iter_id,  El, Vl, tT, tW, Ml)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+INSERT INTO tbl_lvls(active, lvl, lvl_hash, psums_delta, psums_fine, iter_id, weight,  El, Vl, tT, tW, Ml)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                             [iteration.active_lvls[k],
                              lvl, _md5(lvl),
                              _pickle(iteration.psums_delta[k, :]),
-                             _pickle(iteration.psums_fine[k, :]), iter_id]+
+                             _pickle(iteration.psums_fine[k, :]), iter_id, iteration.weights[k]] +
                             lvl_data)
 
     def readRunsByID(self, run_ids):
@@ -360,7 +362,7 @@ ORDER BY dr.run_id, dr.iteration_idx
 
             lvlsAll = cur.execute('''
             SELECT dr.iter_id, l.lvl, l.psums_delta, l.psums_fine, l.Ml,
-                     l.tT, l.tW, l.Vl, l.active
+                     l.tT, l.tW, l.Vl, l.active, l.weight
             FROM
             tbl_lvls l INNER JOIN tbl_iters dr ON
             dr.iter_id=l.iter_id INNER JOIN tbl_runs r on r.run_id=dr.run_id
@@ -412,7 +414,6 @@ ORDER BY dr.run_id, dr.iteration_idx
                 run.iters.append(iteration)
                 if iter_id not in dictLvls:
                     continue
-                active_lvls = []
                 for l in dictLvls[iter_id]:
                     t = np.array(map(int, [p for p in re.split(",|\|", l[1]) if p]),
                                  dtype=setutil.ind_t)
@@ -420,7 +421,6 @@ ORDER BY dr.run_id, dr.iteration_idx
                     if k is None:
                         iteration.lvls_add_from_list(inds=[t[1::2]], j=[t[::2]])
                         k = iteration.lvls_count-1
-
                     iteration.active_lvls[k] = l[8]
                     iteration.zero_samples(k)
                     iteration.addSamples(k, M=_none2nan(l[4]),
@@ -429,6 +429,7 @@ ORDER BY dr.run_id, dr.iteration_idx
                                          psums_delta=_unpickle(l[2]),
                                          psums_fine=_unpickle(l[3]))
                     iteration.Vl_estimate[k] = _none2nan(l[7])
+                    iteration.weights[k] = l[9]
 
         return lstruns
 

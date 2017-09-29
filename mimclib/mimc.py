@@ -58,6 +58,13 @@ def _calcTheoryM(TOL, theta, Vl, Wl,
 
 
 @public
+def calc_ml2r_weights(alpha, L):
+    ell = np.arange(L+1)
+    denom = np.hstack(([1.], np.cumprod(1-np.exp(-alpha*(ell+1)))))
+    w = (-1) ** (L-ell) * np.exp(-alpha*(L-ell)*(L+1-ell)/2.) / (denom[ell] * denom[L-ell])
+    return np.cumsum(w[::-1])[::-1]
+
+@public
 class custom_obj(object):
     # Used to add samples. Supposedly not used if M is fixed to 1
     def __add__(self, d):  # d type is custom_obj
@@ -206,16 +213,17 @@ class MIMCItrData(object):
         """
         return np.sum(self.calcEl(active_only=True), axis=0)
 
-    def calcEl(self, moment=1, active_only=False):
-        El = self.calcDeltaCentralMoment(moment=moment)
-        El[self.active_lvls==0, :] = self.calcFineCentralMoment(moment=moment)[self.active_lvls==0]
-        El[self.active_lvls<0, :] = None
+    def calcEl(self, moment=1, active_only=False, weighted=True):
+        El = self.calcDeltaCentralMoment(moment=moment, weighted=weighted)
+        El[self.active_lvls==0, ...] = self.calcFineCentralMoment(moment=moment,
+                                                                  weighted=weighted)[self.active_lvls==0, ...]
+        El[self.active_lvls<0, ...] = None
         if active_only:
-            return El[self.active_lvls >= 0, :]
+            return El[self.active_lvls >= 0, ...]
         return El
 
-    def calcVl(self, active_only=False):
-        return self.calcEl(moment=2, active_only=active_only)
+    def calcVl(self, active_only=False, weighted=True):
+        return self.calcEl(moment=2, active_only=active_only, weighted=weighted)
 
     # def computedMoments(self):
     #     return self.moments
@@ -239,16 +247,22 @@ class MIMCItrData(object):
     def calcDeltaCentralMoment(self, moment, weighted=True):
         if self.psums_delta is None:
             return np.array([])
-        w = self.weights**moment if weighted else 1.
-        return w[:, None] * compute_central_moment(self.psums_delta,
-                                                   self.M, moment)
+        B = compute_central_moment(self.psums_delta, self.M, moment)
+        if not weighted:
+            return B
+        w = self.weights**moment
+        slicer = [slice(None)] + [None]*(len(B.shape)-1)
+        return w[slicer] * B
 
     def calcFineCentralMoment(self, moment, weighted=True):
         if self.psums_delta is None:
             return np.array([])
-        w = self.weights**moment if weighted else 1.
-        return w[:, None] * compute_central_moment(self.psums_fine,
-                                                   self.M, moment)
+        B = compute_central_moment(self.psums_fine, self.M, moment)
+        if not weighted:
+            return B
+        w = self.weights**moment
+        slicer = [slice(None)] + [None]*(len(B.shape)-1)
+        return w[slicer] * B
 
     def calcTl(self):
         idx = self.M != 0
@@ -516,9 +530,16 @@ class MIMCRun(object):
                                                              self.params.beta)
 
         if not hasattr(self.fn, "EstimateBias"):
-            self.fn.EstimateBias = (self._estimateBayesianBias
-                                    if self.params.lsq_est
-                                    else self._estimateBias)
+            if self.params.ml2r:
+                self.fn.EstimateBias = lambda r=self: estimate_bias_ml2r(r)
+            elif self.params.lsq_est:
+                self.fn.EstimateBias = self._estimateBayesianBias
+            elif self.params.bias_calc == 'setutil':
+                self.fn.EstimateBias = lambda r=self: estimate_bias_setutil(r)
+            elif self.params.bias_calc == 'bnd':
+                self.fn.EstimateBias = lambda r=self: estimate_bias_bnd(r)
+            elif self.params.bias_calc == 'abs-bnd':
+                self.fn.EstimateBias = lambda r=self: estimate_bias_abs_bnd(r)
 
         if self.params.lsq_est and not hasattr(self.fn, "WorkModel"):
             raise NotImplementedError("Bayesian parameter fitting is only \
@@ -564,10 +585,10 @@ supported with a given work model")
         # fnHierarchy(lvls): Returns associated hierarchy of lvls
         for k in kwargs.keys():
             kk = k[2:] if k.startswith('fn') else k
-            if kk not in ["SampleLvl", "SampleAll", "ExtendLvls",
-                          "ItrStart", "ItrDone", "WorkModel",
-                          "EstimateBias", "Hierarchy", "SampleQoI",
-                          "Norm"]:
+            if kk not in ["SampleLvl", "SampleLvlSums", "SampleAll",
+                          "ExtendLvls", "ItrStart", "ItrDone",
+                          "WorkModel", "EstimateBias", "Hierarchy",
+                          "SampleQoI", "Norm"]:
                 raise KeyError("Invalid function name `{}`".format(kk))
             if kk == "SampleLvl":
                 if kwargs[k] is not None:
@@ -576,6 +597,11 @@ supported with a given work model")
                                                            moments, kwargs[k],
                                                            fnWorkModel=self.fn.WorkModel if hasattr(self.fn, "WorkModel") else None,
                                                            verbose=self.params.verbose)
+            elif kk == "SampleLvlSums":
+                self.fn.SampleAll = lambda lvls, M, moments: \
+                                        default_sample_all_sums(lvls, M,
+                                                                moments, kwargs[k],
+                                                                verbose=self.params.verbose)
             else:
                 setattr(self.fn, kk, kwargs[k])
 
@@ -608,9 +634,9 @@ of levels in every iteration. This is based on CMLMC.")
         add_store('discard_samples', action='store_false',
                   dest='reuse_samples',
                   default=True, help="Discard samples between iterations")
-        add_store('bias_calc', type=str, default='new',
-                  choices=['new', 'bnd', 'abs-bnd'],
-                  help="new, bnd or abs-bnd")
+        add_store('bias_calc', type=str, default='bnd',
+                  choices=['setutil', 'bnd', 'abs-bnd'],
+                  help="setutil, bnd or abs-bnd")
         add_store('const_theta', action='store_true',
                   help="Use the same theta for all iterations")
         add_store('confidence', type=float, default=0.95,
@@ -692,14 +718,16 @@ Not needed if fnHierarchy is provided.")
         output = ''
         if verbose >= VERBOSE_INFO:
             output += '''Eg             = {}
-Bias           = {:.12g}
-Stat. err      = {:.12g}
+Bias           = {:.12g} | {:.12g}
+Stat. err      = {:.12g} | {:.12g}
 Error est.     = {:.12g} | {:.12g}
 Iteration Work = {:.12g}
 Iteration Time = {:.12g}
 TotalTime      = {:.12g}
 max_lvl        = {}
-'''.format(str(self.last_itr.calcEg()), self.bias, self.stat_error,
+'''.format(str(self.last_itr.calcEg()),
+           self.bias, (1-self.params.theta) * self.last_itr.TOL,
+           self.stat_error, self.params.theta * self.last_itr.TOL,
            self.total_error_est, self.last_itr.TOL,
            self.last_itr.calcTotalWork(),
            self.last_itr.total_time,
@@ -717,32 +745,6 @@ max_lvl        = {}
         """ Helper function to return norm of a single element
         """
         return self.fn.Norm(np.array([x]))[0]
-
-    def _estimateBias(self):
-        El = self.last_itr.calcEl()
-        El[self.last_itr.active_lvls == 0] = np.inf
-        bias_calc = self.params.bias_calc.lower()
-        if bias_calc == 'new':
-            El_norm = np.empty(self.last_itr.lvls_count)
-            El_norm.fill(np.inf)
-            act = self.last_itr.active_lvls > 0
-            El_norm[act] = self.fn.Norm(El[act])
-            bias = self.last_itr.get_lvls().estimate_bias(El_norm)
-        elif bias_calc == 'bnd':
-            El_bnd = El[self.last_itr.get_lvls().is_boundary()]
-            if np.any([e is None for e in El_bnd]):
-                bias = np.inf
-            else:
-                bias = self.fnNorm1(np.sum(El_bnd))
-        elif bias_calc == 'abs-bnd':
-            El_norm = np.empty(len(self.last_itr.lvls_count))
-            El_norm.fill(np.inf)
-            act = self.last_itr.active_lvls >= 0
-            El_bnd = El[self.last_itr.get_lvls().is_boundary()]
-            bias = np.sum(El_norm[El_bnd])
-        else:
-            raise ValueError("bias_calc")
-        return bias
 
     def estimateMonteCarloSampleCount(self, TOL):
         # TODO: Should only be based on base_level
@@ -883,8 +885,7 @@ estimate optimal number of levels"
             todoM = self.fn.ExtendLvls()
         self.last_itr._levels_added()
         self.all_itr._levels_added()
-        if self.params.ml2r:
-            self.last_itr.weights = self.ml2r_weights()
+        self.update_ml2r_weights()
         if todoM is None:
             # TODO: Allow for array todoM
             todoM = np.ones(self.last_itr.lvls_count, dtype=np.int) * self.params.M0[0]
@@ -964,6 +965,7 @@ estimate optimal number of levels"
            self.last_itr.active_lvls = -1*np.ones(len(lvls))
            self.last_itr.active_lvls[lvls[:, 0] > self.cur_start_level] = 1
            self.last_itr.active_lvls[lvls[:, 0] == self.cur_start_level] = 0
+           self.update_ml2r_weights()
 
     def print_info(self, *args, **kwargs):
         if self.params.verbose >= VERBOSE_INFO:
@@ -977,18 +979,18 @@ estimate optimal number of levels"
             itr = self.last_itr
         return itr.total_error_est < np.maximum(self.params.TOL, itr.TOL)
 
-    def ml2r_weights(self):
+    def update_ml2r_weights(self):
+        if not self.params.ml2r:
+            return
         ell = self.last_itr.get_lvls().to_dense_matrix()
         assert ell.shape[1] == 1, "ML2R is supported for one dimensional problems only."
         ell = ell[self.last_itr.active_lvls >= 0, 0]
-        ell -= np.min(ell)
-        L = np.max(ell)
+        L = np.max(ell) - np.min(ell)
         alpha = float(self.params.w[0] * np.log(self.params.beta[0]))
-        denom = np.hstack(([1.], np.cumprod(1-np.exp(-alpha*(ell+1)))))
-        w = (-1) ** (L-ell) * np.exp(-alpha*(L-ell)*(L+1-ell)/2.) / (denom[ell] * denom[L-ell])
-        W = np.zeros(self.last_itr.lvls_count)
-        W[self.last_itr.active_lvls >= 0] = np.cumsum(w[::-1])[::-1]
-        return W
+        self.last_itr.weights = np.ones(self.last_itr.lvls_count)
+        from . import ipdb
+        ipdb.embed()
+        self.last_itr.weights[self.last_itr.active_lvls >= 0] = calc_ml2r_weights(alpha, L)
 
     def doRun(self, TOLs=None):
         timer = Timer()
@@ -1254,7 +1256,6 @@ def extend_prof_lvls(run, profCalc, min_lvls):
     # Only add levels if bias is not satisfied
     if run.bias < (1-run.params.theta) * run.last_itr.TOL:
         return
-
     added = 0
     lvls = run.last_itr.get_lvls()
     if len(lvls) == 0:
@@ -1317,3 +1318,101 @@ def default_sample_all(lvls, M, moments, fnSample, fnWorkModel=None,
             psums_fine[i] += np.sum(np.cumprod(A2, axis=0), axis=1)
             calcM[i] += values.shape[0]
     return calcM, psums_delta, psums_fine, total_time, total_work
+
+
+def default_sample_all_sums(lvls, M, moments, fnSampleSums,
+                            fnWorkModel=None,
+                            verbose=0):
+    # fnSampleLvl(inds, M) -> Returns a matrix of size (M, len(ind)) and
+    # the time estimate
+    lvls_count = len(lvls)
+    psums_delta = np.empty(lvls_count, dtype=object)
+    psums_fine = np.empty(lvls_count, dtype=object)
+    calcM = np.zeros(lvls_count, dtype=np.int)
+    total_time = np.zeros(lvls_count)
+    total_work = np.zeros(lvls_count)
+    if fnWorkModel is not None:
+        work_per_lvl = fnWorkModel(lvls)
+    for i in range(0, lvls_count):
+        if M[i] <= 0:
+            continue
+        if verbose >= VERBOSE_DEBUG:
+            print("Sampling", M[i], " at level ", i)
+        mods, inds = expand_delta(lvls[i])
+        calcM[i] = 0
+        total_time[i] = 0
+        total_work[i] = 0
+        p = moments
+        psums_delta[i] = _empty_obj()
+        psums_fine[i] = _empty_obj()
+        while calcM[i] < M[i]:
+            cur_M, cur_fsums, cur_diffsums, cur_totalTime, cur_totalWork = fnSampleSums(inds=inds, M=M[i]-calcM[i])
+            total_work[i] += cur_totalWork
+            total_time[i] += cur_totalTime
+            psums_fine[i] += cur_fsums
+            if cur_diffsums is None:
+                psums_delta[i] += cur_fsums
+            else:
+                psums_delta[i] += cur_diffsums
+            calcM[i] += cur_M
+    return calcM, psums_delta, psums_fine, total_time, total_work
+
+
+def estimate_bias_setutil(run):
+    itr = run.last_itr
+    El = itr.calcEl()
+    El[itr.active_lvls == 0] = np.inf
+    El_norm = np.empty(itr.lvls_count)
+    El_norm.fill(np.inf)
+    act = itr.active_lvls > 0
+    El_norm[act] = run.fn.Norm(El[act])
+    bias = itr.get_lvls().estimate_bias(El_norm)
+    return bias
+
+def estimate_bias_abs_bnd(run):
+    itr = run.last_itr
+    El = itr.calcEl()
+    El[itr.active_lvls == 0] = np.inf
+    El_norm = np.empty(len(itr.lvls_count))
+    El_norm.fill(np.inf)
+    act = itr.active_lvls >= 0
+    El_norm[act] = self.fn.Norm(El[act])
+    return np.sum(El_norm[itr.get_lvls().is_boundary()])
+
+
+def estimate_bias_bnd(run):
+    itr = run.last_itr
+    El = itr.calcEl()
+    El[itr.active_lvls == 0] = np.inf
+    El_bnd = El[itr.get_lvls().is_boundary()]
+    if np.any([e is None for e in El_bnd]):
+        bias = np.inf
+    else:
+        bias = run.fnNorm1(np.sum(El_bnd))
+    return bias
+
+
+def estimate_bias_ml2r(run):
+    itr = run.last_itr
+    El = itr.calcEl(weighted=False)[itr.active_lvls >= 0]
+    ell = itr.get_lvls().to_dense_matrix()
+    assert ell.shape[1] == 1, "ML2R is supported for one dimensional problems only."
+    ell = ell[itr.active_lvls >= 0, 0]
+    L = np.max(ell) - np.min(ell)
+    alpha = float(run.params.w[0] * np.log(run.params.beta[0]))
+    slicer = [slice(None)] + [None]*(len(El.shape)-1)
+    WL = calc_ml2r_weights(alpha, L)
+    WL_1 = calc_ml2r_weights(alpha, L-1)
+    return np.abs(np.sum(WL_1[slicer] * El[:-1, ...]) - np.sum(WL[slicer]*El))
+
+
+    # def update_ml2r_weights(self):
+    #     if not self.params.ml2r:
+    #         return
+    #     ell = self.last_itr.get_lvls().to_dense_matrix()
+    #     assert ell.shape[1] == 1, "ML2R is supported for one dimensional problems only."
+    #     ell = ell[self.last_itr.active_lvls >= 0, 0]
+    #     L = np.max(ell) - np.min(ell)
+    #     alpha = float(self.params.w[0] * np.log(self.params.beta[0]))
+    #     self.last_itr.weights = np.ones(self.last_itr.lvls_count)
+    #     self.last_itr.weights[self.last_itr.active_lvls >= 0] = calc_ml2r_weights(alpha, L)
