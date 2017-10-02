@@ -40,6 +40,10 @@ from IPython.terminal.ipapp import load_default_config
 @magics_class
 class StackEmbeddedMagics(Magics):
     @line_magic
+    def killem(self):
+        self.shell.embedded_active = False
+
+    @line_magic
     def stack(self, parameter_s=''):
         # parameter_s: +, - or number
         parameter_s = parameter_s.lower().strip()
@@ -377,7 +381,7 @@ class MyTB(ultratb.ListTB):
         if long_header:
             # Header with the exception type, python version, and date
             pyver = 'Python ' + sys.version.split()[0] + ': ' + sys.executable
-            date = time.ctime(time.time())
+            date = time.ctime(time.clock())
 
             if etype is not None:
                 head = '%s%s%s\n%s%s%s\n%s' % (Colors.topline, '-'*75, ColorsNormal,

@@ -59,7 +59,7 @@ __lib__.MakeProfitsAdmissible.argtypes = [ct.c_voidp, __ct_ind_t__,
 #                                    __arr_int32__, __arr_bool__]
 
 __lib__.GetMinOuterProfit.restype = ct.c_double
-__lib__.GetMinOuterProfit.argtypes = [ct.c_voidp, ct.c_voidp]
+__lib__.GetMinOuterProfit.argtypes = [ct.c_voidp, ct.c_voidp, __ct_ind_t__]
 
 __lib__.CalculateSetProfit.restype = None
 __lib__.CalculateSetProfit.argtypes = [ct.c_voidp, ct.c_voidp,
@@ -68,12 +68,20 @@ __lib__.CalculateSetProfit.argtypes = [ct.c_voidp, ct.c_voidp,
 __lib__.CreateMISCProfCalc.restype = ct.c_voidp
 __lib__.CreateMISCProfCalc.argtypes = [__ct_ind_t__, __ct_ind_t__,
                                        __arr_double__, __arr_double__]
+__lib__.CreateMIProfCalc.restype = ct.c_voidp
+__lib__.CreateMIProfCalc.argtypes = [__ct_ind_t__, __arr_double__,
+                                     ct.c_double, ct.c_double,
+                                     ct.c_double]
+__lib__.CreateMIProjProfCalc.restype = ct.c_voidp
+__lib__.CreateMIProjProfCalc.argtypes = [__ct_ind_t__, __ct_ind_t__,
+                                         ct.c_double, ct.c_double,
+                                         ct.c_double, ct.c_double, ct.c_double]
 
-__lib__.CreateTDProfCalc.restype = ct.c_voidp
-__lib__.CreateTDProfCalc.argtypes = [__ct_ind_t__, __arr_double__]
+__lib__.CreateTDFTProfCalc.restype = ct.c_voidp
+__lib__.CreateTDFTProfCalc.argtypes = [__ct_ind_t__, __arr_double__, __arr_double__]
 
-__lib__.CreateFTProfCalc.restype = ct.c_voidp
-__lib__.CreateFTProfCalc.argtypes = [__ct_ind_t__, __arr_double__]
+__lib__.CreateTDHCProfCalc.restype = ct.c_voidp
+__lib__.CreateTDHCProfCalc.argtypes = [__ct_ind_t__, __arr_double__, __arr_double__]
 
 __lib__.FreeProfitCalculator.restype = None
 __lib__.FreeProfitCalculator.argtypes = [ct.c_voidp]
@@ -81,9 +89,6 @@ __lib__.FreeProfitCalculator.argtypes = [ct.c_voidp]
 __lib__.FreeIndexSet.restype = None
 __lib__.FreeIndexSet.argtypes = [ct.c_voidp]
 
-__lib__.GetIndexSet.restype = ct.c_voidp
-__lib__.GetIndexSet.argtypes = [ct.c_voidp, ct.c_voidp, ct.c_double,
-                                ct.POINTER(ct.POINTER(ct.c_double))]
 __lib__.GenTDSet.restype = None
 __lib__.GenTDSet.argtypes = [__ct_ind_t__, __ct_ind_t__,
                              __arr_ind_t__, ct.c_uint32]
@@ -106,6 +111,13 @@ __lib__.VarSizeList_estimate_bias.argtypes = [ct.c_voidp,
                                               __arr_double__, ct.c_uint32,
                                               __arr_double__, ct.c_uint32]
 
+__lib__.VarSizeList_reduce_set.restype = ct.c_voidp
+__lib__.VarSizeList_reduce_set.argtypes = [ct.c_voidp,
+                                           __arr_ind_t__,
+                                           __ct_ind_t__,
+                                           __arr_uint32__,
+                                           ct.c_uint32]
+
 __lib__.VarSizeList_max_dim.restype = __ct_ind_t__
 __lib__.VarSizeList_max_dim.argtypes = [ct.c_voidp]
 
@@ -117,8 +129,9 @@ __lib__.VarSizeList_count.restype = ct.c_uint32
 __lib__.VarSizeList_count.argtypes = [ct.c_voidp]
 
 __lib__.VarSizeList_sublist.restype = ct.c_voidp
-__lib__.VarSizeList_sublist.argtypes = [ct.c_voidp, __arr_uint32__,
-                                        ct.c_uint32]
+__lib__.VarSizeList_sublist.argtypes = [ct.c_voidp,
+                                        __ct_ind_t__, __ct_ind_t__,
+                                        __arr_uint32__, ct.c_uint32]
 
 
 __lib__.VarSizeList_all_dim.restype = None
@@ -152,12 +165,18 @@ __lib__.VarSizeList_find.argtypes = [ct.c_voidp, __arr_ind_t__,
 
 __lib__.VarSizeList_expand_set.restype = ct.c_voidp
 __lib__.VarSizeList_expand_set.argtypes = [ct.c_voidp, __arr_double__,
-                                           __arr_double__,
-                                           ct.c_uint32, __ct_ind_t__]
+                                           ct.c_uint32, ct.c_uint32,
+                                           __ct_ind_t__]
+
+__lib__.VarSizeList_expand_set_calc.restype = ct.c_voidp
+__lib__.VarSizeList_expand_set_calc.argtypes = [ct.c_voidp, ct.c_voidp,
+                                                ct.c_double, __ct_ind_t__,
+                                                ct.POINTER(ct.POINTER(ct.c_double))]
+
 __lib__.VarSizeList_set_diff.restype = ct.c_voidp
 __lib__.VarSizeList_set_diff.argtypes = [ct.c_voidp, ct.c_voidp]
-__lib__.VarSizeList_set_union.restype = ct.c_voidp
-__lib__.VarSizeList_set_union.argtypes = [ct.c_voidp, ct.c_voidp]
+__lib__.VarSizeList_set_union.restype = None
+__lib__.VarSizeList_set_union.argtypes = [ct.c_voidp, ct.c_voidp, __arr_uint32__]
 
 __lib__.VarSizeList_copy.restype = ct.c_voidp
 __lib__.VarSizeList_copy.argtypes = [ct.c_voidp]
@@ -165,9 +184,8 @@ __lib__.VarSizeList_copy.argtypes = [ct.c_voidp]
 __lib__.VarSizeList_get_adaptive_order.restype = None
 __lib__.VarSizeList_get_adaptive_order.argtypes = [ct.c_voidp,
                                                    __arr_double__,
-                                                   __arr_double__,
                                                    __arr_uint32__,
-                                                   ct.c_uint32,
+                                                   ct.c_uint32, ct.c_uint32,
                                                    __ct_ind_t__]
 
 __lib__.Tree_new.restype = ct.c_voidp
@@ -210,52 +228,73 @@ class VarSizeList(object):
             self._handle = _handle
         assert len(kwargs) == 0, "Unrecognized options {}".format(kwargs)
 
+    # Pickle override
+    def __getstate__(self):
+        data, ind = self.to_list()
+        return self.min_dim, data, ind
+
+    def __setstate__(self, state):
+        assert(not hasattr(self, "_handle"))
+        self._handle = __lib__.VarSizeList_copy(0)
+        self.min_dim = state[0]
+        self.add_from_list(state[1], state[2])
+
     def copy(self):
         return VarSizeList(_handle=__lib__.VarSizeList_copy(self._handle),
                            min_dim=self.min_dim)
+
+    def __copy__(self):
+        return self.copy()
 
     def __del__(self):
         if self._handle is not None:
             __lib__.FreeIndexSet(self._handle)
             self._handle = None
 
-    # def __inflate_ind(self, ind):
-    #     if len(ind) >= self.min_dim:
-    #         return ind
-    #     return np.concatenate((ind, np.ones(self.min_dim-len(ind),
-    #                                         dtype=ind.dtype)))
-
-    def sublist(self, sel):
-        sel = np.array(sel).reshape((-1,))
-        if sel.dtype == np.bool:
-            sel = np.nonzero(sel)[0]
-        sel[sel < 0] = len(self) + sel[sel < 0]
+    def sublist(self, sel=None, d_start=0, d_end=None, min_dim=None):
+        if sel is not None:
+            sel = np.array(sel).reshape((-1,))
+            if sel.dtype == np.bool:
+                sel = np.nonzero(sel)[0]
+            sel[sel < 0] = len(self) + sel[sel < 0]
+            sel = sel.astype(dtype=np.uint32)
+        if d_end is None:
+            d_end = self.max_dim()
         new = __lib__.VarSizeList_sublist(self._handle,
-                                          np.array(sel, dtype=np.uint32),
-                                          len(sel))
-        return VarSizeList(_handle=new, min_dim=self.min_dim)
+                                          d_start, d_end,
+                                          sel, len(sel))
+        return VarSizeList(_handle=new,
+                           min_dim=min_dim if min_dim is not None else self.min_dim)
 
-    def __getitem__(self, i):
-        item = np.empty(np.maximum(self.min_dim, self.get_dim(i)), dtype=ind_t)
+    def get_item(self, i, dim=None):
         data = np.empty(self.get_active_dim(i), dtype=ind_t)
         j    = np.empty(len(data), dtype=ind_t)
         if i < 0:
             i = len(self) + i
         __lib__.VarSizeList_get(self._handle, i, data, j, len(data))
+        if dim is not None and dim <= 0:
+            return j, data
+        if dim is None:
+            dim = np.maximum(self.min_dim, self.get_dim(i))
+        item = np.empty(dim, dtype=ind_t)
         item.fill(__lib__.GetDefaultSetBase())
         item[j] = data
         return item
 
+    def __getitem__(self, i):
+        return self.get_item(i)
+
     def __iter__(self):
         return self.dense_itr()
 
-    def dense_itr(self, start=0, end=None):
+    def dense_itr(self, start=0, end=None, min_dim=None):
         if end is None:
             end = len(self)
         dims = self.get_dim()
         active_dims = self.get_active_dim()
+        min_dim = self.min_dim if min_dim is None else min_dim
         for i in xrange(start, end):
-            item = np.empty(np.maximum(self.min_dim, dims[i]), dtype=ind_t)
+            item = np.empty(np.maximum(min_dim, dims[i]), dtype=ind_t)
             data = np.empty(active_dims[i], dtype=ind_t)
             j    = np.empty(active_dims[i], dtype=ind_t)
             __lib__.VarSizeList_get(self._handle, i, data, j, len(data))
@@ -285,9 +324,24 @@ class VarSizeList(object):
     def max_active_dim(self):
         return np.max(self.get_active_dim()) if len(self) > 0 else 0
 
+    def to_list(self, d_start=0, d_end=None):
+        d_end = d_end or np.maximum(1, self.max_dim())
+        assert(d_end > d_start)
+        sizes = self.get_active_dim()
+        ind_count = np.sum(sizes)
+        ij = np.empty(int(ind_count*2), dtype=ind_t)
+        data = np.empty(ind_count, dtype=ind_t)
+        __lib__.VarSizeList_to_matrix(self._handle, ij, len(ij), data,
+                                      len(data))
+        # Partition data based on sizes
+        s = np.hstack((np.array([0], dtype=np.int), np.cumsum(sizes, dtype=np.int)))
+        ind = ij[1::2]
+        return [data[s[i]:s[i+1]] for i in xrange(0, len(s)-1)],\
+            [ind[s[i]:s[i+1]] for i in xrange(0, len(s)-1)]
+
     def to_sparse_matrix(self, d_start=0, d_end=None):
         # Assumes that the martix is base 0
-        d_end = d_end or self.max_dim()
+        d_end = d_end if d_end is not None else np.maximum(1, self.max_dim())
         assert(d_end >= d_start)
         ind_count = np.sum(self.get_active_dim())
         ij = np.empty(int(ind_count*2), dtype=ind_t)
@@ -318,17 +372,16 @@ class VarSizeList(object):
             return dim
         return __lib__.VarSizeList_get_active_dim(self._handle, i)
 
-    def CheckAdmissibility(self, d_start=0, d_end=-1):
-        if d_end < 0:
+    def check_admissibility(self, d_start=0, d_end=None):
+        if d_end is None:
             d_end = self.max_dim()
         admissible = np.empty(len(self), dtype=np.int8)
-        __lib__.CheckAdmissibility(self._handle, d_start, d_end,
-                                   admissible)
+        __lib__.CheckAdmissibility(self._handle, d_start, d_end, admissible)
         return admissible.astype(np.bool)
 
-    def MakeProfitsAdmissible(self, profits, d_start=0, d_end=-1):
+    def make_profits_admissible(self, profits, d_start=0, d_end=None):
         assert(len(profits) == len(self))
-        if d_end < 0:
+        if d_end is None:
             d_end = self.max_dim()
         pro = profits.copy()
         __lib__.MakeProfitsAdmissible(self._handle, d_start, d_end, pro)
@@ -356,7 +409,7 @@ class VarSizeList(object):
                                         sizes, len(sizes),
                                         j, len(j), inds, len(inds))
 
-    def calc_log_prof(self, U):
+    def calc_log_prof(self, profCalc):
         log_prof = np.empty(len(self))
         __lib__.CalculateSetProfit(self._handle, profCalc._handle,
                                    log_prof, len(log_prof))
@@ -373,32 +426,22 @@ class VarSizeList(object):
     #     __lib__.GetLevelBoundaries(C._handle, lvls, len(lvls), inner_bnd, real_lvls)
     #     return inner_bnd, real_lvls
 
-    # def expand_set(self, error, work, seedLookahead=5):
-    #     assert(len(error) == len(self))
-    #     assert(len(work) == len(self))
-    #     return VarSizeList(_handle=__lib__.VarSizeList_expand_set(self._handle,
-    #                                                       np.array(error, dtype=np.float),
-    #                                                       np.array(work, dtype=np.float),
-    #                                                       len(error),
-    #                                                       seedLookahead),
-    #                        min_dim=self.min_dim)
-
     def set_diff(self, rhs):
         return VarSizeList(_handle=__lib__.VarSizeList_set_diff(self._handle, rhs._handle),
                            min_dim=self.min_dim)
 
     def set_union(self, rhs):
-        return VarSizeList(_handle=__lib__.VarSizeList_set_union(self._handle, rhs._handle),
-                           min_dim=self.min_dim)
+        ind = np.empty(len(rhs), dtype=np.uint32)
+        __lib__.VarSizeList_set_union(self._handle, rhs._handle, ind)
+        return ind
 
-    def get_adaptive_order(self, error, work, seedLookahead=5):
-        assert(len(self) == len(error))
-        assert(len(self) == len(work))
+    def get_adaptive_order(self, profits, max_added=5, seedLookahead=5):
+        assert(len(self) == len(profits))
         adaptive_order = np.empty(len(self), dtype=np.uint32)
         __lib__.VarSizeList_get_adaptive_order(self._handle,
-                                               error, work,
+                                               profits,
                                                adaptive_order,
-                                               len(self),
+                                               len(self), max_added,
                                                seedLookahead)
         return adaptive_order
 
@@ -425,13 +468,32 @@ class VarSizeList(object):
     def is_boundary(self):
         return self.count_neighbors() < self.max_dim()
 
-    def expand_set(self, profCalc, max_prof=None):
-        if max_prof is None:
-            max_prof = self.get_min_outer_prof(profCalc)
-        __lib__.GetIndexSet(self._handle, profCalc._handle, np.float(max_prof), None)
+    def expand_set(self, profits, max_dim, max_added=None, max_prof=None):
+        assert max_dim >= self.max_dim(), "Set already has more than max_dim"
+        if isinstance(profits, ProfCalculator):
+            assert max_added is None, \
+                "Cannot provide max_added when using a profit calculator"
+            if max_prof is None:
+                max_prof = self.get_min_outer_prof(profits, max_dim)
+            new_handle = __lib__.VarSizeList_expand_set_calc(self._handle,
+                                                             profits._handle,
+                                                             max_prof, max_dim,
+                                                             None)
+        else:
+            assert(len(profits) == len(self))
+            seedLookahead = max_dim-self.max_dim()
+            new_handle = __lib__.VarSizeList_expand_set(self._handle,
+                                                        np.array(profits, dtype=np.float),
+                                                        len(profits),
+                                                        max_added,
+                                                        seedLookahead)
+        # Add to current set
+        self.set_union(VarSizeList(_handle=new_handle))
+        return self
 
-    def get_min_outer_prof(self, profCalc):
-        return __lib__.GetMinOuterProfit(self._handle, profCalc._handle)
+    def get_min_outer_prof(self, profCalc, max_dim):
+        return __lib__.GetMinOuterProfit(self._handle,
+                                         profCalc._handle, max_dim)
 
     def estimate_bias(self, err_contributions, rates=None):
         if rates is None:
@@ -439,6 +501,14 @@ class VarSizeList(object):
         return __lib__.VarSizeList_estimate_bias(self._handle,
                                                  err_contributions, len(err_contributions),
                                                  rates, len(rates))
+
+    def reduce_set(self, dims):
+        indices = np.empty(len(self), dtype=np.uint32)
+        new_handle = __lib__.VarSizeList_reduce_set(self._handle,
+                                                    np.array(dims, dtype=ind_t),
+                                                    len(dims),
+                                                    indices, len(indices))
+        return VarSizeList(_handle=new_handle, min_dim=self.min_dim), indices
 
 class ProfCalculator(object):
     # def GetIndexSet(self, max_prof):
@@ -453,8 +523,8 @@ class ProfCalculator(object):
     #                                         (count,)).copy().reshape(count)
     #     finally:
     #         __lib__.FreeMemory(ct.byref(ct.cast(mem_prof, ct.c_void_p)))
-
     #     return indSet, profits
+
     def __del__(self):
         if self._handle is not None:
             __lib__.FreeProfitCalculator(self._handle)
@@ -463,19 +533,42 @@ class ProfCalculator(object):
 
 class MISCProfCalculator(ProfCalculator):
     def __init__(self, d_rates, s_err_rates):
-        self.d = len(d_rates)
+        self.max_dim = len(d_rates) + len(s_err_rates)
         self._handle = __lib__.CreateMISCProfCalc(len(d_rates),
                                                   len(s_err_rates),
                                                   np.array(d_rates, dtype=np.float),
                                                   np.array(s_err_rates, dtype=np.float))
+class MIProfCalculator(ProfCalculator):
+    def __init__(self, dexp, xi, sexp, mul=1):
+        self._handle = __lib__.CreateMIProfCalc(len(dexp),
+                                                np.array(dexp, dtype=np.float),
+                                                xi, sexp, mul)
 
-class TDProfCalculator(ProfCalculator):
-    def __init__(self, w):
-        self._handle = __lib__.CreateTDProfCalc(len(w), w)
+class MIProjProfCalculator(ProfCalculator):
+    def __init__(self, D, d, beta, gamma, alpha, theta=1, proj_sample_ratio=1.):
+        self._handle = __lib__.CreateMIProjProfCalc(D, d, beta, gamma,
+                                                    alpha, theta,
+                                                    proj_sample_ratio)
 
-class FTProfCalculator(ProfCalculator):
-    def __init__(self, w):
-        self._handle = __lib__.CreateFTProfCalc(len(w), w)
+class TDFTProfCalculator(ProfCalculator):
+    def __init__(self, td_w=None, ft_w=None):
+        ft_w = ft_w if ft_w is not None else np.zeros(len(td_w))
+        td_w = td_w if td_w is not None else np.zeros(len(ft_w))
+        assert len(td_w) == len(ft_w), "Argument mismatch"
+        self.max_dim = len(td_w)
+        self._handle = __lib__.CreateTDFTProfCalc(len(td_w),
+                                                  np.array(td_w, dtype=np.float),
+                                                  np.array(ft_w, dtype=np.float))
+
+class TDHCProfCalculator(ProfCalculator):
+    def __init__(self, td_w=None, hc_w=None):
+        hc_w = hc_w if hc_w is not None else np.zeros(len(td_w))
+        td_w = td_w if td_w is not None else np.zeros(len(hc_w))
+        assert len(td_w) == len(hc_w), "Argument mismatch"
+        self.max_dim = len(td_w)
+        self._handle = __lib__.CreateTDHCProfCalc(len(td_w),
+                                                  np.array(td_w, dtype=np.float),
+                                                  np.array(hc_w, dtype=np.float))
 
 @public
 def TensorGrid(m, base=1, count=None):
@@ -529,3 +622,7 @@ class Tree(object):
 
     def output(self):
         __lib__.Tree_print(self._handle)
+
+
+def calc_log_prof_from_EW(error, work):
+    return np.log(work) - np.log(np.abs(error))

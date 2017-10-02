@@ -4,8 +4,13 @@ from __future__ import print_function
 
 import numpy as np
 from . import setutil
+__all__ = []
 
+def public(sym):
+    __all__.append(sym.__name__)
+    return sym
 
+@public
 class MISCSampler(object):
     def __init__(self, d, fnKnots, prevData=None, points_tol=1e-14, min_dim=0):
         self.d = d
@@ -120,7 +125,7 @@ class MISCSampler(object):
         # TODO: Need to generalize to allow for array or general objects
         from . import mimc
         import time
-        t = time.time()
+        t = time.clock()
         samples = np.empty((M, len(inds)))
         for i, dind in enumerate(inds):
             alpha = dind[:self.d]
@@ -129,9 +134,10 @@ class MISCSampler(object):
             knots = self.collapsePoints(knots)
             values = self._solveAtPoints(fnSample, alpha, knots)
             samples[0, i] = np.sum(weights * values)
-        work = time.time()-t
+        work = time.clock()-t
         return samples, work
 
+@public
 def knots_gaussian(n, mi, sigma):
     # [x,w]=KNOTS_GAUSSIAN(n,mi,sigma)
     #
@@ -174,7 +180,7 @@ def knots_gaussian(n, mi, sigma):
     x = mi + np.sqrt(2) * sigma * x
     return x, w
 
-
+@public
 def knots_CC(nn, x_a, x_b, whichrho='prob'):
     # [x,w] = KNOTS_CC(nn,x_a,x_b)
     #
@@ -233,6 +239,7 @@ use only odd number of points')
         raise Exception('4th input not recognized')
     return x, w
 
+@public
 def knots_uniform(n, x_a, x_b, whichrho='prob'):
     # [x,w]=KNOTS_UNIFORM(n,x_a,x_b)
     #
@@ -301,7 +308,7 @@ def knots_uniform(n, x_a, x_b, whichrho='prob'):
     # ----------------------------------------------------------------------
     return x, w
 
-
+@public
 def lev2knots_doubling(i):
     # m = lev2knots_doubling(i)
     #
@@ -325,7 +332,7 @@ def lev2knots_doubling(i):
         return m[0]
     return m
 
-
+@public
 def lev2knots_lin(i):
     #   relation level / number of points:
     #    m = i
@@ -340,6 +347,7 @@ def lev2knots_lin(i):
     #----------------------------------------------------
     return i
 
+@public
 def estimate_misc_error_rates(d, lvls, errs,
                               lev2knots,
                               d_err_rates=None, tol=1e-14):

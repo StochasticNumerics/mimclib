@@ -19,10 +19,18 @@ extern "C"{
 
     PProfitCalculator CreateMISCProfCalc(ind_t d, ind_t s,
                                          const double *d_rates, const double *s_err_rates);
-    PProfitCalculator CreateTDProfCalc(ind_t d, const double *w);
-    PProfitCalculator CreateFTProfCalc(ind_t d, const double *w);
+    PProfitCalculator CreateMIProfCalc(ind_t d, const double *dexp,
+                                       double xi, double sexp, double mul);
+    PProfitCalculator CreateTDFTProfCalc(ind_t d, const double *td_w, const double *ft_w);
+    PProfitCalculator CreateTDHCProfCalc(ind_t d, const double *td_w, const double *hc_w);
+    PProfitCalculator CreateMIProjProfCalc(ind_t D, ind_t d,
+                                           double beta, double gamma,
+                                           double alpha, double theta,
+                                           double proj_sample_ratio);
 
-    double GetMinOuterProfit(const PVarSizeList, const PProfitCalculator profCalc);
+    double GetMinOuterProfit(const PVarSizeList,
+                             const PProfitCalculator profCalc,
+                             ind_t max_dim);
     void CalculateSetProfit(const PVarSizeList,
                             const PProfitCalculator profCalc,
                             double *log_prof, uint32 size);
@@ -32,32 +40,33 @@ extern "C"{
                                double *pProfits);
 
     PVarSizeList VarSizeList_expand_set(const PVarSizeList pset,
-                                        const double* error, const double* work,
-                                        uint32 count, ind_t dimLookahead);
+                                        const double* profit, uint32 count,
+                                        uint32 max_added, ind_t dimLookahead);
+    PVarSizeList VarSizeList_reduce_set(const PVarSizeList pset,
+                                        const ind_t *keep_dim,
+                                        ind_t keep_dim_count,
+                                        uint32* out_indices,
+                                        uint32 out_indices_count);
+    PVarSizeList VarSizeList_expand_set_calc(const PVarSizeList pset,
+                                             PProfitCalculator profCalc,
+                                             double max_prof, ind_t max_d,
+                                             double **p_profits);
     PVarSizeList VarSizeList_copy(const PVarSizeList from);
     PVarSizeList VarSizeList_set_diff(const PVarSizeList lhs, const PVarSizeList rhs);
-    PVarSizeList VarSizeList_set_union(const PVarSizeList lhs, const PVarSizeList rhs);
+    void VarSizeList_set_union(PVarSizeList lhs, const PVarSizeList rhs,
+                               uint32 *ind);
+
     void VarSizeList_get_adaptive_order(const PVarSizeList pset,
-                                        const double *error,
-                                        const double *work,
+                                        const double *profits,
                                         uint32 *adaptive_order,
                                         uint32 count,
-                                        ind_t seedLookahead);
+                                        uint32 max_added, ind_t dimLookahead);
     /* void GetLevelBoundaries(const PVarSizeList, const uint32 *levels, */
     /*                         uint32 levels_count, int32 *inner_bnd, */
     /*                         unsigned char *inner_real_lvls); */
     /* void GetBoundaryInd(uint32 setSize, uint32 l, int32 i, */
     /*                     int32* sel, int32* inner_bnd, unsigned char* bnd_ind); */
 
-
-    PVarSizeList GetIndexSet(PVarSizeList,
-                             const PProfitCalculator profCalc,
-                             double max_prof,
-                             double **p_profits);
-
-    void GetAdaptiveOrder(const PVarSizeList,
-                          double *log_profits,
-                          uint32 *out_order);
 
     void GenTDSet(ind_t d, ind_t base, ind_t *td_set, uint32 count);
     void TensorGrid(ind_t d, ind_t base, const ind_t *m, ind_t* tensor_grid,
@@ -76,7 +85,9 @@ extern "C"{
                                      const double *rates, uint32 rates_size);
 
     uint32 VarSizeList_count(const PVarSizeList);
-    PVarSizeList VarSizeList_sublist(const PVarSizeList, uint32* idx, uint32 _count);
+    PVarSizeList VarSizeList_sublist(const PVarSizeList,
+                                     ind_t d_start, ind_t d_end,
+                                     uint32* idx, uint32 _count);
     void VarSizeList_all_dim(const PVarSizeList, uint32 *dim, uint32 size);
     void VarSizeList_all_active_dim(const PVarSizeList, uint32 *active_dim, uint32 size);
     void VarSizeList_to_matrix(const PVarSizeList,

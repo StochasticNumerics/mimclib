@@ -1,6 +1,7 @@
 #include "petsc.h"
 #include "common.hpp"
 #include "assert.h"
+#include <iostream>
 //////// This solver is based on Leveque book
 #define MAXD 10
 #define M_SQRT_PI 1.77245385091
@@ -13,7 +14,8 @@ typedef const void *CSField;
 #pragma GCC visibility push(default)
 extern "C"{
     void SFieldCreate(SField *_sf,
-                      int problem_arg,
+                      int example,
+                      double a, double b,
                       uint d,
                       double a0,
                       double f0,
@@ -23,13 +25,10 @@ extern "C"{
                       double qoi_scale,
                       double *qoi_x0,
                       double qoi_sigma);
-    int SFieldBeginRuns(SField sfv,
-                        unsigned int N,
-                        const unsigned int *nelem);
+    int SFieldBeginRuns(SField sfv, unsigned int N, const unsigned int *nelem);
     double SFieldSolveFor(SField sfv, double *Y, unsigned int yCount);
     void SFieldGetSolution(SField sfv, double *Y, unsigned int yCount,
                            double *out_x, double *out_y, unsigned int out_size);
-
     void SFieldEndRuns(SField sfv);
     void SFieldDestroy(SField *_sf);
 }
@@ -38,7 +37,9 @@ extern "C"{
 struct __sfield {
     // Problem parameters
     double a0, f0, df_nu, df_L, df_sig;
-    unsigned int d, problem_arg;
+    unsigned int d, example;
+
+    double a, b;   // Interval: a < b
 
     // QoI
     double sigma2, x0[MAXD], qoi_scale;
@@ -50,7 +51,6 @@ struct __sfield {
     ind_t *N_multi_idx;
     unsigned int modes;
     ind_t *d_multi_idx;
-
 
     Mat J;
     Vec U,F;
@@ -70,7 +70,8 @@ typedef struct __sfield *mySField;
 typedef const struct __sfield *myCSField;
 
 void SFieldCreate(SField *_sf,
-                  int problem_arg,
+                  int example,
+                  double a, double b,
                   uint d,
                   double a0,
                   double f0,
@@ -83,10 +84,9 @@ void SFieldCreate(SField *_sf,
     mySField sf = new __sfield;
     *_sf = sf;
 
-    sf->problem_arg = problem_arg;
-    assert(sf->problem_arg == 0 || sf->problem_arg == 1);
-
+    sf->example = example;
     sf->d = d;
+    sf->a = a; sf->b = b;
     sf->a0 = a0;
     sf->f0 = f0;
     sf->df_sig = df_sig;
@@ -143,8 +143,7 @@ PetscReal CalcCoeff(const PetscReal* x, myCSField sf){
 
             bool skip_Y = 0;
             for (j=0;j<sf->d;j++){
-                skip_Y = skip_Y || (l[j]==0 && k[j]==0)
-                    || (sf->problem_arg == 1 && l[j] == 0);
+                skip_Y = skip_Y || (l[j]==0 && k[j]==0);
                 temp *= pow(cos_k[j], l[j])*pow(sin_k[j], 1-l[j]);
             }
             if (skip_Y){
@@ -155,10 +154,43 @@ PetscReal CalcCoeff(const PetscReal* x, myCSField sf){
             /* printf("%d -> %d -> Ak=%.12g, Y=%.12g, temp=%.12g, cos=%.12g, sin=%.12g, l=%d -> %.12g\n", k[0], */
             /*        curY, Ak, sf->Y[curY], temp, cos_k[0], sin_k[0], l[0], Ak*sf->Y[curY]*temp); */
             field += Ak*sf->Y[curY++]*temp;
+            // std::cout << "k = " << curY-1 << ", Ak="
+            //           << Ak << ", Term=" << (l[0]==0?"sin":"cos")<<std::endl;
         }
     }
     assert(curY == sf->curN || curY+1 == sf->curN);
     return sf->a0 + exp(field);
+}
+
+PetscReal CalcCoeff_Simple(const PetscReal* x, myCSField sf){
+    int curY = 0;   // Every time we increment we should check that is
+                    // is less than N. We are ignoring the first mode
+                    // because the coefficient is zero
+    unsigned int i;
+    double field=0, func=0;
+    assert(sf->d == 1);
+    for (i=0;curY < sf->curN;i++){
+        uint k0 = i>0;
+        double Ak = sf->df_sig * pow(2, k0/2.) * pow(1 + i*i, -(sf->df_nu+sf->d/2.)/2.);
+        if (i % 2)
+            func = sin(i*x[0]*M_PI/sf->df_L);
+        else
+            func = cos(i*x[0]*M_PI/sf->df_L);
+        field += Ak*sf->Y[curY++]*func;
+    }
+    return sf->a0 + exp(field);
+}
+
+PetscReal CalcCoeff_Kink(const PetscReal* x, myCSField sf){
+    int i;
+    double x2=0, y2=0;
+    for (i=0;i < static_cast<int>(sf->d);i++){
+        x2 += x[i]*x[i];
+    }
+    for (i=0;i<sf->curN;i++) {
+        y2 += sf->Y[i]*sf->Y[i];
+    }
+    return 1 + std::sqrt(x2) + std::pow(y2, 3./2.);
 }
 
 PetscReal QoIAtPoint(const PetscReal *x, PetscReal u, myCSField sf) {
@@ -176,13 +208,13 @@ PetscReal QoIAtPoint(const PetscReal *x, PetscReal u, myCSField sf) {
 
 // ------------------------------------------
 static inline double dx(int i, myCSField sf) {
-    return 1./(double)(sf->mesh[i]+1);
+    return (sf->b - sf->a)/(double)(sf->mesh[i]+1);
 }
 void getPoint(const int *pt, double *x, myCSField sf) {
     unsigned int i;
     assert(sf->d < MAXD);
     for (i=0;i<sf->d;i++){
-        x[i] = (double)pt[i] * dx(i, sf);
+        x[i] = sf->a + (double)pt[i] * dx(i, sf);
     }
 }
 
@@ -190,23 +222,28 @@ double Coeff(int *pt, int di, double shift, myCSField sf) {
     double x[sf->d];
     getPoint(pt, x, sf);
     x[di] += shift;
-    /* double xx=0.5; */
-    /* printf("x=%.12f, field=%f\n", xx, CalcCoeff(&xx, sf)); */
-    /* assert(0); */
-    return CalcCoeff(x, sf);
+    switch (sf->example){
+    case 0:
+        return CalcCoeff(x, sf);
+    case 1:
+        return CalcCoeff_Simple(x, sf);
+    case 2:
+        return CalcCoeff_Kink(x, sf);
+    default:
+        assert(0);
+    }
 }
 
 double Forcing(int *pt, myCSField sf) {
-    if (sf->problem_arg == 0)
-        return sf->f0;
-    double x[sf->d];
-    getPoint(pt, x, sf);
-    double c = 1.;
-    unsigned int i=0;
-    double sigma2 = 0.1*0.1;
-    for (i=0;i<sf->d;i++)
-        c *= exp(-0.5*(((x[i] - 0.5)*(x[i] - 0.5))/sigma2));
-    return sf->f0 * c * pow(2*sigma2*M_PI, -sf->d/2.);
+    return sf->f0;
+    // double x[sf->d];
+    // getPoint(pt, x, sf);
+    // double c = 1.;
+    // unsigned int i=0;
+    // double sigma2 = 0.1*0.1;
+    // for (i=0;i<sf->d;i++)
+    //     c *= exp(-0.5*(((x[i] - 0.5)*(x[i] - 0.5))/sigma2));
+    // return sf->f0 * c * pow(2*sigma2*M_PI, -sf->d/2.);
 }
 
 double Integrate(Vec U, int *pt, unsigned int i, myCSField sf) {
@@ -284,7 +321,8 @@ int SFieldBeginRuns(SField sfv,
     KSPCreate(PETSC_COMM_WORLD,&ksp);
     KSPSetFromOptions(ksp);
 
-    sf->J = J; sf->F = F; sf->U = U; sf->ksp = ksp;
+    sf->ksp = ksp;
+    sf->J = J; sf->F = F; sf->U = U;
     return 0;
 }
 

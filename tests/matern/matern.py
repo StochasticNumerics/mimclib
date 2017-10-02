@@ -12,7 +12,9 @@ __arr_uint32_1__ = npct.ndpointer(dtype=np.uint32, ndim=1, flags='CONTIGUOUS')
 import os
 __lib__ = npct.load_library("_matern.so", __file__)
 __lib__.SFieldCreate.restype = None
-__lib__.SFieldCreate.argtypes = [ct.c_voidp, ct.c_int32, ct.c_uint32,
+__lib__.SFieldCreate.argtypes = [ct.c_voidp, ct.c_int32,
+                                 ct.c_double, ct.c_double,
+                                 ct.c_uint32,
                                  ct.c_double, ct.c_double,
                                  ct.c_double, ct.c_double,
                                  ct.c_double, ct.c_double,
@@ -36,28 +38,41 @@ __lib__.SFieldGetSolution.argtypes = [ct.c_voidp, __arr_double_1__,
 
 
 class SField_Matern(object):
-    def __init__(self, params, nested=False):
+    def __init__(self, params):
         self.ref = ct.c_voidp()
-        self.nested = nested
         self.params = params
         assert(len(params.qoi_x0) >= params.qoi_dim), "x0 should have d dimension"
         #print("---------", d, a0, f0, nu, L, x0, sigma)
-        __lib__.SFieldCreate(ct.byref(self.ref), params.qoi_problem,
+        example = 0
+        if params.qoi_example == 'sf-matern':
+            a, b = 0, 1
+            example = 1
+        elif params.qoi_example == 'sf-matern-full':
+            a, b = 0, 1
+            example = 0
+        elif params.qoi_example == 'sf-kink':
+            a, b = -1, 1
+            example = 2
+        else:
+            raise ValueError('qoi_example is invalid')
+
+        __lib__.SFieldCreate(ct.byref(self.ref),
+                             example, a, b,
                              params.qoi_dim, params.qoi_a0,
-                             params.qoi_f0,
-                             params.qoi_df_nu,
-                             params.qoi_df_L,
-                             params.qoi_df_sig,
-                             params.qoi_scale,
-                             params.qoi_x0,
+                             params.qoi_f0, params.qoi_df_nu,
+                             params.qoi_df_L, params.qoi_df_sig,
+                             params.qoi_scale, params.qoi_x0,
                              params.qoi_sigma)
 
 
     def BeginRuns(self, ind, N):
         self.nelem = np.array(self.params.h0inv * self.params.beta**(np.array(ind)), dtype=np.uint32)
-        if self.nested:
-            self.nelem -= 1   # Making it nested
-        assert(len(self.nelem) == self.GetDim())
+        if len(self.nelem) != self.GetDim():
+            if len(self.nelem) == 1:
+                # Just repeat it
+                self.nelem = np.repeat(self.nelem, self.GetDim())
+            else:
+                assert(False)
         __lib__.SFieldBeginRuns(self.ref, N, self.nelem)
 
     def SolveFor(self, Y):
@@ -66,7 +81,6 @@ class SField_Matern(object):
     def EndRuns(self):
         self.nelem = None
         __lib__.SFieldEndRuns(self.ref)
-
 
     def Sample(self, inds, M, rand_gen):
         sample_rand = rand_gen.uniform(-np.sqrt(3), np.sqrt(3),
@@ -114,3 +128,30 @@ class SField_Matern(object):
 
     def GetN(self):
         return self.params.qoi_N
+
+if __name__=='__main__':
+    from mimclib import Bunch
+    params = Bunch()
+    params.qoi_dim = 1
+    params.qoi_a0 = 0
+    params.qoi_f0 = 1
+    params.qoi_df_nu = 3.5
+    params.qoi_df_L = 1
+    params.qoi_df_sig = 0.5
+    params.qoi_scale = 1
+    params.qoi_x0 = np.array([0.3,0.4, 0.6])
+    params.qoi_sigma = 1
+    params.h0inv = 3
+    params.beta = 2
+
+    arrY = np.array([[1,1,1,1], [1,1,1,1]], dtype=np.float)
+    SField_Matern.Init()
+    output = np.zeros(len(arrY))
+    sf = SField_Matern(params)
+    sf.BeginRuns(np.array([5]), np.max([len(Y) for Y in arrY]))
+    for i, Y in enumerate(arrY):
+        output[i] = sf.SolveFor(np.array(Y))
+    sf.EndRuns()
+    SField_Matern.Final()
+
+    print(output)

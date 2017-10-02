@@ -20,13 +20,15 @@ import numpy as np
 import time
 from wcumsum import wcumsum
 
-warnings.filterwarnings("error")
+warnings.filterwarnings("default")
 
 
 def addExtraArguments(parser):
     parser.add_argument("-qoi_sigma", type=float, default=1.,
                         action="store", help="Volatility in GBM")
     parser.add_argument("-qoi_mu", type=float, default=1.,
+                        action="store", help="Drift in GBM")
+    parser.add_argument("-qoi_K", type=float, default=80.,
                         action="store", help="Drift in GBM")
     parser.add_argument("-qoi_T", type=float, default=1.,
                         action="store", help="Final time in GBM")
@@ -62,10 +64,11 @@ class CustomClass(mimclib.mimc.custom_obj):
         return self.data
 
 def mySampleQoI(run, inds, M):
+    M = np.minimum(M, 1000)
     meshes = (run.params.qoi_T/run.fn.Hierarchy(inds)).reshape(-1).astype(np.int)
     maxN = np.max(meshes)
 
-    tStart = time.time()
+    tStart = time.clock()
     if run.params.qoi_type == "real":
         solves = np.empty((M, len(inds)), dtype=float)
     elif run.params.qoi_type == "obj":
@@ -88,7 +91,10 @@ def mySampleQoI(run, inds, M):
         elif run.params.qoi_type == "arr":
             solves[:, i, 0] = val
             solves[:, i, 1] = val
-    return solves, time.time()-tStart
+
+    # Call option
+    solves = np.exp(-run.params.qoi_mu * run.params.qoi_T) * np.maximum(solves - run.params.qoi_K, 0)
+    return solves, time.clock()-tStart
 
 def initRun(run):
     if run.params.qoi_type == "obj":
@@ -102,6 +108,8 @@ def initRun(run):
 
 if __name__ == "__main__":
     import mimclib.test
+    from mimclib import ipdb
+    ipdb.set_excepthook()
     import sys
     mimclib.test.RunStandardTest(fnSampleLvl=mySampleQoI,
                                  fnAddExtraArgs=addExtraArguments,

@@ -3,6 +3,7 @@
 #include <vector>
 #include <cmath>
 #include <numeric>
+#include <stdexcept>
 
 typedef std::vector<double> array;
 typedef unsigned int uint;

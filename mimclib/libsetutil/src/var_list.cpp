@@ -10,7 +10,8 @@
 #include "var_list.hpp"
 
 #define DEBUG_ASSERT(x)
-static const int SET_BASE = SparseMIndex::SET_BASE;
+static const int SET_BASE = SparseMIndex
+    ::SET_BASE;
 
 template <typename T>
 std::vector<uint32> argsort(const T &v, size_t size) {
@@ -82,11 +83,15 @@ void VarSizeList::make_profits_admissible(ind_t d_start,
 
 
 // Returns the minimum profit on the outer set
-double VarSizeList::get_min_outer_profit(const PProfitCalculator profCalc) const {
-    ind_t max_d = profCalc->max_dim();//set.max_dim();
+double VarSizeList::get_min_outer_profit(const PProfitCalculator profCalc,
+                                         ind_t max_d) const {
+    assert(max_d >= this->max_dim());
     std::vector<ind_t> bnd_neigh = this->count_neighbors();
 
     //------------- Calculate outer boundary
+    if (!this->count())
+        return profCalc->calc_log_prof(mul_ind_t());
+
     double minProf = std::numeric_limits<double>::infinity();
     unsigned int bnd_count = 0;
     for (uint32 k=0;k<this->count();k++){
@@ -206,15 +211,15 @@ void VarSizeList::count_neighbors(ind_t* bnd_neigh, size_t size) const {
     }
 }
 
-uint32 add_children(const VarSizeList* pthis, uint32 k, VarSizeList &result,
-    uint32 max_add){
+uint32 VarSizeList::add_admissible_children(mul_ind_t cur,
+                                            uint32 max_add,
+                                            VarSizeList &out) const{
     uint32 added = 0;
-    auto cur = pthis->get(k);
-    for (uint32 i=0;i<cur.size() && added < max_add;i++){
+    for (uint32 i=0;i<cur.size() && out.count() < max_add;i++){
         cur.step(i, 1);
-        if (!pthis->has_ind(cur) && pthis->is_ind_admissible(cur)
-            && !result.has_ind(cur)){
-            result.push_back(cur);
+        if (!this->has_ind(cur) && this->is_ind_admissible(cur)
+            && !out.has_ind(cur)){
+            out.push_back_unsafe(cur);
             added++;
         }
         cur.step(i, -1);
@@ -222,51 +227,106 @@ uint32 add_children(const VarSizeList* pthis, uint32 k, VarSizeList &result,
     return added;
 }
 
-VarSizeList VarSizeList::expand_set(const double *error,
-                                    const double *work,
-                                    uint32 count,
-                                    ind_t seedLookahead) const{
-    // Sorted ind lists the indices in order of expansion (of decreasing profit).
-    VarSizeList result;
-    assert(count == this->count());
-    std::vector<double> profits(count);
-    for (size_t i=0;i<profits.size();i++)
-        profits[i] = log(work[i]) - log(fabs(error[i]));
 
-    std::vector<uint32> sorted_ind = argsort(profits);
+struct setprof_t{
+    setprof_t(const mul_ind_t &i, double p): ind(i), profit(p), size(i.size()) {}
+    setprof_t(const mul_ind_t &i, double p, ind_t _size): ind(i), profit(p), size(_size) {}
+
+    mul_ind_t ind;
+    double profit;
+    ind_t size;
+};
+
+VarSizeList VarSizeList::expand_set(PProfitCalculator profCalc,
+                                    double max_prof, ind_t max_d,
+                                    double **p_profits) const {
+    typedef std::list<setprof_t> ind_mul_ind_t;
+    ind_mul_ind_t ind_set;
+    ind_set.push_back(setprof_t(mul_ind_t(), profCalc->calc_log_prof(mul_ind_t())));
+
+    double cur_prof;
+    ind_mul_ind_t::iterator itrCur = ind_set.begin();
+    while (itrCur != ind_set.end()) {
+        if (itrCur->size < max_d) {
+            mul_ind_t cur_ind = itrCur->ind;
+            ind_set.push_back(setprof_t(cur_ind, -1, itrCur->size+1));
+
+            ind_t cur_size = itrCur->size;
+            cur_ind.step(cur_size);
+            while ((cur_prof=profCalc->calc_log_prof(cur_ind)) <= max_prof){
+                ind_set.push_back(setprof_t(cur_ind, cur_prof));
+                cur_ind.step(cur_size);
+            }
+            // if (added > 0)  // This assumes that dimensions are ordered!
+
+        }
+        // If this iterator has negative profit it means it's temporary and
+        //  can be deleted safely (since all derivatives are already added)
+        if (itrCur->profit < 0)
+            itrCur = ind_set.erase(itrCur); // erase returns the next iterator
+        else
+            itrCur++;
+    }
+
+    ind_set.sort([](const setprof_t& first, const setprof_t& second)
+                 {return first.profit < second.profit; });
+
+    if (p_profits)
+        *p_profits = static_cast<double*>(malloc(sizeof(double) * ind_set.size()));
+
+    uint32 i=0;
+    VarSizeList ret;
+    for (auto itr=ind_set.begin();itr!=ind_set.end();itr++){
+        ret.push_back_unsafe(itr->ind);
+        if (p_profits)
+            (*p_profits)[i++] = itr->profit;
+    }
+    return ret;
+}
+
+VarSizeList VarSizeList::expand_set(const double *profits, uint32 count,
+                                    uint32 max_added,
+                                    ind_t seedLookahead) const {
+    // Sorted ind lists the indices in order of expansion (of decreasing profit).
+    assert(count == this->count());
+    // std::vector<double> profits(count);
+    // for (size_t i=0;i<profits.size();i++)
+    //     profits[i] = log(work[i]) - log(fabs(error[i]));
+    std::vector<uint32> sorted_ind = argsort(profits, count);
     std::vector<ind_t> bnd_neigh = this->count_neighbors();
 
-#define ADD_IND(ind) if (!this->has_ind(ind)) result.push_back(ind)
     //------------- Calculate outer boundary
     ind_t max_dim = this->max_dim();
-    uint32 added = 0;
-    for (uint32 j=0;j<count && added == 0;j++){
-        uint32 k = sorted_ind[j];   // Start from the least -logprofit
+    VarSizeList new_indices;
+    for (uint32 j=0;j<count && new_indices.count() < max_added;j++) {
+        uint32 k = sorted_ind[j];   // Start from the least -log profit
         if (bnd_neigh[k] < max_dim) {
             // This is a boundary, check all outer indices that are
             // not in the set already
-            added += add_children(this, k, result, max_dim);
+            add_admissible_children(this->get(k),
+                                    max_added,
+                                    new_indices);
         }
     }
 
-    // Expand set where on boundaries where there are exactly errors=0
-    // The idea is that these indices might be a fluke and it is better
-    // to explore these indices
-    std::vector<uint32> sorted_work_ind = argsort(work, count);
-    added = 0;
-    for (uint32 j=0;j<count && added == 0;j++){
-        uint32 k = sorted_work_ind[j];   // Start from the least work
-        if (bnd_neigh[k] < max_dim && error[k] == 0.0) {
-            added += add_children(this, k, result, 1);
-        }
-    }
+    // // Expand set on boundaries where there are exactly errors=0
+    // // The idea is that these indices might be a fluke and it is better
+    // // to explore these indices
+    // for (uint32 j=0;j<count && added == 0;j++){
+    //     uint32 k = sorted_work_ind[j];   // Start from the least work
+    //     if (bnd_neigh[k] < max_dim && error[k] == 0.0) {
+    //         added += add_children(this, k, 1);
+    //     }
+    // }
 
     // Now add at least seedLookahead + base element
+#define ADD_IND(ind) if (!this->has_ind(ind) && !new_indices.has_ind(ind)) \
+    { new_indices.push_back_unsafe(ind); }
+
     mul_ind_t cur;  // Set all to zeros
     ADD_IND(cur);
     if (!seedLookahead)
-        return result;
-
+        return new_indices;
     if (max_dim < seedLookahead)
     {
         uint32 diff = static_cast<uint32>(seedLookahead-max_dim);
@@ -279,7 +339,7 @@ VarSizeList VarSizeList::expand_set(const double *error,
             cur.step(i, -1);
         }
     }
-    for (ind_t i=0;i<seedLookahead;i++){
+    for (ind_t i=0;i<seedLookahead;i++) {
         // Count number of elements with exactly size=max_dim-i
         uint32 count = 0;
         for (auto itr=m_ind_set.begin();itr!=m_ind_set.end();itr++)
@@ -297,7 +357,7 @@ VarSizeList VarSizeList::expand_set(const double *error,
         }
     }
 #undef ADD_CUR
-    return result;
+    return new_indices;
 }
 
 bool VarSizeList::is_ind_admissible(const mul_ind_t& ind) const{
@@ -325,19 +385,24 @@ VarSizeList VarSizeList::set_diff(const VarSizeList& rhs) const {
     return result;
 }
 
-VarSizeList VarSizeList::set_union(const VarSizeList& rhs) const{
-    VarSizeList result = VarSizeList(*this);
-    for (auto itr=rhs.m_ind_set.begin();itr!=rhs.m_ind_set.end();itr++)
-        if (!result.has_ind(*itr))
-            result.push_back(*itr);
-    return result;
+void VarSizeList::set_union(const VarSizeList& rhs,
+                            uint32* new_index) {
+    uint32 i=0;
+    for (auto itr=rhs.m_ind_set.begin();itr!=rhs.m_ind_set.end();itr++, i++){
+        uint32 ind;
+        if (!this->find_ind(*itr, ind)){
+            this->push_back_unsafe(*itr);
+            ind = this->count()-1;
+        }
+        if (new_index) new_index[i] = ind;
+    }
 }
 
 
-void VarSizeList::get_adaptive_order(const double *error,
-                                     const double *work,
+void VarSizeList::get_adaptive_order(const double *profits,
                                      uint32 *adaptive_order,
                                      uint32 count,
+                                     uint32 max_added,
                                      ind_t seedLookahead) const
 {
     // Start with an empty index
@@ -347,27 +412,26 @@ void VarSizeList::get_adaptive_order(const double *error,
 
     VarSizeList curList;
     uint32 cur_order = 1;
-    std::vector<double> error_in_set;
-    std::vector<double> work_in_set;
+    std::vector<double> profits_in_set;
     while (1){
-        VarSizeList newList = curList.expand_set(&error_in_set[0],
-                                                 &work_in_set[0],
-                                                 curList.count(),
-                                                 seedLookahead);
+        size_t prev_count = curList.count();
+        curList.set_union(curList.expand_set(&profits_in_set[0],
+                                             curList.count(),
+                                             max_added, seedLookahead), NULL);
         bool all_found = true;
-        for (auto itr=newList.m_ind_set.begin();itr!=newList.m_ind_set.end();itr++){
+        for (auto itr=curList.m_ind_set.begin()+prev_count;
+             itr!=curList.m_ind_set.end();
+             itr++){
             uint32 ii;
             if (!this->find_ind(*itr, ii)){
                 all_found = false;
                 break;
             }
             adaptive_order[ii] = cur_order;
-            error_in_set.push_back(error[ii]);
-            work_in_set.push_back(work[ii]);
+            profits_in_set.push_back(profits[ii]);
         }
         if (!all_found)
             break;
-        curList = curList.set_union(newList);
         cur_order++;
     }
 }
@@ -418,7 +482,7 @@ double VarSizeList::estimate_bias(const double *err_contributions,
                                   uint32 count,
                                   const double *rates, uint32 rates_size) const {
     ind_t max_d = this->max_dim();
-    assert(count >= this->count && rates_size >= max_d);
+    assert(count >= this->count() && rates_size >= max_d);
     std::vector<ind_t> bnd_neigh = this->count_neighbors();
 
     std::map<mul_ind_t, double> map_contrib;
@@ -442,9 +506,35 @@ double VarSizeList::estimate_bias(const double *err_contributions,
             }
         }
     }
+    if (!map_contrib.size())
+        return std::numeric_limits<double>::infinity();
     double bias=0;
     for (auto itr=map_contrib.begin();itr!=map_contrib.end();itr++){
         bias += itr->second;
     }
     return bias;
+}
+
+VarSizeList VarSizeList::reduce_set(const ind_t *keep_dim, ind_t keep_dim_count,
+                                    uint32* out_indices,
+                                    uint32 out_indices_count) const {
+    assert(out_indices_count >= count());
+
+    VarSizeList new_list;
+    for (auto itr=m_ind_set.begin();itr!=m_ind_set.end();itr++)
+    {
+        mul_ind_t::const_iterator ind_itr;
+        mul_ind_t new_ind = itr->sub_index(keep_dim, keep_dim_count);
+
+        uint32 index;
+        if (new_list.find_ind(new_ind, index)){
+            // Already added
+            out_indices[itr-m_ind_set.begin()] = index;
+        }
+        else{
+            new_list.push_back(new_ind);
+            out_indices[itr-m_ind_set.begin()] = new_list.count()-1;
+        }
+    }
+    return new_list;
 }

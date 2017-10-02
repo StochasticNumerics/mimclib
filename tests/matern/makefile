@@ -13,6 +13,10 @@ _matern.so: matern.o common.o
 matern.o: matern.cpp
 	${PETSC_COMPILE_SINGLE} -fPIC  -rdynamic $< ${DEBUG}
 
+
+# _optimal_leg_pts.so: optimal_leg_pts.cpp
+# 	g++ -fPIC -Wall -std=c++11 -I../../mimclib/libsetutil/src/ -shared -Wl,-soname,$@ -o $@ $^
+
 include ${PETSC_DIR}/lib/petsc/conf/variables
 include ${PETSC_DIR}/lib/petsc/conf/rules
 #include ${PETSC_DIR}/conf/rules
