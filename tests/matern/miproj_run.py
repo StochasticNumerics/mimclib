@@ -117,7 +117,7 @@ class MyRun:
             SField_Matern.Init()
             self.sf = SField_Matern(run.params)
 
-        run.setFunctions(ExtendLvls=lambda lvls, r=run: self.extendLvls(run, lvls),
+        run.setFunctions(ExtendLvls=lambda r=run: self.extendLvls(run),
                          fnNorm=lambda arr: np.array([x.norm() for x in arr]))
 
         self.profit_calc = None
@@ -150,7 +150,8 @@ class MyRun:
         else:
             assert run.params.miproj_set == 'adaptive' or run.params.miproj_set == 'apriori-adapt'
 
-    def extendLvls(self, run, lvls):
+    def extendLvls(self, run):
+        lvls = run.last_itr.get_lvls()
         max_added = None
         if run.params.miproj_set == 'apriori' or run.params.miproj_set == 'apriori-adapt':
             max_dim = run.params.min_dim+1
@@ -161,7 +162,7 @@ class MyRun:
                                             max_dim))
         if self.profit_calc is None:
             # Adaptive
-            error = run.fn.Norm(run.last_itr.calcDeltaEl())
+            error = run.fn.Norm(run.last_itr.calcEl())
             if run.params.miproj_time:
                 work = run.last_itr.calcTl()
             else:
@@ -209,8 +210,8 @@ class MyRun:
 
         migrp = parser.add_argument_group('miproj', 'Arguments to control projection')
         pre = '-miproj_'
-        migrp.add_argument(pre + "double_work", type="bool",
-                           default=False, action="store")
+        migrp.add_argument(pre + "double_work",
+                           default=False, action="store_true")
         migrp.add_argument(pre + "set", type=str, default="adaptive",
                            action="store")
         migrp.add_argument(pre + "set_xi", type=float, default=2.,
@@ -229,13 +230,15 @@ class MyRun:
                            action="store")
         migrp.add_argument(pre + "pts_sampler", type=str,
                            default="optimal", action="store")
-        migrp.add_argument(pre + "reuse_samples", type="bool",
-                           default=True, action="store")
+        migrp.add_argument(pre + "discard_samples",
+                           dest="miproj_reuse_samples",
+                           default=True,
+                           action="store_false")
         migrp.add_argument(pre + "fix_lvl", type=int, default=3, action="store")
         migrp.add_argument(pre + "min_vars", type=int, default=10, action="store")
         migrp.add_argument(pre + "max_vars", type=int, default=10**6, action="store")
         migrp.add_argument(pre + "max_lvl", type=int, default=1000, action="store")
-        migrp.add_argument(pre + "time", type="bool", default=False, action="store")
+        migrp.add_argument(pre + "time", default=False, action="store_true")
 
 
     def ItrDone(self, db, run_id, run):
@@ -244,7 +247,7 @@ class MyRun:
             db.writeRunData(run_id, run,
                             iteration_idx=len(run.iters)-1)
         self.proj.user_data = []
-
+        return True
 
 if __name__ == "__main__":
     from mimclib import ipdb

@@ -2,19 +2,20 @@
 
 # make
 # rm -f data.sql
-VERBOSE="-db False -mimc_verbose 1 "
+VERBOSE="-db -mimc_verbose 1 "
 SEL_CMD="$1"
 EXAMPLE="$2"
 if [ -z "$EXAMPLE" ]; then
     EXAMPLE='sf-kink'
 fi
-DB_CONN='-db_engine mysql -db_name mimc -db_host 129.67.187.118 '
+#DB_CONN='-db_engine mysql -db_name mimc -db_host 129.67.187.118 '
+DB_CONN='-db_engine sqlite -db_name miproj.sqlite '
 BASETAG="$EXAMPLE-"
 COMMON="-qoi_seed 0 -ksp_rtol 1e-15 -ksp_type gmres  $DB_CONN "
 EST_CMD="python miproj_esterr.py $COMMON "
 RUN_CMD="OPENBLAS_NUM_THREADS=1 python miproj_run.py -qoi_example $EXAMPLE \
        -mimc_TOL 0 -qoi_seed 0 -mimc_gamma 1 -mimc_h0inv 3 \
-       -miproj_reuse_samples True $VERBOSE $COMMON "
+       -mimc_bias_calc setutil  $VERBOSE $COMMON "
 
 function run_cmd {
     echo  $RUN_CMD -miproj_max_lvl $3 \
@@ -76,16 +77,16 @@ fi;
 
 if [ "$EXAMPLE" = "sf-kink" ]; then
     CMN='-qoi_sigma -1 -mimc_beta 1.4142135623730951 -qoi_scale 0.5 '
-    for N in 2
+    for N in 2 4 6
     do
         max_lvl=12
 	    ALPHA=3.
 	    THETA=`echo "$N/2" | bc -l`
 
-        # all_cmds "-td-theory" 2 $max_lvl $N -miproj_max_vars $N \
-        #          -miproj_s_alpha $ALPHA -miproj_s_proj_sample_ratio 0. \
-        #          -miproj_s_theta $THETA -miproj_d_beta 1. -miproj_d_gamma 1. \
-        #          -miproj_set apriori -mimc_min_dim 1 $CMN  -miproj_double_work True
+        all_cmds "-td-theory" 2 $max_lvl $N -miproj_max_vars $N \
+                 -miproj_s_alpha $ALPHA -miproj_s_proj_sample_ratio 0. \
+                 -miproj_s_theta $THETA -miproj_d_beta 1. -miproj_d_gamma 1. \
+                 -miproj_set apriori -mimc_min_dim 1 $CMN  -miproj_double_work True
 
         all_cmds "-adapt" 2 $max_lvl $N -miproj_max_vars $N \
                  -miproj_s_proj_sample_ratio 0. -miproj_set_maxadd 1 \
@@ -94,6 +95,7 @@ if [ "$EXAMPLE" = "sf-kink" ]; then
         # all_cmds "-adapt-time" 2 $max_lvl $N -miproj_max_vars $N \
         #          -miproj_s_proj_sample_ratio 0. -miproj_set_maxadd 1 \
         #          -miproj_time True -miproj_set apriori-adapt -mimc_min_dim 1 $CMN
+
         # all_cmds "-noproj" 2 $max_lvl $N -miproj_max_vars $N \
         #          -miproj_s_alpha $ALPHA -miproj_s_proj_sample_ratio 0. \
         #          -miproj_set apriori -mimc_min_dim 1 $CMN  -miproj_double_work True

@@ -124,6 +124,13 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
 
 CREATE VIEW vw_lvls AS SELECT iter_id, lvl, active, El, Vl, tT, tW, Ml FROM tbl_lvls;
 
+CREATE VIEW vw_run_sum AS SELECT vw_runs.run_id, tag,
+TRUNCATE(TIMESTAMPDIFF(SECOND, vw_runs.creation_date,
+        max(vw_iters.creation_date))/3600., 4) as "wall time (hours)",
+TRUNCATE(sum(vw_iters.totalTime) / 3600., 4) as "totTime (hours)",
+min(vw_iters.TOL) as minTOL from vw_runs INNER JOIN vw_iters on
+vw_iters.run_id=vw_runs.run_id GROUP BY vw_runs.run_id, tag;
+
 -- CREATE USER 'USER'@'%';
 -- GRANT ALL PRIVILEGES ON *.* TO 'USER'@'%' WITH GRANT OPTION;
 '''.format(DBName=db)
@@ -238,6 +245,14 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
 );
 
 CREATE VIEW vw_lvls AS SELECT iter_id, lvl, active, El, Vl, tT, tW, Ml FROM tbl_lvls;
+
+CREATE VIEW vw_run_sum AS SELECT vw_runs.run_id, tag,
+(julianday(max(vw_iters.creation_date))-
+julianday(vw_runs.creation_date))*24.0 as "wall time (hours)",
+sum(vw_iters.totalTime) / 3600 as "totTime (hours)",
+min(vw_iters.TOL) as minTOL from vw_runs INNER JOIN vw_iters on
+vw_iters.run_id=vw_runs.run_id GROUP BY vw_runs.run_id, tag;
+
 '''
         return script
 

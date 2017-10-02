@@ -252,7 +252,7 @@ class MIMCItrData(object):
             return B
         w = self.weights**moment
         slicer = [slice(None)] + [None]*(len(B.shape)-1)
-        return w[slicer] * B
+        return B*w[slicer]
 
     def calcFineCentralMoment(self, moment, weighted=True):
         if self.psums_delta is None:
@@ -262,7 +262,7 @@ class MIMCItrData(object):
             return B
         w = self.weights**moment
         slicer = [slice(None)] + [None]*(len(B.shape)-1)
-        return w[slicer] * B
+        return B*w[slicer]
 
     def calcTl(self):
         idx = self.M != 0
@@ -988,8 +988,6 @@ estimate optimal number of levels"
         L = np.max(ell) - np.min(ell)
         alpha = float(self.params.w[0] * np.log(self.params.beta[0]))
         self.last_itr.weights = np.ones(self.last_itr.lvls_count)
-        from . import ipdb
-        ipdb.embed()
         self.last_itr.weights[self.last_itr.active_lvls >= 0] = calc_ml2r_weights(alpha, L)
 
     def doRun(self, TOLs=None):
@@ -1062,6 +1060,8 @@ estimate optimal number of levels"
                     self._update_active_lvls()
                     # TODO: We might not need newTodoM is some of the
                     # levels are inactive. This is needed for MIMC, not MLMC
+                    if not self.params.reuse_samples:
+                        self.last_itr.zero_samples()
                     samples_added = self._genSamples(newTodoM) or samples_added
 
                 self.Q.theta = self._calcTheta(TOL, self.bias)
@@ -1076,10 +1076,11 @@ estimate optimal number of levels"
                 self.print_debug("Wl: ", self.Wl_estimate)
                 self.print_debug("Vl: ", self.Vl_estimate)
                 self.print_debug("New M: ", todoM)
+
                 if not self.params.reuse_samples:
                     self.last_itr.zero_samples()
-
                 samples_added = self._genSamples(todoM) or samples_added
+
                 self.last_itr.total_time = timer.toc()
                 self.output(verbose=self.params.verbose)
                 self.print_info("------------------------------------------------")

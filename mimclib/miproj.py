@@ -217,7 +217,7 @@ class MIWProjSampler(object):
     def init_mimc_run(self, run):
         run.params.M0 = np.array([0])
         run.params.reuse_samples = False
-        run.params.baysian = False
+        run.params.lsq_est = False
         run.params.moments = 1
 
     def update_index_set(self, lvls):
