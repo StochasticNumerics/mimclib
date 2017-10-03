@@ -11,7 +11,10 @@ import matplotlib.pylab as plt
 from . import mimc
 from matplotlib.ticker import MaxNLocator
 import os
-from matplotlib2tikz import save as tikz_save
+try:
+    from matplotlib2tikz import save as tikz_save
+except:
+    pass
 from . import db as mimcdb
 from . import test
 import argparse
@@ -1668,9 +1671,6 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
         pass   # Ignore
 
     def addExtraArguments(parser):
-        parser.register('type', 'bool', lambda v: v.lower() in ("yes",
-                                                                "true",
-                                                                "t", "1"))
         parser.add_argument("-db_name", type=str, action="store",
                             help="Database Name")
         parser.add_argument("-db_engine", type=str, action="store",
@@ -1689,12 +1689,11 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
                             action="store", help="Output file")
         parser.add_argument("-cmd", type=str, action="store",
                             help="Command to execute after plotting")
-        parser.add_argument("-verbose", type='bool', action="store",
-                            default=False)
+        parser.add_argument("-verbose", default=False, action="store_true")
         parser.add_argument("-filteritr", type=str, action="store",
                             choices=['convergent', 'all', 'last'])
-        parser.add_argument("-relative", type='bool', action="store",
-                            default=True)
+        parser.add_argument("-abs_err", dest='relative',
+                            action="store_false", default=True)
         parser.add_argument("-done_flag", type=int, nargs='+',
                             action="store", default=None)
         parser.add_argument("-qoi_exact_tag", type=str, action="store")
