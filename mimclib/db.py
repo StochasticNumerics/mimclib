@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     UNIQUE KEY idx_run_lvl (iter_id, lvl_hash)
 );
 
-CREATE VIEW vw_lvls AS SELECT iter_id, lvl, active, El, Vl, tT, tW, Ml FROM tbl_lvls;
+CREATE VIEW vw_lvls AS SELECT iter_id, lvl, active, weight, El, Vl, tT, tW, Ml FROM tbl_lvls;
 
 CREATE VIEW vw_run_sum AS SELECT vw_runs.run_id, tag,
 TRUNCATE(TIMESTAMPDIFF(SECOND, vw_runs.creation_date,
@@ -244,7 +244,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     CONSTRAINT idx_run_lvl UNIQUE (iter_id, lvl_hash)
 );
 
-CREATE VIEW vw_lvls AS SELECT iter_id, lvl, active, El, Vl, tT, tW, Ml FROM tbl_lvls;
+CREATE VIEW vw_lvls AS SELECT iter_id, lvl, active, weight, El, Vl, tT, tW, Ml FROM tbl_lvls;
 
 CREATE VIEW vw_run_sum AS SELECT vw_runs.run_id, tag,
 (julianday(max(vw_iters.creation_date))-

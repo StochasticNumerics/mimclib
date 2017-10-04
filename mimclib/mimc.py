@@ -946,18 +946,21 @@ estimate optimal number of levels"
         # X: Control variate      (level 0)
         # Z: Y-X                  (difference)
         # \sqrt{W_Z V_Z} + \sqrt{W_X V_X} \leq \sqrt{W_Y V_Y}
-        deltaWl = self.last_itr.calcWl()
-        deltaVl = self.fn.Norm(self.last_itr.calcVl())
-        fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
-        VW_Z = deltaVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
-        VW_Y = fineVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
-        VW_X = fineVl[self.cur_start_level]*deltaWl[self.cur_start_level]
-        if np.sqrt(VW_Z) + np.sqrt(VW_X) > np.sqrt(VW_Y):
-            # Increase minimum level one at a time.
-            self.cur_start_level += 1
-            self.print_info("New start level", self.cur_start_level)
-            self._update_active_lvls()
-            self._estimateAll()
+        while self.cur_start_level < self.last_itr.lvls_count-1:
+            deltaWl = self.last_itr.calcWl()
+            deltaVl = self.fn.Norm(self.last_itr.calcVl())
+            fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
+            VW_Z = deltaVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
+            VW_Y = fineVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
+            VW_X = fineVl[self.cur_start_level]*deltaWl[self.cur_start_level]
+            if np.sqrt(VW_Z) + np.sqrt(VW_X) > np.sqrt(VW_Y):
+                # Increase minimum level one at a time.
+                self.cur_start_level += 1
+            else:
+                break
+        self.print_info("New start level", self.cur_start_level)
+        self._update_active_lvls()
+        self._estimateAll()
 
     def _update_active_lvls(self):
         if hasattr(self, "cur_start_level"):
@@ -1065,7 +1068,7 @@ estimate optimal number of levels"
                     samples_added = self._genSamples(newTodoM) or samples_added
 
                 self.Q.theta = self._calcTheta(TOL, self.bias)
-                not self._check_levels()
+                self._check_levels()
 
                 todoM = _calcTheoryM(TOL, self.Q.theta,
                                      self.Vl_estimate,
