@@ -948,13 +948,17 @@ estimate optimal number of levels"
         # \sqrt{W_Z V_Z} + \sqrt{W_X V_X} \leq \sqrt{W_Y V_Y}
         while self.cur_start_level < self.last_itr.lvls_count-1:
             deltaWl = self.last_itr.calcWl()
-            deltaVl = self.fn.Norm(self.last_itr.calcVl())
-            fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
+            deltaVl = self.fn.Norm(self.last_itr.calcVl(weighted=False))
+            fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2,
+                                                                      weighted=False))
             VW_Z = deltaVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
             VW_Y = fineVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
             VW_X = fineVl[self.cur_start_level]*deltaWl[self.cur_start_level]
+            # from . import ipdb
+            # ipdb.embed()
             if np.sqrt(VW_Z) + np.sqrt(VW_X) > np.sqrt(VW_Y):
                 # Increase minimum level one at a time.
+                self.print_debug("sqrt(VW_Z)+sqrt(VW_X) > sqrt(VW_Y): {} > {}".format(np.sqrt(VW_Z) + np.sqrt(VW_X), np.sqrt(VW_Y)))
                 self.cur_start_level += 1
             else:
                 break

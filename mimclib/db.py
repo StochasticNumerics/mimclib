@@ -128,7 +128,7 @@ CREATE VIEW vw_run_sum AS SELECT vw_runs.run_id, tag,
 TRUNCATE(TIMESTAMPDIFF(SECOND, vw_runs.creation_date,
         max(vw_iters.creation_date))/3600., 4) as "wall time (hours)",
 TRUNCATE(sum(vw_iters.totalTime) / 3600., 4) as "totTime (hours)",
-min(vw_iters.TOL) as minTOL from vw_runs INNER JOIN vw_iters on
+min(vw_iters.TOL) as minTOL from vw_runs LEFT JOIN vw_iters on
 vw_iters.run_id=vw_runs.run_id GROUP BY vw_runs.run_id, tag;
 
 -- CREATE USER 'USER'@'%';
@@ -338,6 +338,7 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 if prev_iter is not None:
                     if k < prev_iter.lvls_count:
                         if prev_iter.active_lvls[k] == iteration.active_lvls[k] and \
+                           prev_iter.weights[k] == iteration.weights[k] and \
                            np.all(prev_iter.psums_delta[k, :] == iteration.psums_delta[k, :]) and \
                            np.all(prev_iter.psums_fine[k, :] == iteration.psums_fine[k, :]) and \
                            np.all(np.array(lvl_data[1:]) ==
