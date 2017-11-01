@@ -122,13 +122,13 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     UNIQUE KEY idx_run_lvl (iter_id, lvl_hash)
 );
 
-CREATE VIEW vw_lvls AS SELECT iter_id, lvl, active, El, Vl, tT, tW, Ml FROM tbl_lvls;
+CREATE VIEW vw_lvls AS SELECT iter_id, lvl, active, weight, El, Vl, tT, tW, Ml FROM tbl_lvls;
 
 CREATE VIEW vw_run_sum AS SELECT vw_runs.run_id, tag,
 TRUNCATE(TIMESTAMPDIFF(SECOND, vw_runs.creation_date,
         max(vw_iters.creation_date))/3600., 4) as "wall time (hours)",
 TRUNCATE(sum(vw_iters.totalTime) / 3600., 4) as "totTime (hours)",
-min(vw_iters.TOL) as minTOL from vw_runs INNER JOIN vw_iters on
+min(vw_iters.TOL) as minTOL from vw_runs LEFT JOIN vw_iters on
 vw_iters.run_id=vw_runs.run_id GROUP BY vw_runs.run_id, tag;
 
 -- CREATE USER 'USER'@'%';
@@ -244,7 +244,7 @@ CREATE TABLE IF NOT EXISTS tbl_lvls (
     CONSTRAINT idx_run_lvl UNIQUE (iter_id, lvl_hash)
 );
 
-CREATE VIEW vw_lvls AS SELECT iter_id, lvl, active, El, Vl, tT, tW, Ml FROM tbl_lvls;
+CREATE VIEW vw_lvls AS SELECT iter_id, lvl, active, weight, El, Vl, tT, tW, Ml FROM tbl_lvls;
 
 CREATE VIEW vw_run_sum AS SELECT vw_runs.run_id, tag,
 (julianday(max(vw_iters.creation_date))-
@@ -338,6 +338,7 @@ VALUES(datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 if prev_iter is not None:
                     if k < prev_iter.lvls_count:
                         if prev_iter.active_lvls[k] == iteration.active_lvls[k] and \
+                           prev_iter.weights[k] == iteration.weights[k] and \
                            np.all(prev_iter.psums_delta[k, :] == iteration.psums_delta[k, :]) and \
                            np.all(prev_iter.psums_fine[k, :] == iteration.psums_fine[k, :]) and \
                            np.all(np.array(lvl_data[1:]) ==
@@ -366,7 +367,8 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
 
         with self.connect() as cur:
             runAll = cur.execute(
-                        '''SELECT r.run_id, r.params, r.TOL, r.comment, r.fn, r.tag, r.totalTime
+                        '''SELECT r.run_id, r.params, r.TOL, r.comment, r.fn, r.tag, r.totalTime,
+r.creation_date
                         FROM tbl_runs r WHERE r.run_id in ?''', [run_ids]).fetchall()
             iterAll = cur.execute('''
 SELECT dr.run_id, dr.iter_id, dr.TOL, dr.creation_date,
@@ -401,6 +403,7 @@ ORDER BY dr.run_id, dr.iteration_idx
             run.db_data.comment = run_data[3]
             run.db_data.tag = run_data[5]
             run.db_data.total_time = run_data[6]
+            run.db_data.creation_date = run_data[7]
             run.db_data.run_id = run_data[0]
 
             run.setFunctions(**_unpickle(run_data[4], load=dill.load))

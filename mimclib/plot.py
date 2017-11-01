@@ -11,7 +11,10 @@ import matplotlib.pylab as plt
 from . import mimc
 from matplotlib.ticker import MaxNLocator
 import os
-from matplotlib2tikz import save as tikz_save
+try:
+    from matplotlib2tikz import save as tikz_save
+except:
+    pass
 from . import db as mimcdb
 from . import test
 import argparse
@@ -107,7 +110,7 @@ class FunctionLine2D(plt.Line2D):
         self.fn = self.orig_fn
         data = kwargs.pop('data', None)
         log_data = kwargs.pop('log_data', True)
-        if data is not None:
+        if data is not None and data.shape[1] > 0:
             self.set_data(data, log_data)
 
         super(FunctionLine2D, self).__init__([], [], *args, **kwargs)
@@ -1140,6 +1143,8 @@ def plotTimeVsTOL(ax, runs, *args, **kwargs):
            fnMCWork(r, itr) * r.estimateMonteCarloSampleCount(itr.TOL)
            * tol2_scale(itr.TOL)]
           for i, r, itr in enum_iter_i(runs, filteritr)]
+    if len(xy) == 0:
+        return np.array([]).reshape(2, 0), []
 
     plotObj = []
     TOLs, times = __get_stats(xy)
@@ -1194,6 +1199,8 @@ def plotLvlsNumVsTOL(ax, runs, *args, **kwargs):
     summary = np.array(summary)
 
     a = summary
+    if len(a) == 0:
+        return None, []
     b = np.ascontiguousarray(a).view(np.dtype((np.void, a.dtype.itemsize * a.shape[1])))
     _, idx = np.unique(b, return_index=True)
     unique_a = a[idx]
@@ -1441,7 +1448,7 @@ def genBooklet(runs, filteritr=None, input_args=dict(),
     mpl.rc('text', usetex=True)
     mpl.rc('font', **{'family': 'normal', 'weight': 'demibold',
                       'size': 15})
-    plt.rc('text.latex', preamble=r'\providecommand{\tol}{\ensuremath{\varepsilon}}')
+    mpl.rc('text.latex', preamble=r'\providecommand{\tol}{\ensuremath{\varepsilon}}')
 
     figures = []
     def add_fig():
@@ -1668,9 +1675,6 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
         pass   # Ignore
 
     def addExtraArguments(parser):
-        parser.register('type', 'bool', lambda v: v.lower() in ("yes",
-                                                                "true",
-                                                                "t", "1"))
         parser.add_argument("-db_name", type=str, action="store",
                             help="Database Name")
         parser.add_argument("-db_engine", type=str, action="store",
@@ -1689,12 +1693,11 @@ def run_plot_program(fnPlot=genBooklet, fnExactErr=None, **kwargs):
                             action="store", help="Output file")
         parser.add_argument("-cmd", type=str, action="store",
                             help="Command to execute after plotting")
-        parser.add_argument("-verbose", type='bool', action="store",
-                            default=False)
+        parser.add_argument("-verbose", default=False, action="store_true")
         parser.add_argument("-filteritr", type=str, action="store",
                             choices=['convergent', 'all', 'last'])
-        parser.add_argument("-relative", type='bool', action="store",
-                            default=True)
+        parser.add_argument("-abs_err", dest='relative',
+                            action="store_false", default=True)
         parser.add_argument("-done_flag", type=int, nargs='+',
                             action="store", default=None)
         parser.add_argument("-qoi_exact_tag", type=str, action="store")

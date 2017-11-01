@@ -407,17 +407,17 @@ class MIMCItrData(object):
             columns.append([title, fmt, value_fmt, fn])
 
         add_column("Level", "<8", "<8", lambda i: str(self.lvls_get(i)))
-        add_column("E", "^20", ">20.12e", lambda i: E[i])
+        add_column("E", "<10", "<10.4e", lambda i: E[i])
         if has_var:
-            add_column("V", "^20", ">20.12e", lambda i: V[i])
-            add_column("fineV", "^20", ">20.12e", lambda i: V_fine[i])
-            add_column("DeltaV", "^20", ">20.12e", lambda i: V_sample[i])
-        add_column("W", "^20", ">20.12e", lambda i: Wl[i])
-        add_column("M", "^8", ">8", lambda i: self.M[i])
-        add_column("Time", "^15", ">15.6e", lambda i: T[i])
+            add_column("V", "<10", "<10.4e", lambda i: V[i])
+            add_column("fineV", "<10", "<10.4e", lambda i: V_fine[i])
+            add_column("DeltaV", "<10", "<10.4e", lambda i: V_sample[i])
+        add_column("W", "<10", "<10.4e", lambda i: Wl[i])
+        add_column("M", "<8", "<8", lambda i: self.M[i])
+        add_column("Time", "<15", "<15.4e", lambda i: T[i])
 
-        header_fmt = "".join(sum([["{:", c[1], "}"] for c in columns], [])) + "\n"
-        value_fmt = "".join(sum([["{:", c[2], "}"] for c in columns], [])) + "\n"
+        header_fmt = "_|_".join(["{{:_{}}}".format(c[1]) for c in columns]) + "\n"
+        value_fmt = " | ".join(["{{:{}}}".format(c[2]) for c in columns]) + "\n"
 
         output = header_fmt.format(*[c[0] for c in columns])
 
@@ -718,19 +718,19 @@ Not needed if fnHierarchy is provided.")
         output = ''
         if verbose >= VERBOSE_INFO:
             output += '''Eg             = {}
-Bias           = {:.12g} | {:.12g}
-Stat. err      = {:.12g} | {:.12g}
-Error est.     = {:.12g} | {:.12g}
-Iteration Work = {:.12g}
-Iteration Time = {:.12g}
-TotalTime      = {:.12g}
+Bias           = {:.4e} | {:.4e}
+Stat. err      = {:.4e} | {:.4e}
+Error est.     = {:.4e} | {:.4e}
+Iteration Work = {:.4e}
+Iteration Time = {:.4e}
+TotalTime      = {:.4e}
 max_lvl        = {}
 '''.format(str(self.last_itr.calcEg()),
            self.bias, (1-self.params.theta) * self.last_itr.TOL,
            self.stat_error, self.params.theta * self.last_itr.TOL,
            self.total_error_est, self.last_itr.TOL,
            self.last_itr.calcTotalWork(),
-           self.last_itr.total_time,
+           self.last_itr.calcTotalTime(),
            self.iter_total_times[-1],
            self.last_itr._lvls.to_sparse_matrix().max(axis=0).todense())
 
@@ -946,18 +946,28 @@ estimate optimal number of levels"
         # X: Control variate      (level 0)
         # Z: Y-X                  (difference)
         # \sqrt{W_Z V_Z} + \sqrt{W_X V_X} \leq \sqrt{W_Y V_Y}
-        deltaWl = self.last_itr.calcWl()
-        deltaVl = self.fn.Norm(self.last_itr.calcVl())
-        fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2))
-        VW_Z = deltaVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
-        VW_Y = fineVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
-        VW_X = fineVl[self.cur_start_level]*deltaWl[self.cur_start_level]
-        if np.sqrt(VW_Z) + np.sqrt(VW_X) > np.sqrt(VW_Y):
-            # Increase minimum level one at a time.
-            self.cur_start_level += 1
+        changed = False
+        while self.cur_start_level < self.last_itr.lvls_count-1:
+            deltaWl = self.last_itr.calcWl()
+            deltaVl = self.fn.Norm(self.last_itr.calcVl(weighted=False))
+            fineVl = self.fn.Norm(self.last_itr.calcFineCentralMoment(moment=2,
+                                                                      weighted=False))
+            VW_Z = deltaVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
+            VW_Y = fineVl[self.cur_start_level+1]*deltaWl[self.cur_start_level+1]
+            VW_X = fineVl[self.cur_start_level]*deltaWl[self.cur_start_level]
+            # from . import ipdb
+            # ipdb.embed()
+            if np.sqrt(VW_Z) + np.sqrt(VW_X) > np.sqrt(VW_Y):
+                # Increase minimum level one at a time.
+                self.print_debug("sqrt(VW_Z)+sqrt(VW_X) > sqrt(VW_Y): {} > {}".format(np.sqrt(VW_Z) + np.sqrt(VW_X), np.sqrt(VW_Y)))
+                self.cur_start_level += 1
+                changed = True
+            else:
+                break
+        if changed:
             self.print_info("New start level", self.cur_start_level)
-            self._update_active_lvls()
-            self._estimateAll()
+        self._update_active_lvls()
+        self._estimateAll()
 
     def _update_active_lvls(self):
         if hasattr(self, "cur_start_level"):
@@ -1065,7 +1075,7 @@ estimate optimal number of levels"
                     samples_added = self._genSamples(newTodoM) or samples_added
 
                 self.Q.theta = self._calcTheta(TOL, self.bias)
-                not self._check_levels()
+                self._check_levels()
 
                 todoM = _calcTheoryM(TOL, self.Q.theta,
                                      self.Vl_estimate,

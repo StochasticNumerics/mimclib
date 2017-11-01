@@ -2,14 +2,23 @@
 
 MIMClib is open source library for UQ problems written mainly in Python.
 The library aims to give the user an easy to use, customizable and extendable
-library to solve a wide class of stochastic problems subject to 
+library to solve a wide class of stochastic problems subject to
 error tolerance efficiently.
 
 ## Installing
 
+### On a cluster
+Make sure you have `pip` then run `make pip` to install the library locally.
+Most likely, you will need mysql_config to be installed from [here](https://dev.mysql.com/downloads/connector/c/).
+You [might](https://stackoverflow.com/questions/43543483/pip-install-mysql-python-fails-with-indexerror#44309407)
+also need to change a line in `\bin\mysql_config` from
+`Libs = " $ libs   -l"`
+to
+`Libs = "$ libs -lmysqlclient -lssl -lcrypto"`
+
 ### On a GNU/Linux system
 
-1. Install Dependencies: python-pip (version 6 or greater) mysql-server mysql-client libmysqlclient-dev build-essential ipython libpng-dev libfreetype6-dev libxft-dev libpython-dev liblapack-dev libblas-dev gfortran parallel numpy matplotlib scipy mysql-python (Package names may be slightly different in your particular platform) 
+1. Install Dependencies: python-pip (version 6 or greater) mysql-server mysql-client libmysqlclient-dev build-essential ipython libpng-dev libfreetype6-dev libxft-dev libpython-dev liblapack-dev libblas-dev gfortran parallel numpy matplotlib scipy mysql-python (Package names may be slightly different in your particular platform)
 2. Clone this repository `https://github.com/StochasticNumerics/mimclib.git`
 3. In the downloaded folder run `make` and `make pip`
 4. Create the database `python -c 'from mimclib.db import MIMCDatabase; print MIMCDatabase().DBCreationScript();' | mysql -u root -p`
@@ -62,7 +71,7 @@ being stored in the database with identical tags.
 Following the example in
 [tests/gbm](https://github.com/StochasticNumerics/mimclib/tree/master/tests/gbm),
 you can copy the example directory
-and generate your own ideas based on that. You can replace the 
+and generate your own ideas based on that. You can replace the
 function
 [mySampleQoI](https://github.com/StochasticNumerics/mimclib/blob/master/tests/gbm/mimc_run.py#L65)
 in
@@ -110,6 +119,3 @@ Code in this repository is released under
 ## References
 
 [Multi Index Monte Carlo: When Sparsity Meets Sampling](http://link.springer.com/article/10.1007/s00211-015-0734-5)
-
-
-
