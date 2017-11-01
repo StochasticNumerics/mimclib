@@ -367,7 +367,8 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
 
         with self.connect() as cur:
             runAll = cur.execute(
-                        '''SELECT r.run_id, r.params, r.TOL, r.comment, r.fn, r.tag, r.totalTime
+                        '''SELECT r.run_id, r.params, r.TOL, r.comment, r.fn, r.tag, r.totalTime,
+r.creation_date
                         FROM tbl_runs r WHERE r.run_id in ?''', [run_ids]).fetchall()
             iterAll = cur.execute('''
 SELECT dr.run_id, dr.iter_id, dr.TOL, dr.creation_date,
@@ -402,6 +403,7 @@ ORDER BY dr.run_id, dr.iteration_idx
             run.db_data.comment = run_data[3]
             run.db_data.tag = run_data[5]
             run.db_data.total_time = run_data[6]
+            run.db_data.creation_date = run_data[7]
             run.db_data.run_id = run_data[0]
 
             run.setFunctions(**_unpickle(run_data[4], load=dill.load))
